@@ -159,6 +159,72 @@ def parse_fight_details(tag):
             'link': fighter2_link
         }
     }
+    
+import re
+
+# Words that reliably appear in event titles across orgs
+TITLE_HINTS = re.compile(r'\b(UFC|Fight Night|Bellator|PFL|Contender|Invicta|One|Cage|LFA)\b', re.I)
+
+def get_event_title(soup):
+    # 1) Direct CSS selector (works even if other classes are added)
+    h = soup.select_one('h1.text-tap_3, h2.text-tap_3')
+    if h and (txt := h.get_text(strip=True)):
+        return txt
+
+    # 2) Any h1/h2 that *includes* the class (subset match, order-agnostic)
+    for tag in soup.find_all(['h1', 'h2']):
+        classes = tag.get('class', [])
+        if classes and 'text-tap_3' in classes:
+            txt = tag.get_text(strip=True)
+            if txt:
+                return txt
+
+    # 3) Heuristic: bold, centered headline often used for the title
+    h = soup.select_one('h1.font-bold.text-center, h2.font-bold.text-center')
+    if h and (txt := h.get_text(strip=True)):
+        return txt
+
+    # 4) Regex on the text itself (catches variant tags/structures)
+    h = soup.find(['h1', 'h2'], string=lambda s: s and TITLE_HINTS.search(s))
+    if h and (txt := h.get_text(strip=True)):
+        return txt
+
+    # 5) OG meta as a reliable fallback
+    og = soup.find('meta', property='og:title')
+    if og and og.get('content'):
+        return og['content'].strip()
+
+    # 6) <title> tag last resort
+    if soup.title and soup.title.string:
+        return soup.title.string.strip()
+
+    return None
+
+def get_event_date_location(soup):
+    date, location = None, None
+
+    # 1) Grab all list items under the event details list
+    details = soup.select("ul[data-controller='unordered-list-background'] li")
+
+    for li in details:
+        label = li.find("span", class_="font-bold")
+        value = li.find("span", class_="text-neutral-700")
+
+        if not label or not value:
+            continue
+
+        label_text = label.get_text(strip=True).lower()
+
+        # Match "date/time"
+        if "date" in label_text:
+            date = value.get_text(" ", strip=True)
+
+        # Match "location"
+        elif "location" in label_text:
+            location = value.get_text(" ", strip=True)
+
+    return date, location
+
 
 
 base_url = "https://www.tapology.com"
@@ -177,11 +243,22 @@ for event_tag in soup.select('a[href^="/fightcenter/events/"]'):
         event_url_arr.append(event_url)
 
 # response = requests.get('https://www.tapology.com/fightcenter/events/128190-ufc-319-du-plessis-vs-chimaev', headers=headers)
-# soup = BeautifulSoup(response.text, "html.parser")
-
+# soup = BeautifulSoup(response.text, "html.parser")'
 def get_events_data(event_url):
     response = requests.get(event_url, headers=headers)
     soup = BeautifulSoup(response.text, "html.parser")
+    h2 = soup.find(
+        "h2",
+        class_="text-2xl md:text-2xl text-center font-bold text-tap_3"
+    )
+    title = get_event_title(soup)
+    date, location = get_event_date_location(soup)
+    print(f'date: {date}, location: {location}')
+    print(title)
+    if title != None:
+        return 1
+    return 0
+
     # Loop over each fight block
     sectionFightCard = soup.select('div[id^="sectionFightCard"]')
 
@@ -190,10 +267,15 @@ def get_events_data(event_url):
         fights = section.select('li.border-b.border-dotted.border-tap_6[data-controller="table-row-background"]')
         for fight in fights:
             data12 = parse_fight_details(fight)
+            # return data12
             import pprint
-            pprint.pprint(data12)
-            print('\n\n')
-            
+            # pprint.pprint(data12)
+            # print('\n\n')
+total = 0
+found = 0
 for event in event_url_arr:
     print(f'-----\nEVENT: {event}\n-----\n\n')
-    get_events_data(event)
+    data = get_events_data(event)
+    found += data
+    total+=1
+print(f'Total Events: {total}, Found: {found}')
