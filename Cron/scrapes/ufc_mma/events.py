@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 from .utils import get_event_title, get_event_date_location, ufc_weight_class
 import re
+from datetime import datetime
 
 BASE_URL = "https://www.tapology.com"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
@@ -103,7 +104,6 @@ def parse_fight_details(tag):
     # 📊 Fighter Stats Table
     table = tag.select_one('table#boutComparisonTable')
     rows = table.find_all('tr') if table else []
-    # print(rows)
 
     nickname1, nickname2 = extract_column_data(rows, 'Nickname')
     odds1, odds2 = extract_column_data(rows, 'Betting Odds')
@@ -138,14 +138,24 @@ def parse_fight_details(tag):
         }
     }
 
-def get_all_events(group: str = "ufc", past: bool = False):
-    #fightcenter_url = f"{BASE_URL}/fightcenter?group={group}&schedule=results&page=2 to scrape even more past events, you could go on for so long and get so much fucking data to work with"
+def is_future_event(date_str: str) -> bool:
+    # Parse only the date portion
+    dt = datetime.strptime(date_str, "%A %m.%d.%Y at %I:%M %p ET")
+    today = datetime.today()
+    
+    # Compare by date only (ignore time)
+    return dt.date() >= today.date()
+
+def get_all_events(group: str = "ufc", past: bool = False, page: int = 1):
     if past:
-        fightcenter_url = f"{BASE_URL}/fightcenter?group={group}&schedule=results"
+        fightcenter_url = f"{BASE_URL}/fightcenter?group={group}&schedule=results&page={page}"
     else:
         fightcenter_url = f"{BASE_URL}/fightcenter?group={group}&schedule=upcoming"
     response = requests.get(fightcenter_url, headers=HEADERS)
     soup = BeautifulSoup(response.text, "html.parser")
+    with open("t_p1.txt", "w", encoding="utf-8") as f:
+        f.write(soup.prettify())   # prettify makes it formatted nicely
+
 
     urls = []
     for tag in soup.select('a[href^="/fightcenter/events/"]'):
@@ -154,26 +164,38 @@ def get_all_events(group: str = "ufc", past: bool = False):
             urls.append(url)
     return urls
 
-def get_event_data(event_url: str):
+def get_event_data(event_url: str, getting_old_data: bool):
     response = requests.get(event_url, headers=HEADERS)
     soup = BeautifulSoup(response.text, "html.parser")
-
+    
     title = get_event_title(soup)
     date, location = get_event_date_location(soup)
 
-    fights = []
-    section_cards = soup.select('div[id^="sectionFightCard"]')
-    for section in section_cards:
-        fight_tags = section.select(
-            'li.border-b.border-dotted.border-tap_6[data-controller="table-row-background"]'
-        )
-        for fight in fight_tags:
-            fights.append(parse_fight_details(fight))
+    def get_data():
+        fights = []
+        section_cards = soup.select('div[id^="sectionFightCard"]')
+        for section in section_cards:
+            fight_tags = section.select(
+                'li.border-b.border-dotted.border-tap_6[data-controller="table-row-background"]'
+            )
+            for fight in fight_tags:
+                fights.append(parse_fight_details(fight))
 
-    return {
-        "url": event_url,
-        "title": title,
-        "date": date,
-        "location": location,
-        "fights": fights,
-    }
+        return {
+            "url": event_url,
+            "title": title,
+            "date": date,
+            "location": location,
+            "fights": fights,
+        }
+    if date is None:
+        return
+    is_future_event_bool = is_future_event(date)
+    if getting_old_data == False and is_future_event_bool == True:
+        return get_data()
+    if getting_old_data == False and is_future_event_bool == False:
+        return
+    if getting_old_data == True and is_future_event_bool == True:
+        return
+    return get_data()
+        
