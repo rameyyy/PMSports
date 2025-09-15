@@ -71,6 +71,10 @@ def parse_fight_details(tag):
     def extract_mobile_text(cell):
         mobile_div = cell.select_one('div.md\\:hidden')
         return mobile_div.get_text(separator=' ', strip=True) if mobile_div else cell.get_text(strip=True)
+    
+    def get_fighter_image_url(soup: BeautifulSoup, fighter_name: str) -> str | None:
+        img_tag = soup.find("img", alt=lambda x: x and fighter_name.lower() in x.lower())
+        return img_tag["src"] if img_tag else None
 
     def extract_column_data(rows, label, extract_age=False):
         for row in rows:
@@ -111,6 +115,8 @@ def parse_fight_details(tag):
     weight1, weight2 = extract_column_data(rows, 'Latest Weight')
     height1, height2 = extract_column_data(rows, 'Height')
     reach1, reach2 = extract_column_data(rows, 'Reach')
+    fighter1_img_url = get_fighter_image_url(tag, fighter1_name)
+    fighter2_img_url = get_fighter_image_url(tag, fighter2_name)
 
     return {
         'fight_overview': fight_overview,
@@ -123,7 +129,8 @@ def parse_fight_details(tag):
             'latest_weight': weight1,
             'height': height1,
             'reach': reach1,
-            'link': fighter1_link
+            'link': fighter1_link,
+            'img_link': fighter1_img_url
         },
         'fighter2': {
             'fighter_name': fighter2_name,
@@ -134,7 +141,8 @@ def parse_fight_details(tag):
             'latest_weight': weight2,
             'height': height2,
             'reach': reach2,
-            'link': fighter2_link
+            'link': fighter2_link,
+            'img_link': fighter2_img_url
         }
     }
 
