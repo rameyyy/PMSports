@@ -7,6 +7,15 @@ from datetime import datetime
 BASE_URL = "https://www.tapology.com"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
+def empty_to_none(obj):
+        if isinstance(obj, dict):
+            return {k: empty_to_none(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [empty_to_none(v) for v in obj]
+        elif obj == "":
+            return None
+        return obj
+
 def parse_fight_details(tag):
     records_to_find = tag.find_all(lambda tag: tag.name == 'span' and 'text-[15px]' in tag.get('class', []))
     fighter_links = tag.find_all('a', class_='link-primary-red')
@@ -88,7 +97,7 @@ def parse_fight_details(tag):
                     return age1, age2
                 return extract_mobile_text(cols[0]), extract_mobile_text(cols[4])
         return '', ''
-
+    
     # 🟨 Fight Overview
     weight_class = tag.select_one('span.bg-tap_darkgold')
     weight_class_weight = weight_class.text.strip() if weight_class else ''
@@ -97,6 +106,42 @@ def parse_fight_details(tag):
         'weight_class_weight': weight_class_weight,
         'weight_class': ufc_weight_class(weight_class_weight)
     }
+
+    def convert_to_inches(height_str: str) -> float | None:
+        # Case 1: Feet + inches (e.g., 5'8")
+        match = re.search(r"(\d+)'(\d+)", height_str)
+        if match:
+            feet, inches = map(int, match.groups())
+            return float(feet * 12 + inches)
+
+        # Case 2: Direct inches (e.g., 70.0")
+        match = re.search(r"(\d+(?:\.\d+)?)\"", height_str)
+        if match:
+            return float(match.group(1))
+
+        return None
+
+    def parse_odds(odds_str: str) -> int | None:
+        match = re.search(r"([+-]?\d+(\.\d+)?)", odds_str)
+        if not match:
+            return None
+        return round(float(match.group(1)))
+
+    def parse_age_to_float(age_str: str) -> float | None:
+        years = months = weeks = days = 0
+
+        y = re.search(r"(\d+)\s*year[s]?", age_str)
+        m = re.search(r"(\d+)\s*month[s]?", age_str)
+        w = re.search(r"(\d+)\s*week[s]?", age_str)
+        d = re.search(r"(\d+)\s*day[s]?", age_str)
+
+        if y: years = int(y.group(1))
+        if m: months = int(m.group(1))
+        if w: weeks = int(w.group(1))
+        if d: days = int(d.group(1))
+
+        total_days = months * 30.44 + weeks * 7 + days  # avg month length
+        return round(years + total_days / 365, 3)
 
     fighter1_name = fighters_data[0][0]
     fighter2_name = fighters_data[1][0]
@@ -111,10 +156,13 @@ def parse_fight_details(tag):
 
     nickname1, nickname2 = extract_column_data(rows, 'Nickname')
     odds1, odds2 = extract_column_data(rows, 'Betting Odds')
-    age1, age2 = age_of_fighter[0], age_of_fighter[1]
+    odds1, odds2 = parse_odds(odds1), parse_odds(odds2)
+    age1, age2 = parse_age_to_float(age_of_fighter[0]), parse_age_to_float(age_of_fighter[1])
     weight1, weight2 = extract_column_data(rows, 'Latest Weight')
     height1, height2 = extract_column_data(rows, 'Height')
+    height1, height2 = convert_to_inches(height1), convert_to_inches(height2)
     reach1, reach2 = extract_column_data(rows, 'Reach')
+    reach1, reach2 = convert_to_inches(reach1), convert_to_inches(reach2)
     fighter1_img_url = get_fighter_image_url(tag, fighter1_name)
     fighter2_img_url = get_fighter_image_url(tag, fighter2_name)
 
@@ -127,8 +175,8 @@ def parse_fight_details(tag):
             'betting_odds': odds1,
             'age_at_fight': age1,
             'latest_weight': weight1,
-            'height': height1,
-            'reach': reach1,
+            'height_inches': height1,
+            'reach_inches': reach1,
             'link': fighter1_link,
             'img_link': fighter1_img_url
         },
@@ -139,8 +187,8 @@ def parse_fight_details(tag):
             'betting_odds': odds2,
             'age_at_fight': age2,
             'latest_weight': weight2,
-            'height': height2,
-            'reach': reach2,
+            'height_inches': height2,
+            'reach_inches': reach2,
             'link': fighter2_link,
             'img_link': fighter2_img_url
         }
@@ -160,6 +208,8 @@ def get_all_events(group: str = "ufc", past: bool = False, page: int = 1):
     else:
         fightcenter_url = f"{BASE_URL}/fightcenter?group={group}&schedule=upcoming"
     response = requests.get(fightcenter_url, headers=HEADERS)
+    print(response.status_code)
+    print(response.headers)
     soup = BeautifulSoup(response.text, "html.parser")
 
     urls = []
@@ -197,9 +247,9 @@ def get_event_data(event_url: str, getting_old_data: bool):
         return
     is_future_event_bool = is_future_event(date)
     if getting_old_data == False and is_future_event_bool == True:
-        return get_data()
+        return empty_to_none(get_data())
     if getting_old_data == False and is_future_event_bool == False:
         return
     if getting_old_data == True and is_future_event_bool == True:
         return
-    return get_data()
+    return empty_to_none(get_data())
