@@ -1,4 +1,4 @@
-from scrapes.ufc_mma import get_all_events, get_event_data
+from scrapes.ufc_mma import get_all_events, get_event_data, get_fighter_data
 import pprint
 
 def main():
@@ -21,7 +21,10 @@ def main():
             # print(f"Date: {data['date']}")
             # print(f"Location: {data['location']}")
             # print(f"Fights scraped: {len(data['fights'])}")
-            pprint.pprint(data)
+            # pprint.pprint(data)
+            fighters_url = data['fights'][0]['fighter1']['link']
+            soup = get_fighter_data(fighters_url)
+            break
             total_fights += len(data['fights'])
             total_events += 1
 

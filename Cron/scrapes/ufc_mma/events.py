@@ -161,9 +161,6 @@ def get_all_events(group: str = "ufc", past: bool = False, page: int = 1):
         fightcenter_url = f"{BASE_URL}/fightcenter?group={group}&schedule=upcoming"
     response = requests.get(fightcenter_url, headers=HEADERS)
     soup = BeautifulSoup(response.text, "html.parser")
-    with open("t_p1.txt", "w", encoding="utf-8") as f:
-        f.write(soup.prettify())   # prettify makes it formatted nicely
-
 
     urls = []
     for tag in soup.select('a[href^="/fightcenter/events/"]'):
@@ -206,4 +203,3 @@ def get_event_data(event_url: str, getting_old_data: bool):
     if getting_old_data == True and is_future_event_bool == True:
         return
     return get_data()
-        
