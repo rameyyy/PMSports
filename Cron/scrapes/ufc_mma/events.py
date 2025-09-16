@@ -209,7 +209,7 @@ def get_all_events(group: str = "ufc", past: bool = False, page: int = 1):
         fightcenter_url = f"{BASE_URL}/fightcenter?group={group}&schedule=upcoming"
     response = requests.get(fightcenter_url, headers=HEADERS)
     print(response.status_code)
-    print(response.headers)
+    # print(response.headers)
     soup = BeautifulSoup(response.text, "html.parser")
 
     urls = []
