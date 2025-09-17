@@ -9,7 +9,7 @@ def main():
     for page_num in range(1, 2):
         events = get_all_events(past=False, page=page_num)
         events_arr.extend(events)
-    print(f'Dupes: {len(events_arr)-len(set(events_arr))}')
+    #print(f'Dupes: {len(events_arr)-len(set(events_arr))}')
     events_arr = set(events_arr)
     print(f"Found {len(events_arr)} events")
     # exit()
@@ -17,24 +17,27 @@ def main():
     for event_url in events_arr:
         data = get_event_data(event_url, getting_old_data=False)
         if data is not None:
-            print(f"\n--- {event_url} ---")
-            print(f"Title: {data['title']}")
-            print(f"Date: {data['date']}")
-            print(f"Location: {data['location']}")
-            print(f"Fights scraped: {len(data['fights'])}")
+            # print(f"\n--- {event_url} ---")
+            # print(f"Title: {data['title']}")
+            # print(f"Date: {data['date']}")
+            # print(f"Location: {data['location']}")
+            # print(f"Fights scraped: {len(data['fights'])}")
             # pprint.pprint(data)
-            print()
+            # print()
             for i in range(0, len(data['fights'])):
                 fighters_url = data['fights'][i]['fighter1']['link']
+                if not fighters_url: 
+                    continue
                 print(fighters_url)
+                #print(fighters_url)
                 fname = data['fights'][i]['fighter1']['fighter_name']
                 fageatfight = data['fights'][i]['fighter1']['age_at_fight']
-                print(f'{fname}: {fageatfight}')
+                #print(f'{fname}: {fageatfight}')
                 soup = get_fighter_data(fighters_url)
-                print('\n')
-            break
-            print('Sleeping for 5s...')
-            time.sleep(5)
+                #print('\n')
+            #break
+            #print('Sleeping for 5s...')
+            #time.sleep(5)
             total_fights += len(data['fights'])
             total_events += 1
 
