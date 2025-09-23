@@ -17,7 +17,8 @@ def main():
     for event_url in events_arr:
         data = get_event_data(event_url, getting_old_data=False)
         if data is not None:
-            # print(f"\n--- {event_url} ---")
+            print(f"--- {event_url} ---\n")
+            # print(event_url)
             # print(f"Title: {data['title']}")
             # print(f"Date: {data['date']}")
             # print(f"Location: {data['location']}")
@@ -28,13 +29,15 @@ def main():
                 fighters_url = data['fights'][i]['fighter1']['link']
                 if not fighters_url: 
                     continue
-                print(fighters_url)
-                #print(fighters_url)
+                # print(fighters_url)
+                fighter1, fighter2 = data['fights'][i]['fighter1']['fighter_name'], data['fights'][i]['fighter2']['fighter_name']
+                print(f'Fight {i+1}: {fighter1} vs {fighter2}')
                 fname = data['fights'][i]['fighter1']['fighter_name']
                 fageatfight = data['fights'][i]['fighter1']['age_at_fight']
                 #print(f'{fname}: {fageatfight}')
                 soup = get_fighter_data(fighters_url)
                 #print('\n')
+            break
             #break
             #print('Sleeping for 5s...')
             #time.sleep(5)
