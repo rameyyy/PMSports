@@ -2,6 +2,8 @@ import requests
 from bs4 import BeautifulSoup, NavigableString
 from datetime import datetime
 import re
+from .utils import parse_fight_type
+from difflib import SequenceMatcher
 
 BASE_URL = "https://www.tapology.com"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
@@ -109,13 +111,21 @@ def clean_fighter_stats(raw: dict) -> dict:
                 cleaned[new_key] = func(raw[old_key])
         except Exception:
             cleaned[new_key] = None
-
+    cleaned['win'] = int(raw['win'])
+    cleaned['loss'] = int(raw['loss'])
+    cleaned['draw'] = int(raw['draw'])
     return cleaned
 
 ### Parsing logic START
 
-import re
-from bs4 import BeautifulSoup  # only for type hints if you want
+def get_fighter_links(soup):
+    links = []
+    for tag in soup.select("a.b-link.b-fight-details__person-link"):
+        href = tag.get("href")
+        if href:
+            links.append(href.strip())
+    return links
+
 
 # ---------- tiny parsers ----------
 
@@ -417,8 +427,10 @@ def parse_fight_meta_str(s: str) -> dict:
     return {
         'method': method,
         'format': fight_format,
+        'type': None,
         'ref': ref,
-        'time': total_time_str
+        'time': total_time_str,
+        'weight_class': None
     }
 
 
@@ -426,8 +438,10 @@ def parse_fight_meta(soup: BeautifulSoup) -> dict:
     meta = {
         'method': None,
         'format': None,
+        'type': None,
         'ref': None,
-        'time': None
+        'time': None,
+        'weight_class': None
     }
     def clean_text(node):
         if not node:
@@ -446,6 +460,21 @@ def parse_fight_meta(soup: BeautifulSoup) -> dict:
                 if label_text == "method":
                     # Some pages put full string like "Decision - Unanimous" here.
                     meta = parse_fight_meta_str(value)
+        for p in soup.select('i.b-fight-details__fight-title'):
+            fight_name = p.text.strip()
+            weightclass, title_bool = parse_fight_type(fight_name)
+            if title_bool:
+                meta['type'] = 'title'
+            elif meta['format'] == 5:
+                meta['type'] = 'main'
+            else:
+                meta['type'] = None
+            if weightclass == 'Unknown':
+                raise f"Weight class should never be unknown. soup text == {fight_name}"
+            else:
+                meta['weight_class'] = weightclass
+        if meta['weight_class'] == None:
+            return -1
     except Exception:
         pass
     return meta
@@ -455,6 +484,14 @@ def extract_career_stats(soup):
     
     # Find the "Career statistics" box
     stat_items = soup.select("ul.b-list__box-list li.b-list__box-list-item")
+
+    for p in soup.select('span.b-content__title-record'):
+        raw = p.text.strip()
+        WLD = raw.split(' ')[1]
+        win, loss, draw = WLD.split('-')
+        stats['win'] = win
+        stats['loss'] = loss
+        stats['draw'] = draw
     
     for item in stat_items:
         label_tag = item.find("i", class_="b-list__box-item-title")
@@ -491,6 +528,11 @@ def _normalize_date(date_text: str) -> str | None:
         if month_num:
             return f"{month_num:02d}-{int(m.group(2)):02d}-{m.group(3)}"
     return None
+
+###
+### TEST FOR PR
+### ACCEPT INCOME V NOT
+###
 
 def _normalize_date(date_text: str) -> str | None:
     """Return MM-DD-YYYY or None."""
@@ -561,19 +603,38 @@ def get_fight_links(soup: BeautifulSoup):
 
     return fights
 
+def least_similar(given: str, candidates: list[str]) -> str:
+    scores = [(c, SequenceMatcher(None, given, c).ratio()) for c in candidates]
+    return min(scores, key=lambda x: x[1])[0]
 
 ### Parsing logic END
 
 ### Scrape Requests
 import json
-def get_single_fight_stats(url: str, date):
+def get_single_fight_stats(url: str, date, og_link, fname):
     response = requests.get(url, headers=HEADERS)
     soup = BeautifulSoup(response.text, 'html.parser')
 
     # Collect all the different dicts
+    fighter_links = get_fighter_links(soup)
+    ops_url = ''
+    for link in fighter_links:
+        if link != og_link:
+            ops_url = link
+    ops_resp = requests.get(ops_url, headers=HEADERS)
+    ops_soup = BeautifulSoup(ops_resp.text, 'html.parser')
+
+    ops_career_stats = extract_career_stats(ops_soup)
+    ops_career_stats_cleaned = clean_fighter_stats(ops_career_stats)
     winner_loser = parse_winner_loser(soup)     # winner/loser names
     meta        = parse_fight_meta(soup)        # method, ref, time, format
+    if meta == -1:
+        print(f'err at: {url}')
     fight_stats = extract_fight_stats(soup)     # totals + rounds stats
+
+    fighters_arr = fight_stats['fighters']
+    op_name = least_similar(fname, fighters_arr)
+    print(f'{fname} v {op_name}')
 
     # Merge into one dictionary
     fight_data = {
@@ -581,6 +642,7 @@ def get_single_fight_stats(url: str, date):
         "date": date,
         "winner_loser": winner_loser,
         "meta": meta,
+        f'{op_name}': ops_career_stats_cleaned,
         "stats": fight_stats
     }
 
@@ -590,7 +652,7 @@ def get_single_fight_stats(url: str, date):
 
     return fight_data
 
-def get_fighter_data_ufc_stats(fighters_url_ufcstats: str):
+def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname):
     response = requests.get(fighters_url_ufcstats, headers=HEADERS)
     soup = BeautifulSoup(response.text, "html.parser")
     data = extract_career_stats(soup = soup)
@@ -599,7 +661,7 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str):
     fights_arr = []
     for i in fight_links:
         try:
-            data = get_single_fight_stats(i['link'], i['date'])
+            data = get_single_fight_stats(i['link'], i['date'], fighters_url_ufcstats, fname)
             fights_arr.append(data)
         except ValueError as e:
             # Only catch the int conversion error you mentioned
@@ -612,11 +674,11 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str):
 
 
 
-def get_fighter_data(fighters_url: str):
+def get_fighter_data(fighters_url: str, fname):
     response = requests.get(fighters_url, headers=HEADERS)
     soup = BeautifulSoup(response.text, "html.parser")
     link=get_ufcstats_link(soup_or_html=soup)
     if link:
-        fighter_career_stats, fights_arr = get_fighter_data_ufc_stats(link)
+        fighter_career_stats, fights_arr = get_fighter_data_ufc_stats(link, fname)
         return fighter_career_stats, fights_arr
     return None, None

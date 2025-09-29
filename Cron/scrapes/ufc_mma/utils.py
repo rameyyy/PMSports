@@ -21,6 +21,47 @@ def ufc_weight_class(weight):
         return "Heavyweight"
     return "Super Heavyweight"
 
+def parse_fight_type(fight_str: str):
+    """
+    Parse a UFC fight description string and return:
+      (weight_class, is_title_fight)
+
+    Examples:
+      "UFC Bantamweight Title Bout" -> ("Bantamweight", True)
+      "Bantamweight Bout" -> ("Bantamweight", False)
+      "Catch Weight Bout" -> ("Catch Weight", False)
+    """
+    fight_str = fight_str.strip()
+
+    # Check if it's a title fight
+    is_title = "title" in fight_str.lower()
+
+    # Map substrings to weight classes
+    weight_map = {
+        "flyweight": "Flyweight",
+        "bantamweight": "Bantamweight",
+        "featherweight": "Featherweight",
+        "lightweight": "Lightweight",
+        "welterweight": "Welterweight",
+        "middleweight": "Middleweight",
+        "light heavyweight": "Light Heavyweight",
+        "heavyweight": "Heavyweight",
+        "catch weight": "Catch Weight"
+    }
+
+    # Find weight class
+    weight_class = None
+    for key, val in weight_map.items():
+        if key in fight_str.lower():
+            weight_class = val
+            break
+
+    # Default if none matched
+    if weight_class is None:
+        weight_class = "Unknown"
+
+    return weight_class, is_title
+
 def get_event_title(soup: BeautifulSoup):
     TITLE_HINTS = re.compile(
         r"\b(UFC|Fight Night|Bellator|PFL|Contender|Invicta|One|Cage|LFA)\b", re.I

@@ -1,6 +1,7 @@
 from scrapes.ufc_mma import get_all_events, get_event_data, get_fighter_data
 import time
 import pprint
+import json
 
 def main():
     total_fights = 0
@@ -13,9 +14,11 @@ def main():
     events_arr = set(events_arr)
     print(f"Found {len(events_arr)} events")
     # exit()
-
+    events_arr = ['https://www.tapology.com/fightcenter/events/132761-ufc-fight-night']
     for event_url in events_arr:
         data = get_event_data(event_url, getting_old_data=False)
+        with open("event.json", "w") as f:
+            json.dump(data, f, indent=4)  # indent=4 makes it pretty
         if data is not None:
             print(f"--- {event_url} ---\n")
             # print(event_url)
@@ -35,9 +38,18 @@ def main():
                 fname = data['fights'][i]['fighter1']['fighter_name']
                 fageatfight = data['fights'][i]['fighter1']['age_at_fight']
                 #print(f'{fname}: {fageatfight}')
-                fighter_career_stats, fights_arr = get_fighter_data(fighters_url)
-                print(fighter_career_stats, '\n', fights_arr)
+                fighter_career_stats, fights_arr = get_fighter_data(fighters_url, fname)
+                fighter_career_stats_dict = {fname: fighter_career_stats}
+                with open("career_stats.json", "w") as f:
+                    json.dump(fighter_career_stats_dict, f, indent=4)  # indent=4 makes it pretty
+                with open("fights.json", "w") as f:
+                    json.dump(fights_arr, f, indent=4)  # indent=4 makes it pretty
+                # print(fighter_career_stats, '\n', fights_arr)
                 #print('\n')
+                print('done')
+                num = i+1
+                if num == 6:
+                    exit()
             break
             #break
             #print('Sleeping for 5s...')
