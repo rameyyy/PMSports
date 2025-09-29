@@ -19,7 +19,7 @@ def main():
         if data is not None:
             print(f"--- {event_url} ---\n")
             # print(event_url)
-            # print(f"Title: {data['title']}")
+            print(f"Title: {data['title']}")
             # print(f"Date: {data['date']}")
             # print(f"Location: {data['location']}")
             # print(f"Fights scraped: {len(data['fights'])}")
@@ -35,7 +35,8 @@ def main():
                 fname = data['fights'][i]['fighter1']['fighter_name']
                 fageatfight = data['fights'][i]['fighter1']['age_at_fight']
                 #print(f'{fname}: {fageatfight}')
-                soup = get_fighter_data(fighters_url)
+                fighter_career_stats, fights_arr = get_fighter_data(fighters_url)
+                print(fighter_career_stats, '\n', fights_arr)
                 #print('\n')
             break
             #break

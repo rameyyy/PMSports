@@ -114,6 +114,199 @@ def clean_fighter_stats(raw: dict) -> dict:
 
 ### Parsing logic START
 
+import re
+from bs4 import BeautifulSoup  # only for type hints if you want
+
+# ---------- tiny parsers ----------
+
+def _parse_landed_attempts(s: str):
+    # "40 of 152" -> {'landed': 40, 'attempts': 152}
+    m = re.match(r"\s*(\d+)\s+of\s+(\d+)\s*$", s or "")
+    return {"landed": int(m.group(1)), "attempts": int(m.group(2))} if m else {"landed": None, "attempts": None}
+
+def _parse_int(s: str):
+    s = (s or "").strip()
+    return None if s in {"---", ""} else int(s)
+
+def _parse_pct(s: str):
+    s = (s or "").strip()
+    return None if s == "---" else int(s.rstrip("%"))
+
+def _mmss(s: str):
+    # normalize "M:SS" or "MM:SS" -> "MM:SS"; allow "---" -> None
+    s = (s or "").strip()
+    if s in {"---", ""}:
+        return None
+    m = re.fullmatch(r"(\d+):([0-5]\d)", s)
+    if not m:
+        return None
+    mm = int(m.group(1)); ss = int(m.group(2))
+    return f"{mm:02d}:{ss:02d}"
+
+# ---------- factories (avoid aliasing!) ----------
+
+def _landed_attempts():
+    return {"landed": None, "attempts": None}
+
+def _sig_breakdown_template():
+    # fresh dicts/lists every call
+    return {
+        "head":     [_landed_attempts(), _landed_attempts()],
+        "body":     [_landed_attempts(), _landed_attempts()],
+        "leg":      [_landed_attempts(), _landed_attempts()],
+        "distance": [_landed_attempts(), _landed_attempts()],
+        "clinch":   [_landed_attempts(), _landed_attempts()],
+        "ground":   [_landed_attempts(), _landed_attempts()],
+    }
+
+def _round_template():
+    return {
+        "kd": [None, None],
+        "sig_str": [_landed_attempts(), _landed_attempts()],
+        "sig_str_pct": [None, None],
+        "total_str": [_landed_attempts(), _landed_attempts()],
+        "td": [_landed_attempts(), _landed_attempts()],
+        "td_pct": [None, None],
+        "sub_att": [None, None],
+        "pass": [None, None],
+        "rev": [None, None],
+        "ctrl": [None, None],  # "MM:SS"
+        "sig_breakdown": _sig_breakdown_template(),
+    }
+
+# ---------- main extractor ----------
+
+def extract_fight_stats(soup):
+    """Parse Tapology-style 'Totals' + 'Per Round' + 'Significant Strikes' tables."""
+    stats = {
+        "fighters": [None, None],
+        "totals_total": {
+            "kd": [None, None],
+            "sig_str": [_landed_attempts(), _landed_attempts()],
+            "sig_str_pct": [None, None],
+            "total_str": [_landed_attempts(), _landed_attempts()],
+            "td": [_landed_attempts(), _landed_attempts()],
+            "td_pct": [None, None],
+            "sub_att": [None, None],
+            "pass": [None, None],     # Tapology sometimes omits; we detect below
+            "rev": [None, None],
+            "ctrl": [None, None],
+            "sig_breakdown": _sig_breakdown_template(),
+        },
+        "rounds": {f"round{i}": _round_template() for i in range(1, 6)},
+    }
+
+    stream = [p.get_text(strip=True) for p in soup.find_all("p", class_="b-fight-details__table-text")]
+
+    i = 0
+    def nxt():
+        nonlocal i
+        if i >= len(stream): return None
+        v = stream[i]; i += 1; return v
+    def peek(k=0):
+        j = i + k
+        return stream[j] if j < len(stream) else None
+
+    # ---- Phase A: TOTALS (overall) ----
+    stats["fighters"][0] = nxt()
+    stats["fighters"][1] = nxt()
+
+    def fill_totals_into(target):
+        # order exactly matches your stream
+        target["kd"][0] = _parse_int(nxt())
+        target["kd"][1] = _parse_int(nxt())
+
+        target["sig_str"][0] = _parse_landed_attempts(nxt())
+        target["sig_str"][1] = _parse_landed_attempts(nxt())
+
+        target["sig_str_pct"][0] = _parse_pct(nxt())
+        target["sig_str_pct"][1] = _parse_pct(nxt())
+
+        target["total_str"][0] = _parse_landed_attempts(nxt())
+        target["total_str"][1] = _parse_landed_attempts(nxt())
+
+        target["td"][0] = _parse_landed_attempts(nxt())
+        target["td"][1] = _parse_landed_attempts(nxt())
+
+        target["td_pct"][0] = _parse_pct(nxt())
+        target["td_pct"][1] = _parse_pct(nxt())
+
+        target["sub_att"][0] = _parse_int(nxt())
+        target["sub_att"][1] = _parse_int(nxt())
+
+        # Optional "pass" column: look ahead safely
+        def _looks_int(x): 
+            return x is not None and re.fullmatch(r"\d+|---", x) is not None
+        def _looks_time(x):
+            return x is not None and re.fullmatch(r"\d+:[0-5]\d|---", x) is not None
+
+        # If next two are ints and the third is not a time, treat them as PASS values.
+        if _looks_int(peek(0)) and _looks_int(peek(1)) and not _looks_time(peek(2)):
+            target["pass"][0] = _parse_int(nxt())
+            target["pass"][1] = _parse_int(nxt())
+
+        target["rev"][0] = _parse_int(nxt())
+        target["rev"][1] = _parse_int(nxt())
+
+        target["ctrl"][0] = _mmss(nxt())
+        target["ctrl"][1] = _mmss(nxt())
+
+    fill_totals_into(stats["totals_total"])
+
+    # ---- Phase B: PER-ROUND totals ----
+    round_idx = 1
+    while round_idx <= 5 and i < len(stream):
+        if peek() != stats["fighters"][0]:
+            break
+        # consume names for each round block
+        name_a = nxt(); name_b = nxt()
+
+        # If the next token is "X of Y", we've reached the significant-strikes section; rewind names and stop.
+        if " of " in (peek() or ""):
+            i -= 2
+            break
+
+        fill_totals_into(stats["rounds"][f"round{round_idx}"])
+        round_idx += 1
+
+    # ---- Phase C: SIGNIFICANT STRIKES (totals) ----
+    # names again
+    if nxt() != stats["fighters"][0]: 
+        return stats
+    if nxt() != stats["fighters"][1]: 
+        return stats
+
+    stats["totals_total"]["sig_str"][0] = _parse_landed_attempts(nxt())
+    stats["totals_total"]["sig_str"][1] = _parse_landed_attempts(nxt())
+    stats["totals_total"]["sig_str_pct"][0] = _parse_pct(nxt())
+    stats["totals_total"]["sig_str_pct"][1] = _parse_pct(nxt())
+
+    for bucket in ("head","body","leg","distance","clinch","ground"):
+        stats["totals_total"]["sig_breakdown"][bucket][0] = _parse_landed_attempts(nxt())
+        stats["totals_total"]["sig_breakdown"][bucket][1] = _parse_landed_attempts(nxt())
+
+    # ---- Phase D: SIGNIFICANT STRIKES (per round) ----
+    r = 1
+    while r <= 5 and i < len(stream):
+        name_a = nxt(); name_b = nxt()
+        if name_a != stats["fighters"][0] or name_b != stats["fighters"][1]:
+            break
+
+        node = stats["rounds"][f"round{r}"]
+        node["sig_str"][0] = _parse_landed_attempts(nxt())
+        node["sig_str"][1] = _parse_landed_attempts(nxt())
+        node["sig_str_pct"][0] = _parse_pct(nxt())
+        node["sig_str_pct"][1] = _parse_pct(nxt())
+
+        for bucket in ("head","body","leg","distance","clinch","ground"):
+            node["sig_breakdown"][bucket][0] = _parse_landed_attempts(nxt())
+            node["sig_breakdown"][bucket][1] = _parse_landed_attempts(nxt())
+
+        r += 1
+
+    return stats
+
+
 def parse_winner_loser(soup: BeautifulSoup) -> dict:
     """
     Given a UFC Stats fight details soup, return:
@@ -274,10 +467,6 @@ def extract_career_stats(soup):
     
     return stats
 
-import re
-from datetime import datetime
-from bs4 import BeautifulSoup
-
 def _normalize_date(date_text: str) -> str | None:
     """Return MM-DD-YYYY or None."""
     if not date_text:
@@ -376,36 +565,50 @@ def get_fight_links(soup: BeautifulSoup):
 ### Parsing logic END
 
 ### Scrape Requests
+import json
+def get_single_fight_stats(url: str, date):
+    response = requests.get(url, headers=HEADERS)
+    soup = BeautifulSoup(response.text, 'html.parser')
 
-def get_single_fight_stats(url: str):
-    try:
-        response = requests.get(url, headers=HEADERS)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        winner_loser = parse_winner_loser(soup)
-        data2 = parse_fight_meta(soup)
-        print(data2)
-        return winner_loser
-    except Exception as e:
-        pass
+    # Collect all the different dicts
+    winner_loser = parse_winner_loser(soup)     # winner/loser names
+    meta        = parse_fight_meta(soup)        # method, ref, time, format
+    fight_stats = extract_fight_stats(soup)     # totals + rounds stats
+
+    # Merge into one dictionary
+    fight_data = {
+        "url": url,
+        "date": date,
+        "winner_loser": winner_loser,
+        "meta": meta,
+        "stats": fight_stats
+    }
+
+    # Write to JSON
+    with open("fight_stats.json", "w", encoding="utf-8") as f:
+        json.dump(fight_data, f, indent=2)
+
+    return fight_data
 
 def get_fighter_data_ufc_stats(fighters_url_ufcstats: str):
-    try: 
-        response = requests.get(fighters_url_ufcstats, headers=HEADERS)
-        # print(response.status_code)
-        soup = BeautifulSoup(response.text, "html.parser")
-        data = extract_career_stats(soup = soup)
-        fight_links = get_fight_links(soup)
-        fighter_career_stats = clean_fighter_stats(data)
-        count=0
-        for i in fight_links:
-            if count == 0:
-                count+=1
+    response = requests.get(fighters_url_ufcstats, headers=HEADERS)
+    soup = BeautifulSoup(response.text, "html.parser")
+    data = extract_career_stats(soup = soup)
+    fight_links = get_fight_links(soup)
+    fighter_career_stats = clean_fighter_stats(data)
+    fights_arr = []
+    for i in fight_links:
+        try:
+            data = get_single_fight_stats(i['link'], i['date'])
+            fights_arr.append(data)
+        except ValueError as e:
+            # Only catch the int conversion error you mentioned
+            if "invalid literal for int()" in str(e):
                 continue
-            data = get_single_fight_stats(i['link'])
-            print(f'{i}: {i['date']} {data}')
-            count+=1
-        # exit()
-    except Exception as e: print(e)
+            else:
+                # If it's some other ValueError, re-raise so you don’t hide real bugs
+                raise
+    return fighter_career_stats, fights_arr
 
 
 
@@ -414,6 +617,6 @@ def get_fighter_data(fighters_url: str):
     soup = BeautifulSoup(response.text, "html.parser")
     link=get_ufcstats_link(soup_or_html=soup)
     if link:
-        get_fighter_data_ufc_stats(link)
-    else:
-        print('notwork')
+        fighter_career_stats, fights_arr = get_fighter_data_ufc_stats(link)
+        return fighter_career_stats, fights_arr
+    return None, None
