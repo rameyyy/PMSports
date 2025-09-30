@@ -5,8 +5,10 @@ import re
 from .utils import parse_fight_type
 from difflib import SequenceMatcher
 
+
 BASE_URL = "https://www.tapology.com"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
+
 
 ### Grab ufc-stats link from Tapology ufc fighter stats page response soup:
 def get_ufcstats_link(soup_or_html) -> str | None:
@@ -26,16 +28,8 @@ def get_ufcstats_link(soup_or_html) -> str | None:
     a = soup.find("a", href=lambda h: h and "ufcstats.com/fighter-details" in h)
     return a["href"] if a else None
 
+
 def clean_fighter_stats(raw: dict) -> dict:
-    """
-    Normalize fighter stats from a raw dict into clean formats.
-    
-    Args:
-        raw (dict): Raw fighter stats with keys like 'Height:', 'Weight:', etc.
-    
-    Returns:
-        dict: Cleaned fighter stats with consistent keys and value types.
-    """
     cleaned = {}
 
     try:
@@ -126,7 +120,6 @@ def get_fighter_links(soup):
             links.append(href.strip())
     return links
 
-
 # ---------- tiny parsers ----------
 
 def _parse_landed_attempts(s: str):
@@ -134,13 +127,16 @@ def _parse_landed_attempts(s: str):
     m = re.match(r"\s*(\d+)\s+of\s+(\d+)\s*$", s or "")
     return {"landed": int(m.group(1)), "attempts": int(m.group(2))} if m else {"landed": None, "attempts": None}
 
+
 def _parse_int(s: str):
     s = (s or "").strip()
     return None if s in {"---", ""} else int(s)
 
+
 def _parse_pct(s: str):
     s = (s or "").strip()
     return None if s == "---" else int(s.rstrip("%"))
+
 
 def _mmss(s: str):
     # normalize "M:SS" or "MM:SS" -> "MM:SS"; allow "---" -> None
@@ -158,6 +154,7 @@ def _mmss(s: str):
 def _landed_attempts():
     return {"landed": None, "attempts": None}
 
+
 def _sig_breakdown_template():
     # fresh dicts/lists every call
     return {
@@ -168,6 +165,7 @@ def _sig_breakdown_template():
         "clinch":   [_landed_attempts(), _landed_attempts()],
         "ground":   [_landed_attempts(), _landed_attempts()],
     }
+
 
 def _round_template():
     return {
@@ -344,6 +342,7 @@ def parse_winner_loser(soup: BeautifulSoup) -> dict:
 
     return result
 
+
 def parse_fight_meta_str(s: str) -> dict:
     """
     Parse a line like:
@@ -479,6 +478,7 @@ def parse_fight_meta(soup: BeautifulSoup) -> dict:
         pass
     return meta
 
+
 def extract_career_stats(soup):
     stats = {}
     
@@ -504,35 +504,6 @@ def extract_career_stats(soup):
     
     return stats
 
-def _normalize_date(date_text: str) -> str | None:
-    """Return MM-DD-YYYY or None."""
-    if not date_text:
-        return None
-    s = date_text.replace("\xa0", " ").strip()
-    # Try common UFCStats formats first
-    for fmt in ("%b %d, %Y", "%b. %d, %Y", "%B %d, %Y"):
-        try:
-            return datetime.strptime(s, fmt).strftime("%m-%d-%Y")
-        except ValueError:
-            pass
-    # Fallback regex (handles 'Oct. 26, 2024' or 'Oct 26, 2024')
-    m = re.search(r'([A-Za-z]{3,})\.?\s+(\d{1,2}),\s*(\d{4})', s)
-    if m:
-        month_map = {
-            'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,
-            'July':7,'August':8,'September':9,'Sept':9,'October':10,'November':11,'December':12,
-            'Jan':1,'Feb':2,'Mar':3,'Apr':4,'Jun':6,'Jul':7,'Aug':8,'Sep':9,'Oct':10,'Nov':11,'Dec':12
-        }
-        mon = m.group(1).title()
-        month_num = month_map.get(mon)
-        if month_num:
-            return f"{month_num:02d}-{int(m.group(2)):02d}-{m.group(3)}"
-    return None
-
-###
-### TEST FOR PR
-### ACCEPT INCOME V NOT
-###
 
 def _normalize_date(date_text: str) -> str | None:
     """Return MM-DD-YYYY or None."""
@@ -558,6 +529,33 @@ def _normalize_date(date_text: str) -> str | None:
         if month_num:
             return f"{month_num:02d}-{int(m.group(2)):02d}-{m.group(3)}"
     return None
+
+
+def _normalize_date(date_text: str) -> str | None:
+    """Return MM-DD-YYYY or None."""
+    if not date_text:
+        return None
+    s = date_text.replace("\xa0", " ").strip()
+    # Try common UFCStats formats first
+    for fmt in ("%b %d, %Y", "%b. %d, %Y", "%B %d, %Y"):
+        try:
+            return datetime.strptime(s, fmt).strftime("%m-%d-%Y")
+        except ValueError:
+            pass
+    # Fallback regex (handles 'Oct. 26, 2024' or 'Oct 26, 2024')
+    m = re.search(r'([A-Za-z]{3,})\.?\s+(\d{1,2}),\s*(\d{4})', s)
+    if m:
+        month_map = {
+            'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,
+            'July':7,'August':8,'September':9,'Sept':9,'October':10,'November':11,'December':12,
+            'Jan':1,'Feb':2,'Mar':3,'Apr':4,'Jun':6,'Jul':7,'Aug':8,'Sep':9,'Oct':10,'Nov':11,'Dec':12
+        }
+        mon = m.group(1).title()
+        month_num = month_map.get(mon)
+        if month_num:
+            return f"{month_num:02d}-{int(m.group(2)):02d}-{m.group(3)}"
+    return None
+
 
 def get_fight_links(soup: BeautifulSoup):
     """
@@ -603,14 +601,16 @@ def get_fight_links(soup: BeautifulSoup):
 
     return fights
 
+
 def least_similar(given: str, candidates: list[str]) -> str:
     scores = [(c, SequenceMatcher(None, given, c).ratio()) for c in candidates]
     return min(scores, key=lambda x: x[1])[0]
 
 ### Parsing logic END
 
+
 ### Scrape Requests
-import json
+
 def get_single_fight_stats(url: str, date, og_link, fname):
     response = requests.get(url, headers=HEADERS)
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -634,23 +634,22 @@ def get_single_fight_stats(url: str, date, og_link, fname):
 
     fighters_arr = fight_stats['fighters']
     op_name = least_similar(fname, fighters_arr)
-    print(f'{fname} v {op_name}')
+    
+    ops_career_stats_cleaned['fighter_name'] = op_name
+    ops_career_stats_cleaned['fighter_id'] = ops_url.rstrip("/").split("/")[-1]
 
     # Merge into one dictionary
     fight_data = {
         "url": url,
+        "fight_id": url.rstrip("/").split("/")[-1],
         "date": date,
         "winner_loser": winner_loser,
         "meta": meta,
-        f'{op_name}': ops_career_stats_cleaned,
+        f'ops_careerstats': ops_career_stats_cleaned,
         "stats": fight_stats
     }
-
-    # Write to JSON
-    with open("fight_stats.json", "w", encoding="utf-8") as f:
-        json.dump(fight_data, f, indent=2)
-
     return fight_data
+
 
 def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname):
     response = requests.get(fighters_url_ufcstats, headers=HEADERS)
@@ -658,7 +657,11 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname):
     data = extract_career_stats(soup = soup)
     fight_links = get_fight_links(soup)
     fighter_career_stats = clean_fighter_stats(data)
+    fighter_career_stats['fighter_name'] = fname
+    fid = fighters_url_ufcstats.rstrip("/").split("/")[-1]
+    fighter_career_stats['fighter_id'] = fid
     fights_arr = []
+    upcoming = []
     for i in fight_links:
         try:
             data = get_single_fight_stats(i['link'], i['date'], fighters_url_ufcstats, fname)
@@ -666,12 +669,22 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname):
         except ValueError as e:
             # Only catch the int conversion error you mentioned
             if "invalid literal for int()" in str(e):
+                response_ = requests.get(i['link'], headers=HEADERS)
+                soup_ = BeautifulSoup(response_.text, "html.parser")
+                links = get_fighter_links(soup_)
+                response = requests.get(fighters_url_ufcstats, headers=HEADERS)
+                soup = BeautifulSoup(response.text, "html.parser")
+                if links:
+                    for link in links:
+                        if fid not in link:
+                            opp_fid = link.rstrip("/").split("/")[-1]
+                            upcoming.append([fid, opp_fid])
+                            break
                 continue
             else:
                 # If it's some other ValueError, re-raise so you don’t hide real bugs
                 raise
-    return fighter_career_stats, fights_arr
-
+    return fighter_career_stats, fights_arr, upcoming
 
 
 def get_fighter_data(fighters_url: str, fname):
@@ -679,6 +692,6 @@ def get_fighter_data(fighters_url: str, fname):
     soup = BeautifulSoup(response.text, "html.parser")
     link=get_ufcstats_link(soup_or_html=soup)
     if link:
-        fighter_career_stats, fights_arr = get_fighter_data_ufc_stats(link, fname)
-        return fighter_career_stats, fights_arr
-    return None, None
+        fighter_career_stats, fights_arr, upcoming = get_fighter_data_ufc_stats(link, fname)
+        return fighter_career_stats, fights_arr, upcoming
+    return None, None, None

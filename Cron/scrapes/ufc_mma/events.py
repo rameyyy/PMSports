@@ -4,8 +4,10 @@ from .utils import get_event_title, get_event_date_location, ufc_weight_class
 import re
 from datetime import datetime
 
+
 BASE_URL = "https://www.tapology.com"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
+
 
 def empty_to_none(obj):
         if isinstance(obj, dict):
@@ -15,6 +17,7 @@ def empty_to_none(obj):
         elif obj == "":
             return None
         return obj
+
 
 def parse_fight_details(tag):
     records_to_find = tag.find_all(lambda tag: tag.name == 'span' and 'text-[15px]' in tag.get('class', []))
@@ -145,6 +148,7 @@ def parse_fight_details(tag):
 
     fighter1_name = fighters_data[0][0]
     fighter2_name = fighters_data[1][0]
+    fighter1_name, fighter2_name = fighter1_name.strip('"'), fighter2_name.strip('"')
     fighter1_link = fighters_data[0][1]
     fighter2_link = fighters_data[1][1]
     fighter1_record = records[0]
@@ -155,6 +159,7 @@ def parse_fight_details(tag):
     rows = table.find_all('tr') if table else []
 
     nickname1, nickname2 = extract_column_data(rows, 'Nickname')
+    nickname1, nickname2 = nickname1.strip('"'), nickname2.strip('"')
     odds1, odds2 = extract_column_data(rows, 'Betting Odds')
     odds1, odds2 = parse_odds(odds1), parse_odds(odds2)
     age1, age2 = parse_age_to_float(age_of_fighter[0]), parse_age_to_float(age_of_fighter[1])
@@ -194,6 +199,7 @@ def parse_fight_details(tag):
         }
     }
 
+
 def is_future_event(date_str: str) -> bool:
     # Parse only the date portion
     dt = datetime.strptime(date_str, "%A %m.%d.%Y at %I:%M %p ET")
@@ -201,6 +207,7 @@ def is_future_event(date_str: str) -> bool:
     
     # Compare by date only (ignore time)
     return dt.date() >= today.date()
+
 
 def get_all_events(group: str = "ufc", past: bool = False, page: int = 1):
     if past:
@@ -218,6 +225,7 @@ def get_all_events(group: str = "ufc", past: bool = False, page: int = 1):
         if url not in urls and group in url:
             urls.append(url)
     return urls
+
 
 def get_event_data(event_url: str, getting_old_data: bool):
     response = requests.get(event_url, headers=HEADERS)
@@ -238,6 +246,7 @@ def get_event_data(event_url: str, getting_old_data: bool):
 
         return {
             "url": event_url,
+            "event_id": event_url.rstrip("/").split("/")[-1],
             "title": title,
             "date": date,
             "location": location,

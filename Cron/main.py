@@ -1,7 +1,5 @@
-from scrapes.ufc_mma import get_all_events, get_event_data, get_fighter_data
+from scrapes.ufc_mma import get_all_events, get_event_data, get_fighter_data, push_events, EventNameIndex, push_fighter
 import time
-import pprint
-import json
 
 def main():
     total_fights = 0
@@ -14,51 +12,49 @@ def main():
     events_arr = set(events_arr)
     print(f"Found {len(events_arr)} events")
     # exit()
-    events_arr = ['https://www.tapology.com/fightcenter/events/132761-ufc-fight-night']
     for event_url in events_arr:
         data = get_event_data(event_url, getting_old_data=False)
-        with open("event.json", "w") as f:
-            json.dump(data, f, indent=4)  # indent=4 makes it pretty
+        idx = EventNameIndex(data)
+        # with open("event.json", "w") as f:
+        #     json.dump(data, f, indent=4)  # indent=4 makes it pretty
+        
+        check = push_events(data)
+        if check:
+            print('worked')
+        else:
+            print('did not work')
         if data is not None:
             print(f"--- {event_url} ---\n")
-            # print(event_url)
             print(f"Title: {data['title']}")
-            # print(f"Date: {data['date']}")
-            # print(f"Location: {data['location']}")
-            # print(f"Fights scraped: {len(data['fights'])}")
-            # pprint.pprint(data)
-            # print()
             for i in range(0, len(data['fights'])):
-                fighters_url = data['fights'][i]['fighter1']['link']
-                if not fighters_url: 
+                fighter1s_url = data['fights'][i]['fighter1']['link']
+                fighter2s_url = data['fights'][i]['fighter2']['link']
+                if not fighter1s_url or not fighter2s_url: # this could be there first fight so they wont have data
                     continue
-                # print(fighters_url)
                 fighter1, fighter2 = data['fights'][i]['fighter1']['fighter_name'], data['fights'][i]['fighter2']['fighter_name']
                 print(f'Fight {i+1}: {fighter1} vs {fighter2}')
-                fname = data['fights'][i]['fighter1']['fighter_name']
-                fageatfight = data['fights'][i]['fighter1']['age_at_fight']
-                #print(f'{fname}: {fageatfight}')
-                fighter_career_stats, fights_arr = get_fighter_data(fighters_url, fname)
-                fighter_career_stats_dict = {fname: fighter_career_stats}
-                with open("career_stats.json", "w") as f:
-                    json.dump(fighter_career_stats_dict, f, indent=4)  # indent=4 makes it pretty
-                with open("fights.json", "w") as f:
-                    json.dump(fights_arr, f, indent=4)  # indent=4 makes it pretty
-                # print(fighter_career_stats, '\n', fights_arr)
-                #print('\n')
-                print('done')
-                num = i+1
-                if num == 6:
-                    exit()
-            break
-            #break
-            #print('Sleeping for 5s...')
-            #time.sleep(5)
-            total_fights += len(data['fights'])
+                fighter1_career_stats, fights_arr1, upcoming1 = get_fighter_data(fighter1s_url, fighter1)
+                fighter2_career_stats, fights_arr2, upcoming2 = get_fighter_data(fighter2s_url, fighter2)
+                if fighter1_career_stats == None: # fighter has not faught for ufc yet (debut)
+                    continue
+                push_fighter(idx, fighter1_career_stats)
+                push_fighter(idx, fighter2_career_stats)
+                for i in fights_arr1:
+                    random_career_stats = i.get('ops_careerstats')
+                    if random_career_stats: push_fighter(idx, random_career_stats)
+                for i in fights_arr2:
+                    random_career_stats = i.get('ops_careerstats')
+                    if random_career_stats: push_fighter(idx, random_career_stats)
+                
+                total_fights += (len(fights_arr1) + len(fights_arr2))
             total_events += 1
 
     print(f"\nTotal fights scraped: {total_fights}")
     print(f"Total events scraped: {total_events}")
 
 if __name__ == "__main__":
+    start_time = time.time()
     main()
+    end_time = time.time()
+    runtime = end_time - start_time
+    print(f"Runtime: {runtime:.2f} seconds")

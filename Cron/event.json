@@ -1,0 +1,288 @@
+{
+    "url": "https://www.tapology.com/fightcenter/events/132653-ufc-322",
+    "event_id": "132653-ufc-322",
+    "title": "UFC 322: Della Maddalena vs. Makhachev",
+    "date": "Saturday 11.15.2025 at 06:00 PM ET",
+    "location": "New York, New York",
+    "fights": [
+        {
+            "fight_overview": {
+                "fight_card_type": "Main Event",
+                "weight_class_weight": "170",
+                "weight_class": "Welterweight"
+            },
+            "fighter1": {
+                "fighter_name": "Jack Della Maddalena",
+                "record": "18-2",
+                "nickname": null,
+                "betting_odds": null,
+                "age_at_fight": 29.18,
+                "latest_weight": "170.0 lbs (77.1 kgs)",
+                "height_inches": 71.0,
+                "reach_inches": 73.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/119831-jack-della-maddalena",
+                "img_link": "https://images.tapology.com/headshot_images/119831/preview/Screenshot.png?1746453030"
+            },
+            "fighter2": {
+                "fighter_name": "J. Della Maddalena",
+                "record": "27-1",
+                "nickname": null,
+                "betting_odds": null,
+                "age_at_fight": 34.052,
+                "latest_weight": "154.5 lbs (70.1 kgs)",
+                "height_inches": 70.0,
+                "reach_inches": 70.5,
+                "link": "https://www.tapology.com/fightcenter/fighters/119831-jack-della-maddalena",
+                "img_link": null
+            }
+        },
+        {
+            "fight_overview": {
+                "fight_card_type": "Co-Main",
+                "weight_class_weight": "125",
+                "weight_class": "Flyweight"
+            },
+            "fighter1": {
+                "fighter_name": "Valentina Shevchenko",
+                "record": "25-4-1",
+                "nickname": "Bullet",
+                "betting_odds": null,
+                "age_at_fight": 37.689,
+                "latest_weight": "124.0 lbs (56.2 kgs)",
+                "height_inches": 65.0,
+                "reach_inches": 65.5,
+                "link": "https://www.tapology.com/fightcenter/fighters/11614-valentina-shevchenko",
+                "img_link": "https://images.tapology.com/headshot_images/11614/preview/Shev_%282%29.jpg?1515954752"
+            },
+            "fighter2": {
+                "fighter_name": "V. Shevchenko",
+                "record": "26-3",
+                "nickname": "Magnum",
+                "betting_odds": null,
+                "age_at_fight": 36.256,
+                "latest_weight": "115.0 lbs (52.2 kgs)",
+                "height_inches": 64.0,
+                "reach_inches": 63.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/11614-valentina-shevchenko",
+                "img_link": null
+            }
+        },
+        {
+            "fight_overview": {
+                "fight_card_type": "Main Card",
+                "weight_class_weight": "125",
+                "weight_class": "Flyweight"
+            },
+            "fighter1": {
+                "fighter_name": "Erin Blanchfield",
+                "record": "13-2",
+                "nickname": "Cold Blooded",
+                "betting_odds": null,
+                "age_at_fight": 26.531,
+                "latest_weight": "125.5 lbs (56.9 kgs)",
+                "height_inches": 64.0,
+                "reach_inches": 68.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/167460-erin-blanchfield",
+                "img_link": "https://images.tapology.com/headshot_images/167460/preview/Erin_Blanchfield-hs.jpg?1676302976"
+            },
+            "fighter2": {
+                "fighter_name": "Tracy Cortez",
+                "record": "12-2",
+                "nickname": null,
+                "betting_odds": null,
+                "age_at_fight": 31.931,
+                "latest_weight": "126.0 lbs (57.2 kgs)",
+                "height_inches": 65.0,
+                "reach_inches": 65.5,
+                "link": "https://www.tapology.com/fightcenter/fighters/63711-tracy-cortez",
+                "img_link": "https://images.tapology.com/headshot_images/63711/preview/Screenshot.png?1715660039"
+            }
+        },
+        {
+            "fight_overview": {
+                "fight_card_type": "Main Card",
+                "weight_class_weight": "170",
+                "weight_class": "Welterweight"
+            },
+            "fighter1": {
+                "fighter_name": "Leon Edwards",
+                "record": "22-5",
+                "nickname": "Rocky",
+                "betting_odds": null,
+                "age_at_fight": 34.224,
+                "latest_weight": "171.0 lbs (77.6 kgs)",
+                "height_inches": 74.0,
+                "reach_inches": 74.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/21429-leon-edwards",
+                "img_link": "https://images.tapology.com/headshot_images/21429/preview/IMG_20200901_093627.jpg?1598949528"
+            },
+            "fighter2": {
+                "fighter_name": "Carlos Prates",
+                "record": "22-7",
+                "nickname": "The Nightmare",
+                "betting_odds": null,
+                "age_at_fight": 32.246,
+                "latest_weight": "170.0 lbs (77.1 kgs)",
+                "height_inches": 73.0,
+                "reach_inches": 78.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/36554-carlos-prates-carlao",
+                "img_link": "https://images.tapology.com/headshot_images/36554/preview/Screenshot_%281%29.png?1745163216"
+            }
+        },
+        {
+            "fight_overview": {
+                "fight_card_type": "Prelim",
+                "weight_class_weight": "185",
+                "weight_class": "Middleweight"
+            },
+            "fighter1": {
+                "fighter_name": "Baisangur Susurkaev",
+                "record": "10-0",
+                "nickname": "Hunter",
+                "betting_odds": null,
+                "age_at_fight": 24.853,
+                "latest_weight": "186.0 lbs (84.4 kgs)",
+                "height_inches": 74.0,
+                "reach_inches": 79.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/281344-baysangur-susurkaev",
+                "img_link": "https://images.tapology.com/headshot_images/281344/preview/Screenshot_%283%29.png?1755210014"
+            },
+            "fighter2": {
+                "fighter_name": "B. Susurkaev",
+                "record": "10-3-1",
+                "nickname": null,
+                "betting_odds": null,
+                "age_at_fight": 35.517,
+                "latest_weight": "204.5 lbs (92.8 kgs)",
+                "height_inches": 72.0,
+                "reach_inches": 77.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/281344-baysangur-susurkaev",
+                "img_link": null
+            }
+        },
+        {
+            "fight_overview": {
+                "fight_card_type": "Prelim",
+                "weight_class_weight": "115",
+                "weight_class": "Flyweight"
+            },
+            "fighter1": {
+                "fighter_name": "Angela Hill",
+                "record": "18-15",
+                "nickname": "Overkill",
+                "betting_odds": null,
+                "age_at_fight": 40.842,
+                "latest_weight": "116.0 lbs (52.6 kgs)",
+                "height_inches": 63.0,
+                "reach_inches": 64.5,
+                "link": "https://www.tapology.com/fightcenter/fighters/57525-angela-hill-overkill",
+                "img_link": "https://images.tapology.com/headshot_images/57525/preview/Angela-Hill-hs.jpg?1424743218"
+            },
+            "fighter2": {
+                "fighter_name": "Fatima Kline",
+                "record": "8-1",
+                "nickname": "The Archangel",
+                "betting_odds": null,
+                "age_at_fight": 25.342,
+                "latest_weight": "115.5 lbs (52.4 kgs)",
+                "height_inches": 66.0,
+                "reach_inches": 67.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/194482-fatima-kline",
+                "img_link": "https://images.tapology.com/headshot_images/194482/preview/Fatima_KOreps.png?1720309985"
+            }
+        },
+        {
+            "fight_overview": {
+                "fight_card_type": "Prelim",
+                "weight_class_weight": "185",
+                "weight_class": "Middleweight"
+            },
+            "fighter1": {
+                "fighter_name": "Gerald Meerschaert",
+                "record": "37-20",
+                "nickname": "GM3",
+                "betting_odds": null,
+                "age_at_fight": 37.911,
+                "latest_weight": "185.0 lbs (83.9 kgs)",
+                "height_inches": 73.0,
+                "reach_inches": 77.5,
+                "link": "https://www.tapology.com/fightcenter/fighters/6018-gerald-meerschaert-the-machine",
+                "img_link": "https://images.tapology.com/headshot_images/6018/preview/Gerald_Meerschaert.jpg?1544408330"
+            },
+            "fighter2": {
+                "fighter_name": "Kyle Daukaus",
+                "record": "16-4",
+                "nickname": "The D'Arce Knight",
+                "betting_odds": null,
+                "age_at_fight": 32.719,
+                "latest_weight": "185.0 lbs (83.9 kgs)",
+                "height_inches": 75.0,
+                "reach_inches": 76.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/16027-kyle-daukaus",
+                "img_link": "https://images.tapology.com/headshot_images/16027/preview/Screenshot_%281%29.png?1754435357"
+            }
+        },
+        {
+            "fight_overview": {
+                "fight_card_type": "Prelim",
+                "weight_class_weight": "185",
+                "weight_class": "Middleweight"
+            },
+            "fighter1": {
+                "fighter_name": "Bo Nickal",
+                "record": "7-1",
+                "nickname": null,
+                "betting_odds": null,
+                "age_at_fight": 29.837,
+                "latest_weight": "185.5 lbs (84.1 kgs)",
+                "height_inches": 73.0,
+                "reach_inches": 76.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/244627-bo-nickal",
+                "img_link": "https://images.tapology.com/headshot_images/244627/preview/Bo_Nickal-hs.jpg?1657132648"
+            },
+            "fighter2": {
+                "fighter_name": "Rodolfo Vieira",
+                "record": "11-3",
+                "nickname": "The Black Belt Hunter",
+                "betting_odds": null,
+                "age_at_fight": 36.141,
+                "latest_weight": "185.0 lbs (83.9 kgs)",
+                "height_inches": 72.0,
+                "reach_inches": 73.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/148791-rodolfo-vieira-srour-the-black-belt-hunter",
+                "img_link": "https://images.tapology.com/headshot_images/148791/preview/Rodolfo_Vieira-hs.jpg?1596547488"
+            }
+        },
+        {
+            "fight_overview": {
+                "fight_card_type": "Prelim",
+                "weight_class_weight": "185",
+                "weight_class": "Middleweight"
+            },
+            "fighter1": {
+                "fighter_name": "Roman Kopylov",
+                "record": "14-4",
+                "nickname": null,
+                "betting_odds": null,
+                "age_at_fight": 34.531,
+                "latest_weight": "185.0 lbs (83.9 kgs)",
+                "height_inches": 72.0,
+                "reach_inches": 75.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/138424-roman-kopylov",
+                "img_link": "https://images.tapology.com/headshot_images/138424/preview/Roman_Kopylov-hs.jpg?1551056313"
+            },
+            "fighter2": {
+                "fighter_name": "Gregory Rodrigues",
+                "record": "17-6",
+                "nickname": "Robocop",
+                "betting_odds": null,
+                "age_at_fight": 33.747,
+                "latest_weight": "186.0 lbs (84.4 kgs)",
+                "height_inches": 75.0,
+                "reach_inches": 75.0,
+                "link": "https://www.tapology.com/fightcenter/fighters/78681-gregory-rodrigues-robocop",
+                "img_link": "https://images.tapology.com/headshot_images/78681/preview/Screenshot_%281%29.png?1739207542"
+            }
+        }
+    ]
+}

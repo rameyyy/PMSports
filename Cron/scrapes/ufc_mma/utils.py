@@ -1,5 +1,12 @@
 import re
 from bs4 import BeautifulSoup
+from datetime import datetime, date
+
+### BASE LINKS FROM UFC-STATS AND TAPOLOGY ###
+ufcstats_fight_details_link = 'http://www.ufcstats.com/fight-details/'
+tapology_fighter_profile_link = 'https://www.tapology.com/fightcenter/fighters/'
+### END ###
+
 
 def ufc_weight_class(weight):
     weight = float(weight)
@@ -20,6 +27,7 @@ def ufc_weight_class(weight):
     elif weight <= 265:
         return "Heavyweight"
     return "Super Heavyweight"
+
 
 def parse_fight_type(fight_str: str):
     """
@@ -62,6 +70,7 @@ def parse_fight_type(fight_str: str):
 
     return weight_class, is_title
 
+
 def get_event_title(soup: BeautifulSoup):
     TITLE_HINTS = re.compile(
         r"\b(UFC|Fight Night|Bellator|PFL|Contender|Invicta|One|Cage|LFA)\b", re.I
@@ -94,6 +103,7 @@ def get_event_title(soup: BeautifulSoup):
 
     return None
 
+
 def get_event_date_location(soup: BeautifulSoup):
     date, location = None, None
     details = soup.select("ul[data-controller='unordered-list-background'] li")
@@ -111,3 +121,23 @@ def get_event_date_location(soup: BeautifulSoup):
             location = value.get_text(" ", strip=True)
 
     return date, location
+
+
+def parse_event_date(date_str: str):
+    cleaned = date_str.replace("ET", "").strip()
+    dt = datetime.strptime(cleaned, "%A %m.%d.%Y at %I:%M %p")
+    sql_date = dt.strftime("%Y-%m-%d")
+    today = date.today()
+    is_future = 1 if dt.date() >= today else 0
+    return sql_date, is_future
+
+
+def _normalize_dob(dob_str: str):
+    """Convert 'MM-DD-YYYY' -> 'YYYY-MM-DD'. Returns None if invalid/empty."""
+    if not dob_str:
+        return None
+    try:
+        dt = datetime.strptime(dob_str, "%m-%d-%Y")
+        return dt.strftime("%Y-%m-%d")
+    except ValueError:
+        return None
