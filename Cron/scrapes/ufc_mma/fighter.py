@@ -672,13 +672,17 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname):
                 response_ = requests.get(i['link'], headers=HEADERS)
                 soup_ = BeautifulSoup(response_.text, "html.parser")
                 links = get_fighter_links(soup_)
-                response = requests.get(fighters_url_ufcstats, headers=HEADERS)
-                soup = BeautifulSoup(response.text, "html.parser")
                 if links:
                     for link in links:
                         if fid not in link:
+                            fight_idt = i['link'].rstrip("/").split("/")[-1]
                             opp_fid = link.rstrip("/").split("/")[-1]
-                            upcoming.append([fid, opp_fid])
+                            response_1 = requests.get(link, headers=HEADERS)
+                            soup_1 = BeautifulSoup(response_1.text, "html.parser")
+                            f2_careerstats = extract_career_stats(soup_1)
+                            f2_careerstats['fighter_id'] = opp_fid
+                            f2_careerstats['fighter_name'] = None
+                            upcoming.append({'fight_id': fight_idt, 'fighter1_name': fname, 'fighter1_id': fid, 'fighter2_careerstats': f2_careerstats})
                             break
                 continue
             else:

@@ -1,7 +1,8 @@
-from scrapes.ufc_mma import get_all_events, get_event_data, get_fighter_data, push_events, EventNameIndex, push_fighter
+from scrapes.ufc_mma import get_all_events, get_event_data, get_fighter_data, push_events, EventNameIndex, push_fighter, create_connection
 import time
 
 def main():
+    conn = create_connection()
     total_fights = 0
     total_events = 0
     events_arr = []
@@ -15,14 +16,7 @@ def main():
     for event_url in events_arr:
         data = get_event_data(event_url, getting_old_data=False)
         idx = EventNameIndex(data)
-        # with open("event.json", "w") as f:
-        #     json.dump(data, f, indent=4)  # indent=4 makes it pretty
-        
-        check = push_events(data)
-        if check:
-            print('worked')
-        else:
-            print('did not work')
+        check = push_events(data, conn)
         if data is not None:
             print(f"--- {event_url} ---\n")
             print(f"Title: {data['title']}")
@@ -37,14 +31,14 @@ def main():
                 fighter2_career_stats, fights_arr2, upcoming2 = get_fighter_data(fighter2s_url, fighter2)
                 if fighter1_career_stats == None: # fighter has not faught for ufc yet (debut)
                     continue
-                push_fighter(idx, fighter1_career_stats)
-                push_fighter(idx, fighter2_career_stats)
+                push_fighter(idx, fighter1_career_stats, conn)
+                push_fighter(idx, fighter2_career_stats, conn)
                 for i in fights_arr1:
                     random_career_stats = i.get('ops_careerstats')
-                    if random_career_stats: push_fighter(idx, random_career_stats)
+                    if random_career_stats: push_fighter(idx, random_career_stats, conn)
                 for i in fights_arr2:
                     random_career_stats = i.get('ops_careerstats')
-                    if random_career_stats: push_fighter(idx, random_career_stats)
+                    if random_career_stats: push_fighter(idx, random_career_stats, conn)
                 
                 total_fights += (len(fights_arr1) + len(fights_arr2))
             total_events += 1

@@ -104,5 +104,4 @@ class EventNameIndex:
 
         if best_f and best_score >= threshold:
             return best_f["fighter_name"], best_score, best_f
-        print(target_name, 'no match, closest:', best_f["fighter_name"], best_score)
         return None, best_score, None
