@@ -47,7 +47,6 @@ except Exception:
         return min(base, 1.0)
     HAVE_RF = False
 
-
 class EventNameIndex:
     """Build once per event; reuse for many lookups."""
     __slots__ = ("fighters", "cands_norm", "cands_init")
@@ -56,16 +55,29 @@ class EventNameIndex:
         # collect candidate fighter dicts once
         seen = set()
         fighters = []
+
         for bout in event_json.get("fights", []):
+            ov = bout.get("fight_overview", {}) or {}
+            # pull the 3 overview fields you want
+            ov_fields = {
+                "fight_card_type": ov.get("fight_card_type"),
+                "weight_class_weight": ov.get("weight_class_weight"),
+                "weight_class": ov.get("weight_class"),
+            }
+
             for k in ("fighter1", "fighter2"):
-                f = bout.get(k, {})
+                f = bout.get(k, {}) or {}
                 n = f.get("fighter_name")
                 if not n:
                     continue
                 key = _norm(n)
                 if key and key not in seen:
                     seen.add(key)
-                    fighters.append(f)  # store whole dict
+                    # make a copy and enrich with overview fields
+                    f_enriched = dict(f)
+                    f_enriched.update(ov_fields)
+                    fighters.append(f_enriched)
+
         self.fighters = fighters
         self.cands_norm = [_norm(f["fighter_name"]) for f in fighters]
         self.cands_init = [_initials_variant(n) for n in self.cands_norm]

@@ -1,6 +1,6 @@
 import mysql.connector
 from mysql.connector import Error
-from .utils import parse_event_date, _normalize_dob, tapology_fighter_profile_link
+from .utils import parse_event_date, _normalize_dob, tapology_fighter_profile_link, ufcstats_fight_details_link
 from dotenv import load_dotenv
 import os
 
@@ -103,6 +103,7 @@ def push_fighter(idx, careerstats, conn):
         return False
     fname = careerstats.get("fighter_name")
     match, score, fighter_eventset = idx.find(fname, threshold=0.82)
+    print(fighter_eventset)
     if match:
         final_name = match
         nickname = fighter_eventset.get("nickname")
@@ -243,6 +244,91 @@ def push_fights(idx, dataset, conn):
         "referee":       meta.get("ref"),
         "end_time":      meta.get("time"),          # fights.end_time is VARCHAR(50)
         "weight_class":  meta.get("weight_class"),
+    }
+    return run_query(conn, cmd, params)
+
+def push_fights_upcoming(idx, dataset, conn):
+    """
+    Upsert a fight row into `fights`.
+    Expects keys like:
+      dataset['fight_id'], ['url'], ['date'], ['meta']{method, format, type, ref, time, weight_class}
+      dataset['stats']['fighters'] -> [fighter1_name, fighter2_name]
+      dataset['winner_loser'] -> {winner, loser}
+    """
+    fname_1 = dataset.get('fighter1_name')
+    fighter2_career_stats = dataset.get('fighter2_careerstats')
+    fname_2 = fighter2_career_stats.get('fighter_name')
+
+    fname1_match, score, fighter_eventset_1 = idx.find(fname_1, threshold=0.82)
+    fname2_match, score, fighter_eventset_2 = idx.find(fname_2, threshold=0.82)
+    if not fname1_match and not fname2_match:
+        return False
+    
+    if not conn:
+        return False
+    
+    fight_type_pre = fighter_eventset_1.get('fight_card_type').lower()
+    if 'main event' in fight_type_pre:
+        fight_type = 'main'
+    elif 'title' in fight_type_pre:
+        fight_type = 'title'
+    else: fight_type = None
+
+    if fight_type:
+        fight_format = 5
+    else:
+        fight_format = 3
+
+    weight_class = fighter_eventset_1.get('weight_class')
+
+    # parse date -> DATE (you already have parse_event_date)
+    fight_date, _ = parse_event_date(fighter_eventset_1.get("date"))
+
+    cmd = """
+        INSERT INTO fights (
+            fight_id, event_id, fighter1_id, fighter2_id, winner_id, loser_id,
+            fighter1_name, fighter2_name, fight_date, fight_link, method,
+            fight_format, fight_type, referee, end_time, weight_class
+        ) VALUES (
+            %(fight_id)s, %(event_id)s, %(fighter1_id)s, %(fighter2_id)s, %(winner_id)s, %(loser_id)s,
+            %(fighter1_name)s, %(fighter2_name)s, %(fight_date)s, %(fight_link)s, %(method)s,
+            %(fight_format)s, %(fight_type)s, %(referee)s, %(end_time)s, %(weight_class)s
+        )
+        ON DUPLICATE KEY UPDATE
+            event_id      = VALUES(event_id),
+            fighter1_id   = VALUES(fighter1_id),
+            fighter2_id   = VALUES(fighter2_id),
+            winner_id     = VALUES(winner_id),
+            loser_id      = VALUES(loser_id),
+            fighter1_name = VALUES(fighter1_name),
+            fighter2_name = VALUES(fighter2_name),
+            fight_date    = VALUES(fight_date),
+            fight_link    = VALUES(fight_link),
+            method        = VALUES(method),
+            fight_format  = VALUES(fight_format),
+            fight_type    = VALUES(fight_type),
+            referee       = VALUES(referee),
+            end_time      = VALUES(end_time),
+            weight_class  = VALUES(weight_class)
+    """
+    params = {
+        "fight_id":     dataset.get("fight_id"),
+        # fill these if/when you resolve IDs upstream; otherwise None is fine
+        "event_id":     fighter_eventset_1.get("event_id"),
+        "fighter1_id":  dataset.get("fighter1_id"),
+        "fighter2_id":  fighter2_career_stats.get("fighter_id"),
+        "winner_id":    None,
+        "loser_id":     None,
+        "fighter1_name": fname_1,
+        "fighter2_name": fname_2,
+        "fight_date":    fight_date,
+        "fight_link":    f'{ufcstats_fight_details_link}{dataset.get("fight_id")}',
+        "method":        None,
+        "fight_format":  fight_format,
+        "fight_type":    fight_type,
+        "referee":       None,
+        "end_time":      None,          # fights.end_time is VARCHAR(50)
+        "weight_class":  weight_class,
     }
     return run_query(conn, cmd, params)
 
