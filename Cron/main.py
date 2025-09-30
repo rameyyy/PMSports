@@ -33,12 +33,24 @@ def main():
                     continue
                 push_fighter(idx, fighter1_career_stats, conn)
                 push_fighter(idx, fighter2_career_stats, conn)
-                for i in fights_arr1:
-                    random_career_stats = i.get('ops_careerstats')
-                    if random_career_stats: push_fighter(idx, random_career_stats, conn)
-                for i in fights_arr2:
-                    random_career_stats = i.get('ops_careerstats')
-                    if random_career_stats: push_fighter(idx, random_career_stats, conn)
+                if fights_arr1:
+                    for i in fights_arr1:
+                        random_career_stats = i.get('ops_careerstats')
+                        if random_career_stats: push_fighter(idx, random_career_stats, conn)
+                if fights_arr2:
+                    for i in fights_arr2:
+                        random_career_stats = i.get('ops_careerstats')
+                        if random_career_stats: push_fighter(idx, random_career_stats, conn)
+                print(upcoming1)
+                print(upcoming2)
+                if upcoming1:
+                    for dict_data in upcoming1:
+                        print(dict_data)
+                        push_fighter(idx, dict_data['fighter2_careerstats'], conn)
+                if upcoming2:
+                    for dict_data in upcoming1:
+                        print(dict_data)
+                        push_fighter(idx, dict_data['fighter2_careerstats'], conn)
                 
                 total_fights += (len(fights_arr1) + len(fights_arr2))
             total_events += 1

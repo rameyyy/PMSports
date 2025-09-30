@@ -478,6 +478,10 @@ def parse_fight_meta(soup: BeautifulSoup) -> dict:
         pass
     return meta
 
+def get_fname_from_fighter_details(soup):
+    for p in soup.select('span.b-content__title-highlight'):
+        raw = p.text.strip()
+        return raw
 
 def extract_career_stats(soup):
     stats = {}
@@ -680,8 +684,9 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname):
                             response_1 = requests.get(link, headers=HEADERS)
                             soup_1 = BeautifulSoup(response_1.text, "html.parser")
                             f2_careerstats = extract_career_stats(soup_1)
+                            f2_careerstats = clean_fighter_stats(f2_careerstats)
                             f2_careerstats['fighter_id'] = opp_fid
-                            f2_careerstats['fighter_name'] = None
+                            f2_careerstats['fighter_name'] = get_fname_from_fighter_details(soup_1)
                             upcoming.append({'fight_id': fight_idt, 'fighter1_name': fname, 'fighter1_id': fid, 'fighter2_careerstats': f2_careerstats})
                             break
                 continue

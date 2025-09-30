@@ -99,6 +99,8 @@ def push_fighter(idx, careerstats, conn):
         return False
 
     # --- Match fighter name ---
+    if not careerstats:
+        return False
     fname = careerstats.get("fighter_name")
     match, score, fighter_eventset = idx.find(fname, threshold=0.82)
     if match:
@@ -170,24 +172,9 @@ def push_fighter(idx, careerstats, conn):
     """
     return run_query(conn, cmd, fighter_data)
 
-
-
 ###### FUNCS NOT WORKED ON YET ######
-# --- helpers ---------------------------------------------------------------
 
-def _mmss_to_seconds(s):
-    """'MM:SS' -> int seconds. Returns None on falsy/invalid."""
-    if not s or not isinstance(s, str) or ":" not in s:
-        return None
-    m, s = s.split(":")
-    try:
-        return int(m) * 60 + int(s)
-    except ValueError:
-        return None
-
-# --- fights ----------------------------------------------------------------
-
-def push_fights(dataset, conn):
+def push_fights(idx, dataset, conn):
     """
     Upsert a fight row into `fights`.
     Expects keys like:
@@ -195,6 +182,11 @@ def push_fights(dataset, conn):
       dataset['stats']['fighters'] -> [fighter1_name, fighter2_name]
       dataset['winner_loser'] -> {winner, loser}
     """
+    fname_winner = dataset['winner_loser']['winner']
+    fname_loser = dataset['winner_loser']['loser']
+
+    # match_winner, score, fighter_eventset_winner = idx.find(fname_winner, threshold=0.82)
+    # match_winner, score, fighter_eventset_winner = idx.find(fname_winner, threshold=0.82)
     if not conn:
         return False
 

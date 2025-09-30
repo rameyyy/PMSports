@@ -141,3 +141,13 @@ def _normalize_dob(dob_str: str):
         return dt.strftime("%Y-%m-%d")
     except ValueError:
         return None
+
+def _mmss_to_seconds(s):
+    """'MM:SS' -> int seconds. Returns None on falsy/invalid."""
+    if not s or not isinstance(s, str) or ":" not in s:
+        return None
+    m, s = s.split(":")
+    try:
+        return int(m) * 60 + int(s)
+    except ValueError:
+        return None
