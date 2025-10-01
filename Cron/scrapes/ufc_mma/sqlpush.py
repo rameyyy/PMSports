@@ -211,8 +211,8 @@ def push_fights(idx, dataset, career_stats, conn):
         winner_id = fighter2_id
         loser_id = fighter1_id
     elif fname_winner == 'draw':
-        winner_id = 'draw'
-        loser_id = 'draw'
+        winner_id = 'drawornc'
+        loser_id = 'drawornc'
     else:
         return False #Names dont match fake data lol
     
@@ -225,8 +225,8 @@ def push_fights(idx, dataset, career_stats, conn):
     event_date_real = None
     if fname1_match and fname2_match:
         event_date = parse_event_date(fighter_eventset_1.get('date'))
-        if event_date == fight_date:
-            event_date_real = event_date
+        if event_date[0] == fight_date:
+            event_date_real = fighter_eventset_1.get('event_id')
     meta = dataset.get("meta")
     cmd = """
         INSERT INTO fights (

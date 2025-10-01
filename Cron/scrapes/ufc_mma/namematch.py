@@ -48,24 +48,27 @@ except Exception:
     HAVE_RF = False
 
 def compare_names(name_a: str, name_b: str) -> float:
-    """
-    Return similarity score between two fighter names (0.0–1.0).
-    Uses the same normalization + RapidFuzz (if available) as EventNameIndex.
-    """
-    a_norm = _norm(name_a).replace(" ", "")
-    b_norm = _norm(name_b).replace(" ", "")
+    a_norm = _norm(name_a)
+    b_norm = _norm(name_b)
     if not a_norm or not b_norm:
         return 0.0
 
-    # base score
-    s = _score(a_norm, b_norm)
+    # Token sets
+    A, B = set(a_norm.split()), set(b_norm.split())
+    inter = len(A & B)
+    score = (2.0 * inter) / (len(A) + len(B))
 
-    # also check initials and combine
-    a_init = _initials_variant(a_norm)
-    b_init = _initials_variant(b_norm)
-    s = max(s, _score(a_init, b_norm), _score(a_norm, b_init))
+    # Extra: boost if one is contained inside the other
+    if a_norm in b_norm or b_norm in a_norm:
+        score = max(score, 0.9)
 
-    return s
+    # If RapidFuzz available, combine with token_set_ratio
+    if HAVE_RF:
+        rf = fuzz.token_set_ratio(a_norm, b_norm) / 100.0
+        score = max(score, rf)
+
+    return score
+
 
 class EventNameIndex:
     """Build once per event; reuse for many lookups."""

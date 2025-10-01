@@ -4,6 +4,7 @@ from datetime import datetime
 import re
 from .utils import parse_fight_type
 from difflib import SequenceMatcher
+from .sqlpush import fetch_query, create_connection
 
 
 BASE_URL = "https://www.tapology.com"
@@ -656,7 +657,7 @@ def get_single_fight_stats(url: str, date, og_link, fname):
     return fight_data, resp_code
 
 
-def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname):
+def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname, conn):
     response = requests.get(fighters_url_ufcstats, headers=HEADERS)
     soup = BeautifulSoup(response.text, "html.parser")
     data = extract_career_stats(soup = soup)
@@ -667,8 +668,20 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname):
     fighter_career_stats['fighter_id'] = fid
     fights_arr = []
     upcoming = []
+    cmd = """
+    SELECT *
+    FROM ufc.fights
+    WHERE fight_id = %s
+    """
+    skipped = 0
     for i in fight_links:
         try:
+            fightid = i['link'].rstrip("/").split("/")[-1]
+            rows = fetch_query(conn, cmd, (fightid,))
+            if rows:
+                skipped+=1
+                resp_code = 200
+                continue
             data, resp_code = get_single_fight_stats(i['link'], i['date'], fighters_url_ufcstats, fname)
             fights_arr.append(data)
         except ValueError as e:
@@ -694,6 +707,7 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname):
             else:
                 # If it's some other ValueError, re-raise so you don’t hide real bugs
                 raise
+    print(f'Skipped {skipped} fight(s) as those fight_ids were already in SQL...')
     return fighter_career_stats, fights_arr, upcoming, resp_code
 
 
@@ -702,6 +716,7 @@ def get_fighter_data(fighters_url: str, fname):
     soup = BeautifulSoup(response.text, "html.parser")
     link=get_ufcstats_link(soup_or_html=soup)
     if link:
-        fighter_career_stats, fights_arr, upcoming, resp_code = get_fighter_data_ufc_stats(link, fname)
+        conn = create_connection()
+        fighter_career_stats, fights_arr, upcoming, resp_code = get_fighter_data_ufc_stats(link, fname, conn)
         return fighter_career_stats, fights_arr, upcoming, resp_code
     return None, None, None, 200

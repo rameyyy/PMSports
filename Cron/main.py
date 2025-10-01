@@ -7,20 +7,23 @@ def main():
     total_fights = 0
     total_events = 0
     events_arr = []
-    for page_num in range(1, 2):
-        events = get_all_events(past=False, page=page_num)
+    for page_num in range(1, 16):
+        events = get_all_events(past=True, page=page_num)
+        if not events:
+            continue
         events_arr.extend(events)
-    events_arr = set(events_arr)
+    events_arr = sorted(set(events_arr), reverse=False) # terminal 2
     print(f"Found {len(events_arr)} events")
+    print(f'Pushing to SQL set to {PUSHVAR}')
     for event_url in events_arr:
-        data = get_event_data(event_url, getting_old_data=False)
+        data = get_event_data(event_url, getting_old_data=True)
         event_id = data.get('event_id')
         query = "SELECT * FROM ufc.events WHERE event_id = %s"
         params = (event_id,)
         rows = fetch_query(conn, query, params)
         if rows: # event data already in
             print(f'event: {event_id} already in SQL')
-            # continue
+            continue
         else:
             print(f'event {event_id} not in SQL yet, continuing..')
         idx = EventNameIndex(data)
@@ -39,7 +42,7 @@ def main():
                 fighter1_career_stats, fights_arr1, upcoming1, resp_code1 = get_fighter_data(fighter1s_url, fighter1)
                 fighter2_career_stats, fights_arr2, upcoming2, resp_code2 = get_fighter_data(fighter2s_url, fighter2)
                 if resp_code1 == 200 and resp_code2 == 200:
-                    print(f'http request response was valid')
+                    pass
                 else:
                     print(f"over requesting server, responses stopped. resp codes: {resp_code1}, {resp_code2}\nstopping program on event_id = '{event_id}'")
                     exit()
@@ -57,7 +60,6 @@ def main():
                         if not i['winner_loser']['winner'] or not i['winner_loser']['loser']:
                             i['winner_loser']['winner'] = 'draw'
                             i['winner_loser']['loser'] = 'draw'
-                            continue
                         if PUSHVAR:
                             push_fights(idx, i, fighter1_career_stats, conn)
                             push_totals(i, fighter1_career_stats, conn)
@@ -69,8 +71,8 @@ def main():
                             if PUSHVAR:
                                 push_fighter(idx, random_career_stats, conn)
                         if not i['winner_loser']['winner'] or not i['winner_loser']['loser']:
-                            print(i)
-                            continue
+                            i['winner_loser']['winner'] = 'draw'
+                            i['winner_loser']['loser'] = 'draw'
                         if PUSHVAR:
                             push_fights(idx, i, fighter2_career_stats, conn)
                             push_totals(i, fighter2_career_stats, conn)
@@ -89,8 +91,8 @@ def main():
                 total_fights += (len(fights_arr1) + len(fights_arr2))
             print()
             total_events += 1
-            if total_events == 4:
-                break
+            # if total_events == 5:
+            #     break
 
     print(f"\nTotal fights scraped: {total_fights}")
     print(f"Total events scraped: {total_events}")
