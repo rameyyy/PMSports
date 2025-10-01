@@ -19,6 +19,25 @@ def empty_to_none(obj):
         return obj
 
 
+def dedupe_fighters(arr):
+    chosen = {}
+    for name, link in arr:
+        # If link not seen yet, take it
+        if link not in chosen:
+            chosen[link] = name
+        else:
+            # Prefer the one without a leading initial
+            current = chosen[link]
+            if name and current and name[1:2] == '.' and not current[1:2] == '.':
+                # keep current (full name already stored)
+                continue
+            elif current and current[1:2] == '.' and not name[1:2] == '.':
+                # replace abbreviation with full name
+                chosen[link] = name
+            # else: keep whichever was stored first
+    return [[n, l] for l, n in chosen.items()]
+
+
 def parse_fight_details(tag):
     records_to_find = tag.find_all(lambda tag: tag.name == 'span' and 'text-[15px]' in tag.get('class', []))
     fighter_links = tag.find_all('a', class_='link-primary-red')
@@ -62,9 +81,10 @@ def parse_fight_details(tag):
             if key not in seen:
                 seen.add(key)
                 fighters.append([name, link])
-            if len(fighters) == 2:
-                break
-        return fighters
+        if len(fighters) == 2:
+            return fighters
+        deduped = dedupe_fighters(fighters)
+        return deduped
 
     def get_fighter_records(tag_list):
         """
@@ -146,6 +166,7 @@ def parse_fight_details(tag):
         total_days = months * 30.44 + weeks * 7 + days  # avg month length
         return round(years + total_days / 365, 3)
 
+    
     fighter1_name = fighters_data[0][0]
     fighter2_name = fighters_data[1][0]
     fighter1_name, fighter2_name = fighter1_name.strip('"'), fighter2_name.strip('"')

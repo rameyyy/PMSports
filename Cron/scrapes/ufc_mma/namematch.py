@@ -47,6 +47,26 @@ except Exception:
         return min(base, 1.0)
     HAVE_RF = False
 
+def compare_names(name_a: str, name_b: str) -> float:
+    """
+    Return similarity score between two fighter names (0.0–1.0).
+    Uses the same normalization + RapidFuzz (if available) as EventNameIndex.
+    """
+    a_norm = _norm(name_a).replace(" ", "")
+    b_norm = _norm(name_b).replace(" ", "")
+    if not a_norm or not b_norm:
+        return 0.0
+
+    # base score
+    s = _score(a_norm, b_norm)
+
+    # also check initials and combine
+    a_init = _initials_variant(a_norm)
+    b_init = _initials_variant(b_norm)
+    s = max(s, _score(a_init, b_norm), _score(a_norm, b_init))
+
+    return s
+
 class EventNameIndex:
     """Build once per event; reuse for many lookups."""
     __slots__ = ("fighters", "cands_norm", "cands_init")
@@ -55,7 +75,8 @@ class EventNameIndex:
         # collect candidate fighter dicts once
         seen = set()
         fighters = []
-
+        fdate = event_json.get('date')
+        event_id = event_json.get('event_id').rstrip("/").split("/")[-1]
         for bout in event_json.get("fights", []):
             ov = bout.get("fight_overview", {}) or {}
             # pull the 3 overview fields you want
@@ -63,6 +84,8 @@ class EventNameIndex:
                 "fight_card_type": ov.get("fight_card_type"),
                 "weight_class_weight": ov.get("weight_class_weight"),
                 "weight_class": ov.get("weight_class"),
+                "date": fdate,
+                "event_id": event_id
             }
 
             for k in ("fighter1", "fighter2"):

@@ -618,6 +618,7 @@ def least_similar(given: str, candidates: list[str]) -> str:
 def get_single_fight_stats(url: str, date, og_link, fname):
     response = requests.get(url, headers=HEADERS)
     soup = BeautifulSoup(response.text, 'html.parser')
+    resp_code = response.status_code
 
     # Collect all the different dicts
     fighter_links = get_fighter_links(soup)
@@ -652,7 +653,7 @@ def get_single_fight_stats(url: str, date, og_link, fname):
         f'ops_careerstats': ops_career_stats_cleaned,
         "stats": fight_stats
     }
-    return fight_data
+    return fight_data, resp_code
 
 
 def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname):
@@ -668,7 +669,7 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname):
     upcoming = []
     for i in fight_links:
         try:
-            data = get_single_fight_stats(i['link'], i['date'], fighters_url_ufcstats, fname)
+            data, resp_code = get_single_fight_stats(i['link'], i['date'], fighters_url_ufcstats, fname)
             fights_arr.append(data)
         except ValueError as e:
             # Only catch the int conversion error you mentioned
@@ -693,7 +694,7 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname):
             else:
                 # If it's some other ValueError, re-raise so you don’t hide real bugs
                 raise
-    return fighter_career_stats, fights_arr, upcoming
+    return fighter_career_stats, fights_arr, upcoming, resp_code
 
 
 def get_fighter_data(fighters_url: str, fname):
@@ -701,6 +702,6 @@ def get_fighter_data(fighters_url: str, fname):
     soup = BeautifulSoup(response.text, "html.parser")
     link=get_ufcstats_link(soup_or_html=soup)
     if link:
-        fighter_career_stats, fights_arr, upcoming = get_fighter_data_ufc_stats(link, fname)
-        return fighter_career_stats, fights_arr, upcoming
-    return None, None, None
+        fighter_career_stats, fights_arr, upcoming, resp_code = get_fighter_data_ufc_stats(link, fname)
+        return fighter_career_stats, fights_arr, upcoming, resp_code
+    return None, None, None, 200

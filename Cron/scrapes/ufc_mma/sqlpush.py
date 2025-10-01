@@ -1,7 +1,8 @@
 import mysql.connector
 from mysql.connector import Error
-from .utils import parse_event_date, _normalize_dob, tapology_fighter_profile_link, ufcstats_fight_details_link
+from .utils import parse_event_date, _normalize_dob, _mmss_to_seconds, _to_sql_date, normalize_name, tapology_fighter_profile_link, ufcstats_fight_details_link
 from dotenv import load_dotenv
+from .namematch import compare_names
 import os
 
 # load environment variables from .env
@@ -101,9 +102,10 @@ def push_fighter(idx, careerstats, conn):
     # --- Match fighter name ---
     if not careerstats:
         return False
+    
     fname = careerstats.get("fighter_name")
     match, score, fighter_eventset = idx.find(fname, threshold=0.82)
-    print(fighter_eventset)
+    
     if match:
         final_name = match
         nickname = fighter_eventset.get("nickname")
@@ -112,6 +114,7 @@ def push_fighter(idx, careerstats, conn):
         final_name = fname
         nickname = None
         img_link = None
+    final_name = normalize_name(final_name)
 
     # --- Prepare insert payload ---
     fighter_data = {
@@ -175,7 +178,7 @@ def push_fighter(idx, careerstats, conn):
 
 ###### FUNCS NOT WORKED ON YET ######
 
-def push_fights(idx, dataset, conn):
+def push_fights(idx, dataset, career_stats, conn):
     """
     Upsert a fight row into `fights`.
     Expects keys like:
@@ -183,22 +186,48 @@ def push_fights(idx, dataset, conn):
       dataset['stats']['fighters'] -> [fighter1_name, fighter2_name]
       dataset['winner_loser'] -> {winner, loser}
     """
-    fname_winner = dataset['winner_loser']['winner']
-    fname_loser = dataset['winner_loser']['loser']
-
-    # match_winner, score, fighter_eventset_winner = idx.find(fname_winner, threshold=0.82)
-    # match_winner, score, fighter_eventset_winner = idx.find(fname_winner, threshold=0.82)
+    if not dataset:
+        return False
+    
     if not conn:
         return False
 
+    fighter1_name = career_stats.get('fighter_name')
+    fighter1_id = career_stats.get('fighter_id')
+    
+    fighter2_name = dataset['ops_careerstats']['fighter_name']
+    fighter2_id = dataset['ops_careerstats']['fighter_id']
+    
+    fname_winner = dataset['winner_loser']['winner']
+    fname_loser = dataset['winner_loser']['loser']
+    fighter1_name = normalize_name(fighter1_name)
+    fighter2_name = normalize_name(fighter2_name)
+    fname_winner = normalize_name(fname_winner)
+    fname_loser = normalize_name(fname_loser)
+    if fighter1_name == fname_winner:
+        winner_id = fighter1_id
+        loser_id = fighter2_id
+    elif fighter2_name == fname_winner:
+        winner_id = fighter2_id
+        loser_id = fighter1_id
+    elif fname_winner == 'draw':
+        winner_id = 'draw'
+        loser_id = 'draw'
+    else:
+        return False #Names dont match fake data lol
+    
+    fname1_match, score, fighter_eventset_1 = idx.find(fighter1_name, threshold=0.78)
+    fname2_match, score, fighter_eventset_2 = idx.find(fighter2_name, threshold=0.78)
+
+
     # parse date -> DATE (you already have parse_event_date)
-    fight_date, _ = parse_event_date(dataset.get("date"))
-
-    fighters = (dataset.get("stats", {}).get("fighters") or [None, None])
-    f1_name = fighters[0] if len(fighters) > 0 else None
-    f2_name = fighters[1] if len(fighters) > 1 else None
-
-    meta = dataset.get("meta", {}) or {}
+    fight_date = _to_sql_date(dataset.get('date'))
+    event_date_real = None
+    if fname1_match and fname2_match:
+        event_date = parse_event_date(fighter_eventset_1.get('date'))
+        if event_date == fight_date:
+            event_date_real = event_date
+    meta = dataset.get("meta")
     cmd = """
         INSERT INTO fights (
             fight_id, event_id, fighter1_id, fighter2_id, winner_id, loser_id,
@@ -228,21 +257,20 @@ def push_fights(idx, dataset, conn):
     """
     params = {
         "fight_id":     dataset.get("fight_id"),
-        # fill these if/when you resolve IDs upstream; otherwise None is fine
-        "event_id":     dataset.get("event_id"),
-        "fighter1_id":  dataset.get("fighter1_id"),
-        "fighter2_id":  dataset.get("fighter2_id"),
-        "winner_id":    dataset.get("winner_id"),
-        "loser_id":     dataset.get("loser_id"),
-        "fighter1_name": f1_name,
-        "fighter2_name": f2_name,
+        "event_id":     event_date_real,
+        "fighter1_id":  fighter1_id,
+        "fighter2_id":  fighter2_id,
+        "winner_id":    winner_id,
+        "loser_id":     loser_id,
+        "fighter1_name": fighter1_name,
+        "fighter2_name": fighter2_name,
         "fight_date":    fight_date,
         "fight_link":    dataset.get("url"),
         "method":        meta.get("method"),
         "fight_format":  meta.get("format"),
         "fight_type":    meta.get("type"),
         "referee":       meta.get("ref"),
-        "end_time":      meta.get("time"),          # fights.end_time is VARCHAR(50)
+        "end_time":      meta.get("time"),
         "weight_class":  meta.get("weight_class"),
     }
     return run_query(conn, cmd, params)
@@ -255,13 +283,13 @@ def push_fights_upcoming(idx, dataset, conn):
       dataset['stats']['fighters'] -> [fighter1_name, fighter2_name]
       dataset['winner_loser'] -> {winner, loser}
     """
-    fname_1 = dataset.get('fighter1_name')
+    fname_1 = normalize_name(dataset.get('fighter1_name'))
     fighter2_career_stats = dataset.get('fighter2_careerstats')
-    fname_2 = fighter2_career_stats.get('fighter_name')
+    fname_2 = normalize_name(fighter2_career_stats.get('fighter_name'))
 
-    fname1_match, score, fighter_eventset_1 = idx.find(fname_1, threshold=0.82)
-    fname2_match, score, fighter_eventset_2 = idx.find(fname_2, threshold=0.82)
-    if not fname1_match and not fname2_match:
+    fname1_match, score, fighter_eventset_1 = idx.find(fname_1, threshold=0.78)
+    fname2_match, score, fighter_eventset_2 = idx.find(fname_2, threshold=0.78)
+    if not fname1_match or not fname2_match:
         return False
     
     if not conn:
@@ -295,25 +323,24 @@ def push_fights_upcoming(idx, dataset, conn):
             %(fight_format)s, %(fight_type)s, %(referee)s, %(end_time)s, %(weight_class)s
         )
         ON DUPLICATE KEY UPDATE
-            event_id      = VALUES(event_id),
-            fighter1_id   = VALUES(fighter1_id),
-            fighter2_id   = VALUES(fighter2_id),
-            winner_id     = VALUES(winner_id),
-            loser_id      = VALUES(loser_id),
-            fighter1_name = VALUES(fighter1_name),
-            fighter2_name = VALUES(fighter2_name),
-            fight_date    = VALUES(fight_date),
-            fight_link    = VALUES(fight_link),
-            method        = VALUES(method),
-            fight_format  = VALUES(fight_format),
-            fight_type    = VALUES(fight_type),
-            referee       = VALUES(referee),
-            end_time      = VALUES(end_time),
-            weight_class  = VALUES(weight_class)
-    """
+            event_id      = IF(VALUES(event_id) IS NULL, event_id, VALUES(event_id)),
+            fighter1_id   = IF(VALUES(fighter1_id) IS NULL, fighter1_id, VALUES(fighter1_id)),
+            fighter2_id   = IF(VALUES(fighter2_id) IS NULL, fighter2_id, VALUES(fighter2_id)),
+            winner_id     = IF(VALUES(winner_id) IS NULL, winner_id, VALUES(winner_id)),
+            loser_id      = IF(VALUES(loser_id) IS NULL, loser_id, VALUES(loser_id)),
+            fighter1_name = IF(VALUES(fighter1_name) IS NULL, fighter1_name, VALUES(fighter1_name)),
+            fighter2_name = IF(VALUES(fighter2_name) IS NULL, fighter2_name, VALUES(fighter2_name)),
+            fight_date    = IF(VALUES(fight_date) IS NULL, fight_date, VALUES(fight_date)),
+            fight_link    = IF(VALUES(fight_link) IS NULL, fight_link, VALUES(fight_link)),
+            method        = IF(VALUES(method) IS NULL, method, VALUES(method)),
+            fight_format  = IF(VALUES(fight_format) IS NULL, fight_format, VALUES(fight_format)),
+            fight_type    = IF(VALUES(fight_type) IS NULL, fight_type, VALUES(fight_type)),
+            referee       = IF(VALUES(referee) IS NULL, referee, VALUES(referee)),
+            end_time      = IF(VALUES(end_time) IS NULL, end_time, VALUES(end_time)),
+            weight_class  = IF(VALUES(weight_class) IS NULL, weight_class, VALUES(weight_class))
+        """
     params = {
         "fight_id":     dataset.get("fight_id"),
-        # fill these if/when you resolve IDs upstream; otherwise None is fine
         "event_id":     fighter_eventset_1.get("event_id"),
         "fighter1_id":  dataset.get("fighter1_id"),
         "fighter2_id":  fighter2_career_stats.get("fighter_id"),
@@ -334,7 +361,7 @@ def push_fights_upcoming(idx, dataset, conn):
 
 # --- fight_totals ----------------------------------------------------------
 
-def push_totals(dataset, conn):
+def push_totals(dataset, careerstats, conn):
     """
     Upsert per-fighter totals into `fight_totals` (two rows, one per fighter).
     Uses composite PK (fight_id, fighter_id). If fighter_id is unknown, pass None
@@ -342,6 +369,10 @@ def push_totals(dataset, conn):
     you ensure (fight_id, fighter_id) uniqueness.
     """
     if not conn:
+        return False
+    if not dataset:
+        return False
+    if not careerstats:
         return False
 
     fight_id = dataset.get("fight_id")
@@ -361,13 +392,27 @@ def push_totals(dataset, conn):
     clinch = brk.get("clinch") or [{}, {}]
     ground = brk.get("ground") or [{}, {}]
     kd = totals.get("kd") or [None, None]
-
+    f1_name = normalize_name(dataset['ops_careerstats']['fighter_name'])
+    f1_id = dataset['ops_careerstats']['fighter_id']
+    f2_name = normalize_name(careerstats.get('fighter_name'))
+    f2_id = careerstats.get('fighter_id')
     rows = []
     for i in range(2):
+        fname = normalize_name(fighters[i])
+        if compare_names(fname, f1_name) > .88:
+            fid = f1_id
+            fighter_nameZ = f1_name
+        elif compare_names(fname, f2_name) > .88:
+            fid = f2_id
+            fighter_nameZ = f2_name
+        else:
+            print('no name to fid match')
+            print(f'{fname} != {f1_name}, {f2_name}')
+            return False # No real data
         rows.append({
             "fight_id": fight_id,
-            "fighter_id": (dataset.get("fighter1_id") if i == 0 else dataset.get("fighter2_id")),
-            "fighter_name": fighters[i] if i < len(fighters) else None,
+            "fighter_id": fid,
+            "fighter_name": fighter_nameZ,
             "kd": kd[i] if i < len(kd) else None,
             "sig_str_landed": sig[i].get("landed") if i < len(sig) else None,
             "sig_str_attempts": sig[i].get("attempts") if i < len(sig) else None,
@@ -411,30 +456,31 @@ def push_totals(dataset, conn):
             %(clinch_landed)s, %(clinch_attempts)s, %(ground_landed)s, %(ground_attempts)s
         )
         ON DUPLICATE KEY UPDATE
-            fighter_name        = VALUES(fighter_name),
-            kd                  = VALUES(kd),
-            sig_str_landed      = VALUES(sig_str_landed),
-            sig_str_attempts    = VALUES(sig_str_attempts),
-            total_str_landed    = VALUES(total_str_landed),
-            total_str_attempts  = VALUES(total_str_attempts),
-            td_landed           = VALUES(td_landed),
-            td_attempts         = VALUES(td_attempts),
-            sub_att             = VALUES(sub_att),
-            rev                 = VALUES(rev),
-            ctrl_time_s         = VALUES(ctrl_time_s),
-            head_landed         = VALUES(head_landed),
-            head_attempts       = VALUES(head_attempts),
-            body_landed         = VALUES(body_landed),
-            body_attempts       = VALUES(body_attempts),
-            leg_landed          = VALUES(leg_landed),
-            leg_attempts        = VALUES(leg_attempts),
-            distance_landed     = VALUES(distance_landed),
-            distance_attempts   = VALUES(distance_attempts),
-            clinch_landed       = VALUES(clinch_landed),
-            clinch_attempts     = VALUES(clinch_attempts),
-            ground_landed       = VALUES(ground_landed),
-            ground_attempts     = VALUES(ground_attempts)
-    """
+            fighter_name        = IF(VALUES(fighter_name) IS NULL, fighter_name, VALUES(fighter_name)),
+            kd                  = IF(VALUES(kd) IS NULL, kd, VALUES(kd)),
+            sig_str_landed      = IF(VALUES(sig_str_landed) IS NULL, sig_str_landed, VALUES(sig_str_landed)),
+            sig_str_attempts    = IF(VALUES(sig_str_attempts) IS NULL, sig_str_attempts, VALUES(sig_str_attempts)),
+            total_str_landed    = IF(VALUES(total_str_landed) IS NULL, total_str_landed, VALUES(total_str_landed)),
+            total_str_attempts  = IF(VALUES(total_str_attempts) IS NULL, total_str_attempts, VALUES(total_str_attempts)),
+            td_landed           = IF(VALUES(td_landed) IS NULL, td_landed, VALUES(td_landed)),
+            td_attempts         = IF(VALUES(td_attempts) IS NULL, td_attempts, VALUES(td_attempts)),
+            sub_att             = IF(VALUES(sub_att) IS NULL, sub_att, VALUES(sub_att)),
+            rev                 = IF(VALUES(rev) IS NULL, rev, VALUES(rev)),
+            ctrl_time_s         = IF(VALUES(ctrl_time_s) IS NULL, ctrl_time_s, VALUES(ctrl_time_s)),
+            head_landed         = IF(VALUES(head_landed) IS NULL, head_landed, VALUES(head_landed)),
+            head_attempts       = IF(VALUES(head_attempts) IS NULL, head_attempts, VALUES(head_attempts)),
+            body_landed         = IF(VALUES(body_landed) IS NULL, body_landed, VALUES(body_landed)),
+            body_attempts       = IF(VALUES(body_attempts) IS NULL, body_attempts, VALUES(body_attempts)),
+            leg_landed          = IF(VALUES(leg_landed) IS NULL, leg_landed, VALUES(leg_landed)),
+            leg_attempts        = IF(VALUES(leg_attempts) IS NULL, leg_attempts, VALUES(leg_attempts)),
+            distance_landed     = IF(VALUES(distance_landed) IS NULL, distance_landed, VALUES(distance_landed)),
+            distance_attempts   = IF(VALUES(distance_attempts) IS NULL, distance_attempts, VALUES(distance_attempts)),
+            clinch_landed       = IF(VALUES(clinch_landed) IS NULL, clinch_landed, VALUES(clinch_landed)),
+            clinch_attempts     = IF(VALUES(clinch_attempts) IS NULL, clinch_attempts, VALUES(clinch_attempts)),
+            ground_landed       = IF(VALUES(ground_landed) IS NULL, ground_landed, VALUES(ground_landed)),
+            ground_attempts     = IF(VALUES(ground_attempts) IS NULL, ground_attempts, VALUES(ground_attempts))
+        """
+
 
     ok1 = run_query(conn, cmd, rows[0])
     ok2 = run_query(conn, cmd, rows[1])
@@ -442,27 +488,43 @@ def push_totals(dataset, conn):
 
 # --- fight_rounds ----------------------------------------------------------
 
-def push_rounds(dataset, conn):
+def push_rounds(dataset, careerstats, conn):
     """
     Upsert per-fighter per-round rows into `fight_rounds`.
     Expects dataset['stats']['rounds'] mapping (round1..round5).
+    Uses composite PK (fight_id, round_number, fighter_id).
+    Skips inserting rows where all stat fields are NULL.
     """
     if not conn:
+        return False
+    if not dataset:
+        return False
+    if not careerstats:
         return False
 
     fight_id = dataset.get("fight_id")
     fighters = dataset.get("stats", {}).get("fighters") or [None, None]
-    f1_id = dataset.get("fighter1_id")
-    f2_id = dataset.get("fighter2_id")
+
+    # fighter1 info from ops_careerstats, fighter2 info from careerstats
+    f1_name = normalize_name(dataset['ops_careerstats']['fighter_name'])
+    f1_id = dataset['ops_careerstats']['fighter_id']
+    f2_name = normalize_name(careerstats.get('fighter_name'))
+    f2_id = careerstats.get('fighter_id')
 
     rounds = dataset.get("stats", {}).get("rounds") or {}
-    # Normalize keys to numeric round numbers
-    def _round_no(k):
-        # 'round3' -> 3
+
+    def _round_no(k: str):
+        """convert 'round3' -> 3"""
         try:
             return int("".join(ch for ch in k if ch.isdigit()))
         except ValueError:
             return None
+
+    def _is_empty_round(row: dict) -> bool:
+        """Return True if all stat fields are None (ignoring PKs and fighter_name)."""
+        ignore = {"fight_id", "round_number", "fighter_id", "fighter_name"}
+        return all(v is None for k, v in row.items() if k not in ignore)
+
 
     cmd = """
         INSERT INTO fight_rounds (
@@ -483,35 +545,35 @@ def push_rounds(dataset, conn):
             %(clinch_landed)s, %(clinch_attempts)s, %(ground_landed)s, %(ground_attempts)s
         )
         ON DUPLICATE KEY UPDATE
-            fighter_name        = VALUES(fighter_name),
-            kd                  = VALUES(kd),
-            sig_str_landed      = VALUES(sig_str_landed),
-            sig_str_attempts    = VALUES(sig_str_attempts),
-            total_str_landed    = VALUES(total_str_landed),
-            total_str_attempts  = VALUES(total_str_attempts),
-            td_landed           = VALUES(td_landed),
-            td_attempts         = VALUES(td_attempts),
-            sub_att             = VALUES(sub_att),
-            rev                 = VALUES(rev),
-            ctrl_time_s         = VALUES(ctrl_time_s),
-            head_landed         = VALUES(head_landed),
-            head_attempts       = VALUES(head_attempts),
-            body_landed         = VALUES(body_landed),
-            body_attempts       = VALUES(body_attempts),
-            leg_landed          = VALUES(leg_landed),
-            leg_attempts        = VALUES(leg_attempts),
-            distance_landed     = VALUES(distance_landed),
-            distance_attempts   = VALUES(distance_attempts),
-            clinch_landed       = VALUES(clinch_landed),
-            clinch_attempts     = VALUES(clinch_attempts),
-            ground_landed       = VALUES(ground_landed),
-            ground_attempts     = VALUES(ground_attempts)
+            fighter_name        = IF(VALUES(fighter_name) IS NULL, fighter_name, VALUES(fighter_name)),
+            kd                  = IF(VALUES(kd) IS NULL, kd, VALUES(kd)),
+            sig_str_landed      = IF(VALUES(sig_str_landed) IS NULL, sig_str_landed, VALUES(sig_str_landed)),
+            sig_str_attempts    = IF(VALUES(sig_str_attempts) IS NULL, sig_str_attempts, VALUES(sig_str_attempts)),
+            total_str_landed    = IF(VALUES(total_str_landed) IS NULL, total_str_landed, VALUES(total_str_landed)),
+            total_str_attempts  = IF(VALUES(total_str_attempts) IS NULL, total_str_attempts, VALUES(total_str_attempts)),
+            td_landed           = IF(VALUES(td_landed) IS NULL, td_landed, VALUES(td_landed)),
+            td_attempts         = IF(VALUES(td_attempts) IS NULL, td_attempts, VALUES(td_attempts)),
+            sub_att             = IF(VALUES(sub_att) IS NULL, sub_att, VALUES(sub_att)),
+            rev                 = IF(VALUES(rev) IS NULL, rev, VALUES(rev)),
+            ctrl_time_s         = IF(VALUES(ctrl_time_s) IS NULL, ctrl_time_s, VALUES(ctrl_time_s)),
+            head_landed         = IF(VALUES(head_landed) IS NULL, head_landed, VALUES(head_landed)),
+            head_attempts       = IF(VALUES(head_attempts) IS NULL, head_attempts, VALUES(head_attempts)),
+            body_landed         = IF(VALUES(body_landed) IS NULL, body_landed, VALUES(body_landed)),
+            body_attempts       = IF(VALUES(body_attempts) IS NULL, body_attempts, VALUES(body_attempts)),
+            leg_landed          = IF(VALUES(leg_landed) IS NULL, leg_landed, VALUES(leg_landed)),
+            leg_attempts        = IF(VALUES(leg_attempts) IS NULL, leg_attempts, VALUES(leg_attempts)),
+            distance_landed     = IF(VALUES(distance_landed) IS NULL, distance_landed, VALUES(distance_landed)),
+            distance_attempts   = IF(VALUES(distance_attempts) IS NULL, distance_attempts, VALUES(distance_attempts)),
+            clinch_landed       = IF(VALUES(clinch_landed) IS NULL, clinch_landed, VALUES(clinch_landed)),
+            clinch_attempts     = IF(VALUES(clinch_attempts) IS NULL, clinch_attempts, VALUES(clinch_attempts)),
+            ground_landed       = IF(VALUES(ground_landed) IS NULL, ground_landed, VALUES(ground_landed)),
+            ground_attempts     = IF(VALUES(ground_attempts) IS NULL, ground_attempts, VALUES(ground_attempts))
     """
 
     ok_all = True
     for rk, rdata in rounds.items():
         rnd = _round_no(rk)
-        if not rnd:  # skip malformed round keys
+        if not rnd:
             continue
 
         kd = rdata.get("kd") or [None, None]
@@ -529,68 +591,49 @@ def push_rounds(dataset, conn):
         clinch = brk.get("clinch") or [{}, {}]
         ground = brk.get("ground") or [{}, {}]
 
-        rows = []
-        # fighter A (index 0)
-        rows.append({
-            "fight_id": fight_id,
-            "round_number": rnd,
-            "fighter_id": f1_id,
-            "fighter_name": fighters[0] if len(fighters) > 0 else None,
-            "kd": kd[0] if len(kd) > 0 else None,
-            "sig_str_landed": sig[0].get("landed") if len(sig) > 0 else None,
-            "sig_str_attempts": sig[0].get("attempts") if len(sig) > 0 else None,
-            "total_str_landed": total[0].get("landed") if len(total) > 0 else None,
-            "total_str_attempts": total[0].get("attempts") if len(total) > 0 else None,
-            "td_landed": td[0].get("landed") if len(td) > 0 else None,
-            "td_attempts": td[0].get("attempts") if len(td) > 0 else None,
-            "sub_att": sub_att[0] if len(sub_att) > 0 else None,
-            "rev": rev[0] if len(rev) > 0 else None,
-            "ctrl_time_s": _mmss_to_seconds(ctrl[0]) if len(ctrl) > 0 else None,
-            "head_landed": head[0].get("landed") if len(head) > 0 else None,
-            "head_attempts": head[0].get("attempts") if len(head) > 0 else None,
-            "body_landed": body[0].get("landed") if len(body) > 0 else None,
-            "body_attempts": body[0].get("attempts") if len(body) > 0 else None,
-            "leg_landed": leg[0].get("landed") if len(leg) > 0 else None,
-            "leg_attempts": leg[0].get("attempts") if len(leg) > 0 else None,
-            "distance_landed": dist[0].get("landed") if len(dist) > 0 else None,
-            "distance_attempts": dist[0].get("attempts") if len(dist) > 0 else None,
-            "clinch_landed": clinch[0].get("landed") if len(clinch) > 0 else None,
-            "clinch_attempts": clinch[0].get("attempts") if len(clinch) > 0 else None,
-            "ground_landed": ground[0].get("landed") if len(ground) > 0 else None,
-            "ground_attempts": ground[0].get("attempts") if len(ground) > 0 else None,
-        })
-        # fighter B (index 1)
-        rows.append({
-            "fight_id": fight_id,
-            "round_number": rnd,
-            "fighter_id": f2_id,
-            "fighter_name": fighters[1] if len(fighters) > 1 else None,
-            "kd": kd[1] if len(kd) > 1 else None,
-            "sig_str_landed": sig[1].get("landed") if len(sig) > 1 else None,
-            "sig_str_attempts": sig[1].get("attempts") if len(sig) > 1 else None,
-            "total_str_landed": total[1].get("landed") if len(total) > 1 else None,
-            "total_str_attempts": total[1].get("attempts") if len(total) > 1 else None,
-            "td_landed": td[1].get("landed") if len(td) > 1 else None,
-            "td_attempts": td[1].get("attempts") if len(td) > 1 else None,
-            "sub_att": sub_att[1] if len(sub_att) > 1 else None,
-            "rev": rev[1] if len(rev) > 1 else None,
-            "ctrl_time_s": _mmss_to_seconds(ctrl[1]) if len(ctrl) > 1 else None,
-            "head_landed": head[1].get("landed") if len(head) > 1 else None,
-            "head_attempts": head[1].get("attempts") if len(head) > 1 else None,
-            "body_landed": body[1].get("landed") if len(body) > 1 else None,
-            "body_attempts": body[1].get("attempts") if len(body) > 1 else None,
-            "leg_landed": leg[1].get("landed") if len(leg) > 1 else None,
-            "leg_attempts": leg[1].get("attempts") if len(leg) > 1 else None,
-            "distance_landed": dist[1].get("landed") if len(dist) > 1 else None,
-            "distance_attempts": dist[1].get("attempts") if len(dist) > 1 else None,
-            "clinch_landed": clinch[1].get("landed") if len(clinch) > 1 else None,
-            "clinch_attempts": clinch[1].get("attempts") if len(clinch) > 1 else None,
-            "ground_landed": ground[1].get("landed") if len(ground) > 1 else None,
-            "ground_attempts": ground[1].get("attempts") if len(ground) > 1 else None,
-        })
+        for i, raw_name in enumerate(fighters):
+            fname = normalize_name(raw_name)
+            if compare_names(fname, f1_name) > .88:
+                fid = f1_id
+                fighter_nameZ = f1_name
+            elif compare_names(fname, f2_name) > .88:
+                fid = f2_id
+                fighter_nameZ = f2_name
+            else:
+                print(f"no name→id match for {fname} != {f1_name}, {f2_name}")
+                return False
 
-        okA = run_query(conn, cmd, rows[0])
-        okB = run_query(conn, cmd, rows[1])
-        ok_all = ok_all and bool(okA and okB)
+            row = {
+                "fight_id": fight_id,
+                "round_number": rnd,
+                "fighter_id": fid,
+                "fighter_name": fighter_nameZ,
+                "kd": kd[i] if i < len(kd) else None,
+                "sig_str_landed": sig[i].get("landed") if i < len(sig) else None,
+                "sig_str_attempts": sig[i].get("attempts") if i < len(sig) else None,
+                "total_str_landed": total[i].get("landed") if i < len(total) else None,
+                "total_str_attempts": total[i].get("attempts") if i < len(total) else None,
+                "td_landed": td[i].get("landed") if i < len(td) else None,
+                "td_attempts": td[i].get("attempts") if i < len(td) else None,
+                "sub_att": sub_att[i] if i < len(sub_att) else None,
+                "rev": rev[i] if i < len(rev) else None,
+                "ctrl_time_s": _mmss_to_seconds(ctrl[i]) if i < len(ctrl) else None,
+                "head_landed": head[i].get("landed") if i < len(head) else None,
+                "head_attempts": head[i].get("attempts") if i < len(head) else None,
+                "body_landed": body[i].get("landed") if i < len(body) else None,
+                "body_attempts": body[i].get("attempts") if i < len(body) else None,
+                "leg_landed": leg[i].get("landed") if i < len(leg) else None,
+                "leg_attempts": leg[i].get("attempts") if i < len(leg) else None,
+                "distance_landed": dist[i].get("landed") if i < len(dist) else None,
+                "distance_attempts": dist[i].get("attempts") if i < len(dist) else None,
+                "clinch_landed": clinch[i].get("landed") if i < len(clinch) else None,
+                "clinch_attempts": clinch[i].get("attempts") if i < len(clinch) else None,
+                "ground_landed": ground[i].get("landed") if i < len(ground) else None,
+                "ground_attempts": ground[i].get("attempts") if i < len(ground) else None,
+            }
+
+            if not _is_empty_round(row):
+                ok = run_query(conn, cmd, row)
+                ok_all = ok_all and bool(ok)
 
     return ok_all

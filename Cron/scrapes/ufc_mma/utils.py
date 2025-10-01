@@ -1,6 +1,7 @@
 import re
 from bs4 import BeautifulSoup
 from datetime import datetime, date
+import unicodedata
 
 ### BASE LINKS FROM UFC-STATS AND TAPOLOGY ###
 ufcstats_fight_details_link = 'http://www.ufcstats.com/fight-details/'
@@ -151,3 +152,44 @@ def _mmss_to_seconds(s):
         return int(m) * 60 + int(s)
     except ValueError:
         return None
+
+
+def _to_sql_date(date_str: str) -> str:
+    """Convert a date string in 'MM-DD-YYYY' format into 'YYYY-MM-DD' for SQL."""
+    dt = datetime.strptime(date_str, "%m-%d-%Y")
+    return dt.strftime("%Y-%m-%d")
+
+
+def normalize_name(name: str) -> str:
+    # Normalize Unicode characters and strip diacritics
+    return "".join(
+        c for c in unicodedata.normalize("NFD", name)
+        if unicodedata.category(c) != "Mn"
+    ).lower()
+
+
+def _normalize_name(name: str) -> list[str]:
+    """Normalize a name into cleaned tokens."""
+    if not name:
+        return []
+    # lowercase
+    s = name.lower()
+    # strip accents
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    # replace hyphens with spaces
+    s = s.replace("-", " ")
+    # remove punctuation
+    s = re.sub(r"[^a-z\s]", " ", s)
+    # collapse spaces
+    toks = [t for t in s.split() if t]
+    return toks
+
+
+def names_equal(n1: str, n2: str) -> bool:
+    """
+    Compare two fighter names
+    """
+    a = set(_normalize_name(n1))
+    b = set(_normalize_name(n2))
+    return a == b
