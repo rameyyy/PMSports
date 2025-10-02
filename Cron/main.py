@@ -16,16 +16,16 @@ def main():
     print(f"Found {len(events_arr)} events")
     print(f'Pushing to SQL set to {PUSHVAR}')
     for event_url in events_arr:
-        data = get_event_data(event_url, getting_old_data=True)
-        event_id = data.get('event_id')
+        event_idtemp= event_url.rstrip("/").split("/")[-1]
         query = "SELECT * FROM ufc.events WHERE event_id = %s"
-        params = (event_id,)
+        params = (event_idtemp,)
         rows = fetch_query(conn, query, params)
         if rows: # event data already in
-            print(f'event: {event_id} already in SQL')
+            print(f'event: {event_idtemp} already in SQL')
             continue
         else:
-            print(f'event {event_id} not in SQL yet, continuing..')
+            print(f'event {event_idtemp} not in SQL yet, continuing..')
+        data = get_event_data(event_url, getting_old_data=True)
         idx = EventNameIndex(data)
         if PUSHVAR:
             push_events(data, conn)
