@@ -1,0 +1,443 @@
+{
+  "url": "https://www.tapology.com/fightcenter/events/129311-ufc-320",
+  "event_id": "129311-ufc-320",
+  "title": "UFC 320: Ankalaev vs. Pereira 2",
+  "date": "Saturday 10.04.2025 at 06:00 PM ET",
+  "location": "Las Vegas, Nevada, United States",
+  "fights": [
+    {
+      "fight_overview": {
+        "fight_card_type": "Main Event",
+        "weight_class_weight": "205",
+        "weight_class": "Light Heavyweight"
+      },
+      "fighter1": {
+        "fighter_name": "Alex Pereira",
+        "record": null,
+        "nickname": "Poatan",
+        "betting_odds": 195,
+        "age_at_fight": 38.241,
+        "latest_weight": null,
+        "height_inches": 76.0,
+        "reach_inches": 79.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/117305-alex-pereira",
+        "img_link": "https://images.tapology.com/headshot_images/117305/preview/Screenshot_%281%29.png?1727291881"
+      },
+      "fighter2": {
+        "fighter_name": "Magomed Ankalaev",
+        "record": null,
+        "nickname": null,
+        "betting_odds": -235,
+        "age_at_fight": 33.339,
+        "latest_weight": null,
+        "height_inches": 75.0,
+        "reach_inches": 75.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/83405-magomed-ankalaev",
+        "img_link": "https://images.tapology.com/headshot_images/83405/preview/Magomed-Ankalaev.jpg?1670645565"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Co-Main",
+        "weight_class_weight": "135",
+        "weight_class": "Bantamweight"
+      },
+      "fighter1": {
+        "fighter_name": "Merab Dvalishvili",
+        "record": null,
+        "nickname": "The Machine",
+        "betting_odds": -450,
+        "age_at_fight": 34.733,
+        "latest_weight": null,
+        "height_inches": 66.0,
+        "reach_inches": 68.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/47934-merab-dvalishvili",
+        "img_link": "https://images.tapology.com/headshot_images/47934/preview/Screenshot_%283%29.png?1746475540"
+      },
+      "fighter2": {
+        "fighter_name": "Cory Sandhagen",
+        "record": null,
+        "nickname": "Sandman",
+        "betting_odds": 340,
+        "age_at_fight": 33.455,
+        "latest_weight": null,
+        "height_inches": 71.0,
+        "reach_inches": 70.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/32931-cory-sandhagen",
+        "img_link": "https://images.tapology.com/headshot_images/32931/preview/Cory_Sandhagen-hs.jpg?1573705989"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Main Card",
+        "weight_class_weight": "205",
+        "weight_class": "Light Heavyweight"
+      },
+      "fighter1": {
+        "fighter_name": "Jiří Procházka",
+        "record": null,
+        "nickname": "BJP",
+        "betting_odds": -200,
+        "age_at_fight": 32.972,
+        "latest_weight": null,
+        "height_inches": 75.0,
+        "reach_inches": 80.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/34779-jiri-prochazka",
+        "img_link": "https://images.tapology.com/headshot_images/34779/preview/jiri-prochazka.jpg?1591644710"
+      },
+      "fighter2": {
+        "fighter_name": "Khalil Rountree Jr.",
+        "record": null,
+        "nickname": "The War Horse",
+        "betting_odds": 165,
+        "age_at_fight": 35.66,
+        "latest_weight": null,
+        "height_inches": 73.0,
+        "reach_inches": 76.5,
+        "link": "https://www.tapology.com/fightcenter/fighters/47284-khalil-rountree-the-war-horse",
+        "img_link": "https://images.tapology.com/headshot_images/47284/preview/Khalil_Rountree.jpg?1535581201"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Main Card",
+        "weight_class_weight": "145",
+        "weight_class": "Featherweight"
+      },
+      "fighter1": {
+        "fighter_name": "Youssef Zalal",
+        "record": null,
+        "nickname": "The Moroccan Devil",
+        "betting_odds": -500,
+        "age_at_fight": 0.0,
+        "latest_weight": null,
+        "height_inches": 70.0,
+        "reach_inches": 72.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/110826-youssef-zalaal",
+        "img_link": "https://images.tapology.com/headshot_images/110826/preview/Youssef_Zalal.jpg?1547522889"
+      },
+      "fighter2": {
+        "fighter_name": "Josh Emmett",
+        "record": null,
+        "nickname": "CC0",
+        "betting_odds": 380,
+        "age_at_fight": 0.0,
+        "latest_weight": null,
+        "height_inches": 66.0,
+        "reach_inches": 70.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/51295-josh-emmett",
+        "img_link": "https://images.tapology.com/headshot_images/51295/preview/Josh_Emmett-hs.jpg?1519237652"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Main Card",
+        "weight_class_weight": "185",
+        "weight_class": "Middleweight"
+      },
+      "fighter1": {
+        "fighter_name": "Joe Pyfer",
+        "record": null,
+        "nickname": "Bodybagz",
+        "betting_odds": -250,
+        "age_at_fight": 29.047,
+        "latest_weight": null,
+        "height_inches": 74.0,
+        "reach_inches": 75.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/144942-joseph-pyfer",
+        "img_link": "https://images.tapology.com/headshot_images/144942/preview/Screenshot_%281%29.png?1752775306"
+      },
+      "fighter2": {
+        "fighter_name": "Abus Magomedov",
+        "record": null,
+        "nickname": null,
+        "betting_odds": 200,
+        "age_at_fight": 35.089,
+        "latest_weight": null,
+        "height_inches": 74.0,
+        "reach_inches": 78.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/30204-abusupiyan-magomedov-abus",
+        "img_link": "https://images.tapology.com/headshot_images/30204/preview/Abus_Magomedov-hs.jpg?1687626076"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Prelim",
+        "weight_class_weight": "185",
+        "weight_class": "Middleweight"
+      },
+      "fighter1": {
+        "fighter_name": "Ateba Gautier",
+        "record": null,
+        "nickname": "The Silent Assassin",
+        "betting_odds": -2000,
+        "age_at_fight": 23.483,
+        "latest_weight": null,
+        "height_inches": 76.0,
+        "reach_inches": 81.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/283766-ateba-abega-gautier",
+        "img_link": "https://images.tapology.com/headshot_images/283766/preview/Screenshot_%281%29.png?1748134718"
+      },
+      "fighter2": {
+        "fighter_name": "Tre'ston Vines",
+        "record": null,
+        "nickname": null,
+        "betting_odds": 950,
+        "age_at_fight": 29.294,
+        "latest_weight": null,
+        "height_inches": 72.0,
+        "reach_inches": null,
+        "link": "https://www.tapology.com/fightcenter/fighters/101085-treston-vines",
+        "img_link": "https://images.tapology.com/headshot_images/101085/preview/Screenshot_%281%29.png?1759278017"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Prelim",
+        "weight_class_weight": "153",
+        "weight_class": "Lightweight"
+      },
+      "fighter1": {
+        "fighter_name": "Daniel Santos",
+        "record": null,
+        "nickname": "Willycat",
+        "betting_odds": -140,
+        "age_at_fight": 30.561,
+        "latest_weight": null,
+        "height_inches": 67.0,
+        "reach_inches": 67.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/65061-daniel-willycat",
+        "img_link": "https://images.tapology.com/headshot_images/65061/preview/Screenshot_%288%29.png?1743273626"
+      },
+      "fighter2": {
+        "fighter_name": "Joo Sang Yoo",
+        "record": null,
+        "nickname": "Zombie Jr.",
+        "betting_odds": 120,
+        "age_at_fight": 31.703,
+        "latest_weight": null,
+        "height_inches": 67.0,
+        "reach_inches": 71.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/157789-joo-sang-yoo",
+        "img_link": "https://images.tapology.com/headshot_images/157789/preview/Untitled7.jpg?1673876895"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Prelim",
+        "weight_class_weight": "135",
+        "weight_class": "Bantamweight"
+      },
+      "fighter1": {
+        "fighter_name": "Jakub Wikłacz",
+        "record": null,
+        "nickname": "Masa",
+        "betting_odds": 280,
+        "age_at_fight": 29.066,
+        "latest_weight": null,
+        "height_inches": 69.0,
+        "reach_inches": 72.8,
+        "link": "https://www.tapology.com/fightcenter/fighters/72337-jakub-wikacz",
+        "img_link": "https://images.tapology.com/headshot_images/72337/preview/Screenshot.png?1759624533"
+      },
+      "fighter2": {
+        "fighter_name": "Patchy Mix",
+        "record": null,
+        "nickname": "No Love",
+        "betting_odds": -350,
+        "age_at_fight": 32.133,
+        "latest_weight": null,
+        "height_inches": 71.0,
+        "reach_inches": 70.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/64036-patrick-mix",
+        "img_link": "https://images.tapology.com/headshot_images/64036/preview/Screenshot_%281%29.png?1715652611"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Prelim",
+        "weight_class_weight": "185",
+        "weight_class": "Middleweight"
+      },
+      "fighter1": {
+        "fighter_name": "Edmen Shahbazyan",
+        "record": null,
+        "nickname": "The Golden Boy",
+        "betting_odds": -320,
+        "age_at_fight": 27.872,
+        "latest_weight": null,
+        "height_inches": 74.0,
+        "reach_inches": 75.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/142325-edmen-shahbazyan",
+        "img_link": "https://images.tapology.com/headshot_images/142325/preview/Edmen_Shahbazyan-hs.jpg?1538069642"
+      },
+      "fighter2": {
+        "fighter_name": "André Muniz",
+        "record": null,
+        "nickname": "Sergipano",
+        "betting_odds": 260,
+        "age_at_fight": 35.63,
+        "latest_weight": null,
+        "height_inches": 73.0,
+        "reach_inches": 78.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/38116-andr-muniz-sergipano",
+        "img_link": "https://images.tapology.com/headshot_images/38116/preview/Screenshot.png?1712603785"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Prelim",
+        "weight_class_weight": "170",
+        "weight_class": "Welterweight"
+      },
+      "fighter1": {
+        "fighter_name": "Punahele Soriano",
+        "record": null,
+        "nickname": "Puna",
+        "betting_odds": -400,
+        "age_at_fight": 32.867,
+        "latest_weight": null,
+        "height_inches": 71.0,
+        "reach_inches": 72.5,
+        "link": "https://www.tapology.com/fightcenter/fighters/119534-punahele-soriano-story-time",
+        "img_link": "https://images.tapology.com/headshot_images/119534/preview/Screenshot.png?1560909005"
+      },
+      "fighter2": {
+        "fighter_name": "Nikolay Veretennikov",
+        "record": null,
+        "nickname": null,
+        "betting_odds": 310,
+        "age_at_fight": 35.783,
+        "latest_weight": null,
+        "height_inches": 73.0,
+        "reach_inches": 74.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/74381-nikolai-veretenikov",
+        "img_link": "https://images.tapology.com/headshot_images/74381/preview/Screenshot_%281%29.png?1721935972"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Prelim",
+        "weight_class_weight": "137",
+        "weight_class": "Featherweight"
+      },
+      "fighter1": {
+        "fighter_name": "Yana Santos",
+        "record": null,
+        "nickname": "Foxy",
+        "betting_odds": 170,
+        "age_at_fight": 35.897,
+        "latest_weight": null,
+        "height_inches": 66.0,
+        "reach_inches": 68.5,
+        "link": "https://www.tapology.com/fightcenter/fighters/19820-yana-kunitskaya-foxy",
+        "img_link": "https://images.tapology.com/headshot_images/19820/preview/Yana_Kunitskaya-hs.jpg?1518044241"
+      },
+      "fighter2": {
+        "fighter_name": "Macy Chiasson",
+        "record": null,
+        "nickname": null,
+        "betting_odds": -210,
+        "age_at_fight": 34.186,
+        "latest_weight": null,
+        "height_inches": 71.0,
+        "reach_inches": 72.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/77737-macy-chiasson",
+        "img_link": "https://images.tapology.com/headshot_images/77737/preview/Macy_Chiasson.jpg?1543470776"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Prelim",
+        "weight_class_weight": "135",
+        "weight_class": "Bantamweight"
+      },
+      "fighter1": {
+        "fighter_name": "Farid Basharat",
+        "record": null,
+        "nickname": "Ferocious",
+        "betting_odds": -560,
+        "age_at_fight": 28.172,
+        "latest_weight": null,
+        "height_inches": 68.0,
+        "reach_inches": 71.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/127815-farid-bashrat",
+        "img_link": "https://images.tapology.com/headshot_images/127815/preview/Screenshot_%281%29.png?1716224654"
+      },
+      "fighter2": {
+        "fighter_name": "Chris Gutierrez",
+        "record": null,
+        "nickname": "El Guapo",
+        "betting_odds": 420,
+        "age_at_fight": 34.45,
+        "latest_weight": null,
+        "height_inches": 69.0,
+        "reach_inches": 67.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/34369-chris-gutierrez",
+        "img_link": "https://images.tapology.com/headshot_images/34369/preview/Chris-Gutierrez-hs.jpg?1543621278"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Prelim",
+        "weight_class_weight": "170",
+        "weight_class": "Welterweight"
+      },
+      "fighter1": {
+        "fighter_name": "Ramiz Brahimaj",
+        "record": null,
+        "nickname": null,
+        "betting_odds": 240,
+        "age_at_fight": 32.881,
+        "latest_weight": null,
+        "height_inches": 70.0,
+        "reach_inches": 72.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/129794-ramiz-brahimaj",
+        "img_link": "https://images.tapology.com/headshot_images/129794/preview/Screenshot_%283%29.png?1744235641"
+      },
+      "fighter2": {
+        "fighter_name": "Austin Vanderford",
+        "record": null,
+        "nickname": "The Gentleman",
+        "betting_odds": -295,
+        "age_at_fight": 35.536,
+        "latest_weight": null,
+        "height_inches": 71.0,
+        "reach_inches": 74.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/39902-austin-vandeford",
+        "img_link": "https://images.tapology.com/headshot_images/39902/preview/Austin_Vanderford-hs.png?1517176077"
+      }
+    },
+    {
+      "fight_overview": {
+        "fight_card_type": "Prelim",
+        "weight_class_weight": "125",
+        "weight_class": "Flyweight"
+      },
+      "fighter1": {
+        "fighter_name": "Veronica Hardy",
+        "record": null,
+        "nickname": null,
+        "betting_odds": -800,
+        "age_at_fight": 29.928,
+        "latest_weight": null,
+        "height_inches": 64.0,
+        "reach_inches": 64.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/82229-veronica-macedo",
+        "img_link": "https://images.tapology.com/headshot_images/82229/preview/Veronica_Macedo-hs.jpg?1519691832"
+      },
+      "fighter2": {
+        "fighter_name": "Brogan Walker",
+        "record": null,
+        "nickname": "The Bear",
+        "betting_odds": 550,
+        "age_at_fight": 36.172,
+        "latest_weight": null,
+        "height_inches": 64.0,
+        "reach_inches": 67.0,
+        "link": "https://www.tapology.com/fightcenter/fighters/78298-brogan-walker-killer-bee",
+        "img_link": "https://images.tapology.com/headshot_images/78298/preview/Brogan_Sanchez.jpg?1547667262"
+      }
+    }
+  ]
+}
