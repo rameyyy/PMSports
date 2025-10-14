@@ -7,12 +7,14 @@ def main():
     total_fights = 0
     total_events = 0
     events_arr = []
-    for page_num in range(1, 16):
-        events = get_all_events(past=True, page=page_num)
-        if not events:
-            continue
-        events_arr.extend(events)
-    events_arr = sorted(set(events_arr), reverse=False) # terminal 2
+    # for page_num in range(1, 16):
+    #     events = get_all_events(past=True, page=page_num)
+    #     if not events:
+    #         continue
+    #     events_arr.extend(events)
+    # events_arr = sorted(set(events_arr), reverse=False) # terminal 2
+    events = get_all_events(past=False)
+    events_arr.extend(events)
     print(f"Found {len(events_arr)} events")
     print(f'Pushing to SQL set to {PUSHVAR}')
     for event_url in events_arr:
@@ -22,10 +24,10 @@ def main():
         rows = fetch_query(conn, query, params)
         if rows: # event data already in
             print(f'event: {event_idtemp} already in SQL')
-            continue
+            # continue
         else:
             print(f'event {event_idtemp} not in SQL yet, continuing..')
-        data = get_event_data(event_url, getting_old_data=True)
+        data = get_event_data(event_url, getting_old_data=False)
         idx = EventNameIndex(data)
         if PUSHVAR:
             push_events(data, conn)

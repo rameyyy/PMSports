@@ -1,1 +1,0 @@
-fight_id,fight_date,weight_class,fight_format,end_time,method,fighter_id,fighter_name,opponent_id,opponent_name,is_winner,fighter_side,hist_fight_ids,hist_dates,hist_opponent_ids,hist_methods,hist_is_winner,hist_weight_classes,hist_fight_formats,hist_end_times
