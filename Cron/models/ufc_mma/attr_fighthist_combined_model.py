@@ -258,9 +258,7 @@ def run_combined_evaluation(df: pl.DataFrame, hist_weight: float = 0.48, attr_we
     
     # Print calibration report
     print_calibration_report(calibration_df)
-    
-    # Save predictions
-    predictions_df.write_csv('combined_model_predictions.csv')
+
     
     return results
 
