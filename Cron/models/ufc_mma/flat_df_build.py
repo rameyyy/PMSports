@@ -116,7 +116,7 @@ def build_pre_fight_snapshots(fightHistoryDf: pl.DataFrame, allRelatedFights: pl
     fightHistoryDf   = fightHistoryDf.with_columns(pl.col("fight_date").cast(pl.Date))
 
     # --- Build long-form fighter history ---
-    optional_cols = [c for c in ("method", "weight_class") if c in allRelatedFights.columns]
+    optional_cols = [c for c in ("method", "weight_class", "end_time", "fight_format") if c in allRelatedFights.columns]
     base_cols = ["fight_id", "fight_date", "winner_id"] + optional_cols
 
     # Create fighter-level view: each row is one fighter's participation in a fight
@@ -154,7 +154,9 @@ def build_pre_fight_snapshots(fightHistoryDf: pl.DataFrame, allRelatedFights: pl
         pl.col("opponent_id"),
         pl.col("result"),
     ] + ([pl.col("method")] if "method" in fighter_fights.columns else []) \
-      + ([pl.col("weight_class")] if "weight_class" in fighter_fights.columns else [])
+      + ([pl.col("weight_class")] if "weight_class" in fighter_fights.columns else []) \
+      + ([pl.col("end_time")] if "end_time" in fighter_fights.columns else []) \
+      + ([pl.col("fight_format")] if "fight_format" in fighter_fights.columns else [])
 
     fighter_fights = fighter_fights.with_columns(
         pl.struct(history_struct_fields).alias("fight_entry")
@@ -220,7 +222,6 @@ def build_pre_fight_snapshots(fightHistoryDf: pl.DataFrame, allRelatedFights: pl
             (pl.col("prior_cnt_f1") >= 4) & (pl.col("prior_cnt_f2") >= 4)
         )
     )
-
     return enriched
 
 def enrich_with_fighter_stats(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
@@ -280,6 +281,9 @@ def enrich_with_fighter_stats(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
     field_names = [field.name for field in struct_fields]
     has_method = "method" in field_names
     has_weight_class = "weight_class" in field_names
+    has_end_time = "end_time" in field_names
+    has_fight_format = "fight_format" in field_names
+    has_fight_format = "fight_format" in field_names
     
     # --- Enrich prior_f1 and prior_f2 history lists ---
     # Add row index to track original rows
@@ -319,6 +323,10 @@ def enrich_with_fighter_stats(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
         struct_fields_list.append(pl.col("prior_f1").struct.field("method"))
     if has_weight_class:
         struct_fields_list.append(pl.col("prior_f1").struct.field("weight_class"))
+    if has_end_time:
+        struct_fields_list.append(pl.col("prior_f1").struct.field("end_time"))
+    if has_fight_format:
+        struct_fields_list.append(pl.col("prior_f1").struct.field("fight_format"))
     
     struct_fields_list.extend([
         pl.col("opp_height_in"),
@@ -371,6 +379,10 @@ def enrich_with_fighter_stats(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
         struct_fields_list_f2.append(pl.col("prior_f2").struct.field("method"))
     if has_weight_class:
         struct_fields_list_f2.append(pl.col("prior_f2").struct.field("weight_class"))
+    if has_end_time:
+        struct_fields_list_f2.append(pl.col("prior_f2").struct.field("end_time"))
+    if has_fight_format:
+        struct_fields_list_f2.append(pl.col("prior_f2").struct.field("fight_format"))
     
     struct_fields_list_f2.extend([
         pl.col("opp_height_in"),
@@ -441,6 +453,7 @@ def enrich_with_fight_totals(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
     field_names = [field.name for field in struct_fields]
     has_method = "method" in field_names
     has_weight_class = "weight_class" in field_names
+    has_end_time = "end_time" in field_names
     
     # --- Add row index to track original rows ---
     enriched_df = enriched_df.with_row_index("_row_idx")
@@ -533,6 +546,9 @@ def enrich_with_fight_totals(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
         struct_fields_list.append(pl.col("prior_f1").struct.field("method"))
     if has_weight_class:
         struct_fields_list.append(pl.col("prior_f1").struct.field("weight_class"))
+    if has_end_time:
+        struct_fields_list.append(pl.col("prior_f1").struct.field("end_time"))
+    struct_fields_list.append(pl.col("prior_f1").struct.field("fight_format"))
     
     # Add fighter stats fields that already exist (from previous enrichment)
     if "opp_height_in" in prior_f1_with_stats.columns:
@@ -686,7 +702,9 @@ def enrich_with_fight_totals(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
         struct_fields_list_f2.append(pl.col("prior_f2").struct.field("method"))
     if has_weight_class:
         struct_fields_list_f2.append(pl.col("prior_f2").struct.field("weight_class"))
-    
+    if has_end_time:
+        struct_fields_list_f2.append(pl.col("prior_f2").struct.field("end_time"))
+    struct_fields_list_f2.append(pl.col("prior_f2").struct.field("fight_format"))
     if "opp_height_in" in prior_f2_with_stats.columns:
         struct_fields_list_f2.extend([
             pl.col("prior_f2").struct.field("opp_height_in"),
@@ -760,7 +778,6 @@ def enrich_with_fight_totals(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
         .join(prior_f2_enriched, on="_row_idx", how="left")
         .drop("_row_idx")
     )
-    
     return enriched_df
 
 def run():
@@ -775,7 +792,4 @@ def run():
     enrichedDfFightTotals = enrich_with_fight_totals(enrichedDfFightersData, conn)
 
     print(f"Rows: {len(enrichedDfFightTotals)}")
-    print(snapshotsDf.select(["fight_id","prior_cnt_f1","prior_cnt_f2", "fight_date"]).head())
-    enrichedDfFightTotals.write_parquet("models/fight_snapshots.parquet")  # recommended over CSV for nested lists
-    print(enrichedDfFightTotals.head(1).to_dicts()[0])
-
+    enrichedDfFightTotals.write_parquet("fight_snapshots.parquet")  # recommended over CSV for nested lists
