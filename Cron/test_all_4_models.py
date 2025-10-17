@@ -66,12 +66,12 @@ def ensemble_all_models(differential_df, combined_df, test_split=0.25):
     ml_models = {
         'logistic': LogisticRegression(max_iter=1000, random_state=42),
         'xgboost': xgb.XGBClassifier(
-            n_estimators=50, max_depth=3, learning_rate=0.1,
-            min_child_weight=5, subsample=0.8, colsample_bytree=0.8,
+            n_estimators=50, max_depth=2, learning_rate=0.08,
+            min_child_weight=9, subsample=0.75, colsample_bytree=0.75,
             random_state=42, eval_metric='logloss'
         ),
         'gradient_boost': GradientBoostingClassifier(
-            n_estimators=50, max_depth=3, learning_rate=0.1,
+            n_estimators=88, max_depth=2, learning_rate=0.07,
             min_samples_split=20, min_samples_leaf=10, subsample=0.8,
             random_state=42
         )
@@ -301,6 +301,112 @@ def ensemble_all_models(differential_df, combined_df, test_split=0.25):
     overall_best = max(all_methods_accuracy.items(), key=lambda x: x[1])
     print(f"\n🏆 Overall Best Model: {overall_best[0]} with {overall_best[1]*100:.2f}% accuracy")
     
+    # ==================== PREDICTION CONFIDENCE ANALYSIS ====================
+    print("\n" + "="*80)
+    print("PREDICTION CONFIDENCE ANALYSIS")
+    print("="*80)
+    
+    # Analyze each model's prediction confidence vs actual accuracy
+    models_to_analyze = {
+        'Logistic': ml_probabilities['logistic'],
+        'XGBoost': ml_probabilities['xgboost'],
+        'Gradient Boost': ml_probabilities['gradient_boost'],
+        'Homemade': homemade_probs,
+        'Ensemble Method 3': avg_proba,
+        'Ensemble Method 4': weighted_proba
+    }
+    
+    for model_name, probs in models_to_analyze.items():
+        print(f"\n{model_name}:")
+        
+        # Calculate average prediction confidence for fighter 1
+        avg_prob_f1 = np.mean(probs)
+        print(f"  Average F1 Win Probability: {avg_prob_f1:.1%} ({len(probs)} fights)")
+        
+        # Count how many predicted for F1 (prob > 0.5)
+        f1_predictions = (probs > 0.5).sum()
+        print(f"  Predicted F1 to win: {f1_predictions} fights ({f1_predictions/len(probs)*100:.1f}%)")
+        
+        # Actual F1 wins
+        actual_f1_wins = y_test.sum()
+        print(f"  Actual F1 wins: {actual_f1_wins} fights ({actual_f1_wins/len(y_test)*100:.1f}%)")
+        
+        # Calibration check: For fights where F1 was predicted to win, what % actually won?
+        if f1_predictions > 0:
+            f1_pred_mask = probs > 0.5
+            f1_pred_accuracy = y_test[f1_pred_mask].sum() / f1_predictions
+            print(f"  When predicted F1 wins: Actual accuracy = {f1_pred_accuracy:.1%}")
+        
+        # Confidence bins (2% increments)
+        print(f"  Confidence distribution:")
+        bins = [(i/100, (i+2)/100) for i in range(0, 100, 2)]
+        for low, high in bins:
+            mask = (probs >= low) & (probs < high)
+            count = mask.sum()
+            if count > 0:
+                bin_accuracy = (y_test[mask] == (probs[mask] > 0.5).astype(int)).sum() / count
+                avg_conf = probs[mask].mean()
+                winner = "F2" if low < 0.5 else "F1"
+                print(f"    {low:.0%}-{high:.0%}: {count:3d} fights (avg {avg_conf:.1%}), accuracy {bin_accuracy:.1%} (predicted {winner})")
+    
+    # ==================== PREDICTION CONFIDENCE ANALYSIS ====================
+    print("\n" + "="*80)
+    print("PREDICTION CONFIDENCE ANALYSIS")
+    print("="*80)
+    
+    # Analyze each model's prediction confidence vs actual accuracy
+    models_to_analyze = {
+        'Logistic': ml_probabilities['logistic'],
+        'XGBoost': ml_probabilities['xgboost'],
+        'Gradient Boost': ml_probabilities['gradient_boost'],
+        'Homemade': homemade_probs,
+        'Ensemble Method 1': ensemble_pred_method1.astype(float),  # Binary, so just 0 or 1
+        'Ensemble Method 2': (weighted_votes / total_weight),
+        'Ensemble Method 3': avg_proba,
+        'Ensemble Method 4': weighted_proba
+    }
+    
+    for model_name, probs in models_to_analyze.items():
+        print(f"\n{model_name}:")
+        
+        # Calculate average prediction confidence for fighter 1
+        avg_prob_f1 = np.mean(probs)
+        print(f"  Average F1 Win Probability: {avg_prob_f1:.1%} ({len(probs)} fights)")
+        
+        # Count how many predicted for F1 (prob > 0.5)
+        f1_predictions = (probs > 0.5).sum()
+        print(f"  Predicted F1 to win: {f1_predictions} fights ({f1_predictions/len(probs)*100:.1f}%)")
+        
+        # Actual F1 wins
+        actual_f1_wins = y_test.sum()
+        print(f"  Actual F1 wins: {actual_f1_wins} fights ({actual_f1_wins/len(y_test)*100:.1f}%)")
+        
+        # Calibration check: For fights where F1 was predicted to win, what % actually won?
+        if f1_predictions > 0:
+            f1_pred_mask = probs > 0.5
+            f1_pred_accuracy = y_test[f1_pred_mask].sum() / f1_predictions
+            print(f"  When predicted F1 wins: Actual accuracy = {f1_pred_accuracy:.1%}")
+        
+        # Confidence bins (2% increments)
+        print(f"  Confidence distribution:")
+        bins = [(i/100, (i+2)/100) for i in range(0, 100, 2)]
+        for low, high in bins:
+            mask = (probs >= low) & (probs < high)
+            count = mask.sum()
+            if count > 0:
+                bin_accuracy = (y_test[mask] == (probs[mask] > 0.5).astype(int)).sum() / count
+                avg_conf = probs[mask].mean()
+                winner = "F2" if low < 0.5 else "F1"
+                print(f"    {low:.0%}-{high:.0%}: {count:3d} fights (avg {avg_conf:.1%}), accuracy {bin_accuracy:.1%} (predicted {winner})")
+    
+    # ==================== FINAL SUMMARY ====================
+    print("\n" + "="*80)
+    print("FINAL SUMMARY")
+    print("="*80)
+    
+    print("\nIndividual Model Accuracies:")
+    for name, acc in all_accuracies.items():
+        print(f"  {name:20s}: {acc:.4f} ({acc*100:.2f}%)")
     return {
         'results_df': results_df,
         'models': ml_models,
@@ -314,6 +420,9 @@ def ensemble_all_models(differential_df, combined_df, test_split=0.25):
 if __name__ == "__main__":
     # Load your data
     print("Loading data...")
+    # from models.ufc_mma import tuning_model
+    # tuning_model.run()
+    # exit()
     differential_df = pl.read_csv('trainingset.csv')
     combined_df = pl.read_parquet('fight_features_extracted.parquet')
     

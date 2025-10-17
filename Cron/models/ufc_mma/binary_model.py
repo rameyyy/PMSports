@@ -97,19 +97,19 @@ def train_and_evaluate_model(differential_df, model_type='logistic', test_split=
     elif model_type == 'xgboost':
         model = xgb.XGBClassifier(
             n_estimators=50,        # Reduced from 100 to prevent overfitting
-            max_depth=3,            # Reduced from 6 to prevent overfitting
-            learning_rate=0.1,
-            min_child_weight=5,     # Prevent overfitting
-            subsample=0.8,          # Use 80% of data per tree
-            colsample_bytree=0.8,   # Use 80% of features per tree
+            max_depth=2,            # Reduced from 6 to prevent overfitting
+            learning_rate=0.08,
+            min_child_weight=9,     # Prevent overfitting
+            subsample=0.75,          # Use 80% of data per tree
+            colsample_bytree=0.75,   # Use 80% of features per tree
             random_state=42,
             eval_metric='logloss'
         )
     elif model_type == 'gradient_boost':
         model = GradientBoostingClassifier(
-            n_estimators=50,        # Reduced from 100
-            max_depth=3,            # Reduced from 5
-            learning_rate=0.1,
+            n_estimators=88,        # Reduced from 100
+            max_depth=2,            # Reduced from 5
+            learning_rate=0.07,
             min_samples_split=20,   # Prevent overfitting
             min_samples_leaf=10,    # Prevent overfitting
             subsample=0.8,          # Use 80% of data per tree
@@ -214,29 +214,3 @@ def train_and_evaluate_model(differential_df, model_type='logistic', test_split=
         'test_results': test_results,
         'confusion_matrix': cm
     }
-
-
-# Example usage:
-"""
-# Step 1: Create differential features
-differential_df = create_differential_features(fight_snapshots_df)
-
-# Step 2: Train and evaluate model
-results = train_and_evaluate_model(
-    differential_df, 
-    model_type='xgboost',  # or 'logistic' or 'gradient_boost'
-    test_split=0.2
-)
-
-# Step 3: Access results
-print(f"Test Accuracy: {results['test_accuracy']:.2%}")
-
-# See wrong predictions
-wrong_predictions = results['test_results'].filter(pl.col('correct') == False)
-print(wrong_predictions)
-
-# Use model for new predictions
-# new_X = ... (prepare new data the same way)
-# new_X_scaled = results['scaler'].transform(new_X)
-# predictions = results['model'].predict(new_X_scaled)
-"""
