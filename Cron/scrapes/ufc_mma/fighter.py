@@ -679,9 +679,10 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname, conn):
             fightid = i['link'].rstrip("/").split("/")[-1]
             rows = fetch_query(conn, cmd, (fightid,))
             if rows:
-                skipped+=1
-                resp_code = 200
-                continue
+                if rows[0].get('winner_id') != None:
+                    skipped+=1
+                    resp_code = 200
+                    continue
             data, resp_code = get_single_fight_stats(i['link'], i['date'], fighters_url_ufcstats, fname)
             fights_arr.append(data)
         except ValueError as e:

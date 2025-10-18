@@ -2,9 +2,10 @@ import polars as pl
 import numpy as np
 from datetime import datetime, date
 
-def calculate_fighter_stats(prior_fights, current_fight_date):
+def calculate_fighter_stats(prior_fights, current_fight_date, career_stats):
     """
     Calculate all statistics for a fighter from their prior fights.
+    Uses career stats from fighters table for overall averages.
     
     Parameters:
     -----------
@@ -12,6 +13,8 @@ def calculate_fighter_stats(prior_fights, current_fight_date):
         List of prior fight dictionaries
     current_fight_date : date
         Date of the current fight
+    career_stats : dict
+        Career statistics from fighters table (win, loss, slpm, str_acc, etc.)
         
     Returns:
     --------
@@ -22,19 +25,16 @@ def calculate_fighter_stats(prior_fights, current_fight_date):
     
     if not prior_fights or len(prior_fights) == 0:
         # Return defaults if no prior fights
-        return get_default_stats()
+        return get_default_stats(career_stats)
     
     # Sort fights by date (most recent first)
     sorted_fights = sorted(prior_fights, key=lambda x: x['fight_date'], reverse=True)
     
-    # ==================== WIN/LOSS RECORD ====================
-    wins = sum(1 for f in sorted_fights if f['result'] == 'win')
-    losses = sum(1 for f in sorted_fights if f['result'] == 'loss')
-    total = len(sorted_fights)
-    
-    stats['wins'] = wins
-    stats['losses'] = losses
-    stats['overall_winrate'] = wins / total if total > 0 else 0
+    # ==================== WIN/LOSS RECORD (FROM CAREER STATS) ====================
+    stats['wins'] = career_stats.get('win', 0) or 0
+    stats['losses'] = career_stats.get('loss', 0) or 0
+    total_career = stats['wins'] + stats['losses']
+    stats['overall_winrate'] = stats['wins'] / total_career if total_career > 0 else 0
     
     # ==================== RECENT WIN RATES ====================
     # Use available fights, up to requested amount
@@ -93,20 +93,32 @@ def calculate_fighter_stats(prior_fights, current_fight_date):
         stats[f'{stat_name}_landed_avg_last5'] = calculate_avg(last5, landed_field)
         stats[f'{stat_name}_accuracy_avg_last5'] = calculate_accuracy_avg(last5, attempts_field, landed_field)
         
-        # Overall
-        stats[f'{stat_name}_attempts_avg_overall'] = calculate_avg(sorted_fights, attempts_field)
-        stats[f'{stat_name}_landed_avg_overall'] = calculate_avg(sorted_fights, landed_field)
-        stats[f'{stat_name}_accuracy_avg_overall'] = calculate_accuracy_avg(sorted_fights, attempts_field, landed_field)
+        # Overall - USE CAREER STATS WHERE AVAILABLE
+        if stat_name == 'sig_str':
+            # Use career stats from fighters table
+            stats['sig_str_attempts_avg_overall'] = 0  # Not available in career stats
+            stats['sig_str_landed_avg_overall'] = career_stats.get('slpm', 0) or 0
+            stats['sig_str_accuracy_avg_overall'] = career_stats.get('str_acc', 0) or 0
+        elif stat_name == 'td':
+            # Use career stats from fighters table
+            stats['td_attempts_avg_overall'] = 0  # Not available in career stats
+            stats['td_landed_avg_overall'] = career_stats.get('td_avg', 0) or 0
+            stats['td_accuracy_avg_overall'] = career_stats.get('td_acc', 0) or 0
+        else:
+            # Calculate from fight history for other stats
+            stats[f'{stat_name}_attempts_avg_overall'] = calculate_avg(sorted_fights, attempts_field)
+            stats[f'{stat_name}_landed_avg_overall'] = calculate_avg(sorted_fights, landed_field)
+            stats[f'{stat_name}_accuracy_avg_overall'] = calculate_accuracy_avg(sorted_fights, attempts_field, landed_field)
     
     # ==================== KNOCKDOWNS ====================
     stats['kd_avg_last3'] = calculate_avg(last3, 'kd')
     stats['kd_avg_last5'] = calculate_avg(last5, 'kd')
     stats['kd_avg_overall'] = calculate_avg(sorted_fights, 'kd')
     
-    # ==================== SUBMISSIONS ====================
+    # ==================== SUBMISSIONS (USE CAREER STATS FOR OVERALL) ====================
     stats['sub_att_avg_last3'] = calculate_avg(last3, 'sub_att')
     stats['sub_att_avg_last5'] = calculate_avg(last5, 'sub_att')
-    stats['sub_att_avg_overall'] = calculate_avg(sorted_fights, 'sub_att')
+    stats['sub_att_avg_overall'] = career_stats.get('sub_avg', 0) or 0
     
     # ==================== ADVANCED WIN RATE ====================
     # Use available fights for each window
@@ -235,11 +247,15 @@ def calculate_advanced_winrate(fights):
     return score
 
 
-def get_default_stats():
+def get_default_stats(career_stats=None):
     """Return default stats for fighters with no prior fights."""
+    if career_stats is None:
+        career_stats = {}
+    
+    # Use career stats if available, otherwise 0
     stats = {
-        'wins': 0,
-        'losses': 0,
+        'wins': career_stats.get('win', 0) or 0,
+        'losses': career_stats.get('loss', 0) or 0,
         'overall_winrate': 0,
         'winrate_last3': 0,
         'winrate_last5': 0,
@@ -248,13 +264,32 @@ def get_default_stats():
         'win_streak': 0,
     }
     
-    # Add all performance stats as 0
+    # Calculate overall winrate if we have career stats
+    total = stats['wins'] + stats['losses']
+    if total > 0:
+        stats['overall_winrate'] = stats['wins'] / total
+    
+    # Add all performance stats
     stat_fields = ['body', 'clinch', 'distance', 'ground', 'head', 'leg', 'td', 'total_str', 'sig_str']
     for stat_name in stat_fields:
-        for window in ['last3', 'last5', 'overall']:
+        for window in ['last3', 'last5']:
             stats[f'{stat_name}_attempts_avg_{window}'] = 0
             stats[f'{stat_name}_landed_avg_{window}'] = 0
             stats[f'{stat_name}_accuracy_avg_{window}'] = 0
+        
+        # Use career stats for overall where available
+        if stat_name == 'sig_str':
+            stats['sig_str_attempts_avg_overall'] = 0
+            stats['sig_str_landed_avg_overall'] = career_stats.get('slpm', 0) or 0
+            stats['sig_str_accuracy_avg_overall'] = career_stats.get('str_acc', 0) or 0
+        elif stat_name == 'td':
+            stats['td_attempts_avg_overall'] = 0
+            stats['td_landed_avg_overall'] = career_stats.get('td_avg', 0) or 0
+            stats['td_accuracy_avg_overall'] = career_stats.get('td_acc', 0) or 0
+        else:
+            stats[f'{stat_name}_attempts_avg_overall'] = 0
+            stats[f'{stat_name}_landed_avg_overall'] = 0
+            stats[f'{stat_name}_accuracy_avg_overall'] = 0
     
     stats['kd_avg_last3'] = 0
     stats['kd_avg_last5'] = 0
@@ -262,7 +297,7 @@ def get_default_stats():
     
     stats['sub_att_avg_last3'] = 0
     stats['sub_att_avg_last5'] = 0
-    stats['sub_att_avg_overall'] = 0
+    stats['sub_att_avg_overall'] = career_stats.get('sub_avg', 0) or 0
     
     stats['winrate_advanced_last3'] = 0
     stats['winrate_advanced_last5'] = 0
@@ -300,27 +335,59 @@ def create_differential_features(df):
         features['fight_id'] = row['fight_id']
         
         # ==================== BASIC DIFFERENTIALS ====================
-        features['height_diff'] = row['f1_height_in'] - row['f2_height_in']
-        features['reach_diff'] = row['f1_reach_in'] - row['f2_reach_in']
+        features['height_diff'] = safe_subtract(row.get('f1_height_in'), row.get('f2_height_in'))
+        features['reach_diff'] = safe_subtract(row.get('f1_reach_in'), row.get('f2_reach_in'))
         
         # Age difference in days at fight time
-        f1_age_days = (row['fight_date'] - row['f1_dob']).days
-        f2_age_days = (row['fight_date'] - row['f2_dob']).days
-        features['age_diff'] = f1_age_days - f2_age_days
+        if row.get('f1_dob') and row.get('f2_dob') and row.get('fight_date'):
+            f1_age_days = (row['fight_date'] - row['f1_dob']).days
+            f2_age_days = (row['fight_date'] - row['f2_dob']).days
+            features['age_diff'] = f1_age_days - f2_age_days
+        else:
+            features['age_diff'] = 0
         
         features['experience_diff'] = row['prior_cnt_f1'] - row['prior_cnt_f2']
         
         # ==================== CATEGORICAL FEATURES ====================
-        features['weight_class'] = row['weight_class']
-        features['stance_matchup'] = f"{row['f1_stance']}_vs_{row['f2_stance']}"
+        features['weight_class'] = row.get('weight_class', 'Unknown')
+        f1_stance = row.get('f1_stance', 'Unknown')
+        f2_stance = row.get('f2_stance', 'Unknown')
+        features['stance_matchup'] = f"{f1_stance}_vs_{f2_stance}"
         
         # ==================== EXTRACT PRIOR FIGHT STATS ====================
         prior_f1 = row['prior_f1'] if row['prior_f1'] is not None else []
         prior_f2 = row['prior_f2'] if row['prior_f2'] is not None else []
         
+        # Build career stats dictionaries from row data
+        f1_career_stats = {
+            'win': row.get('f1_win'),
+            'loss': row.get('f1_loss'),
+            'slpm': row.get('f1_slpm'),
+            'str_acc': row.get('f1_str_acc'),
+            'sapm': row.get('f1_sapm'),
+            'str_def': row.get('f1_str_def'),
+            'td_avg': row.get('f1_td_avg'),
+            'td_acc': row.get('f1_td_acc'),
+            'td_def': row.get('f1_td_def'),
+            'sub_avg': row.get('f1_sub_avg'),
+        }
+        
+        f2_career_stats = {
+            'win': row.get('f2_win'),
+            'loss': row.get('f2_loss'),
+            'slpm': row.get('f2_slpm'),
+            'str_acc': row.get('f2_str_acc'),
+            'sapm': row.get('f2_sapm'),
+            'str_def': row.get('f2_str_def'),
+            'td_avg': row.get('f2_td_avg'),
+            'td_acc': row.get('f2_td_acc'),
+            'td_def': row.get('f2_td_def'),
+            'sub_avg': row.get('f2_sub_avg'),
+        }
+        
         # Calculate stats for both fighters
-        f1_stats = calculate_fighter_stats(prior_f1, row['fight_date'])
-        f2_stats = calculate_fighter_stats(prior_f2, row['fight_date'])
+        f1_stats = calculate_fighter_stats(prior_f1, row['fight_date'], f1_career_stats)
+        f2_stats = calculate_fighter_stats(prior_f2, row['fight_date'], f2_career_stats)
         
         # ==================== RECORD DIFFERENTIALS ====================
         features['wins_diff'] = f1_stats['wins'] - f2_stats['wins']
@@ -377,11 +444,26 @@ def create_differential_features(df):
 def safe_subtract(val1, val2):
     """Safely subtract two values, handling None cases."""
     if val1 is None or val2 is None:
-        return None
+        return 0  # Return 0 instead of None for consistent behavior
     return val1 - val2
 
 
-# Example usage:
-# differential_df = create_differential_features(fight_snapshots_df)
-# print(differential_df.head())
-# print(f"Shape: {differential_df.shape}")
+def process_snapshots_to_flat_features(snapshots_df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Simple one-function call to transform snapshots into flat differential features.
+    """
+    print(f"\n{'='*80}")
+    print("PROCESSING SNAPSHOTS TO FLAT DIFFERENTIAL FEATURES")
+    print(f"{'='*80}\n")
+    
+    print(f"Input: {len(snapshots_df)} fights")
+    
+    flat_df = create_differential_features(snapshots_df)
+    
+    print(f"Output: {len(flat_df)} fights with {len(flat_df.columns)} features")
+
+    print(f"\n{'='*80}")
+    print(f"COMPLETE")
+    print(f"{'='*80}\n")
+    
+    return flat_df

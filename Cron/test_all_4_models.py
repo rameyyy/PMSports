@@ -8,7 +8,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import GradientBoostingClassifier
 import xgboost as xgb
-from models.ufc_mma import flat_df_to_model_ready, attr_fighthist_combined_model
+from Cron.models.ufc_mma import flat_df_to_model_ready_training
+from models.ufc_mma import attr_fighthist_combined_model
 
 def ensemble_all_models(differential_df, combined_df, test_split=0.25):
     """

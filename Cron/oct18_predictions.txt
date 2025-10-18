@@ -1,0 +1,77 @@
+================================================================================
+PREDICTIONS FOR OCTOBER 18, 2025
+Model: Ensemble Weighted Avg Probability
+================================================================================
+
+Fight #1: kyle nelson vs matt frevola
+Ensemble Weighted Avg Prob Prediction: kyle nelson
+Confidence: 50.3%
+Accuracy: 53.3%
+Accuracy Sample: 285 fights
+
+--------------------------------------------------------------------------------
+
+Fight #2: bruno silva vs hyunsung park
+Ensemble Weighted Avg Prob Prediction: hyunsung park
+Confidence: 61.3%
+Accuracy: 72.0%
+Accuracy Sample: 211 fights
+
+--------------------------------------------------------------------------------
+
+Fight #3: marlon vera vs aiemann zahabi **
+Ensemble Weighted Avg Prob Prediction: aiemann zahabi
+Confidence: 59.4%
+Accuracy: 67.9%
+Accuracy Sample: 240 fights
+
+--------------------------------------------------------------------------------
+
+Fight #4: cody gibson vs aoriqileng
+Ensemble Weighted Avg Prob Prediction: aoriqileng
+Confidence: 62.0%
+Accuracy: 72.0%
+Accuracy Sample: 211 fights
+
+--------------------------------------------------------------------------------
+
+Fight #5: charles jourdain vs davey grant
+Ensemble Weighted Avg Prob Prediction: charles jourdain
+Confidence: 58.2%
+Accuracy: 67.9%
+Accuracy Sample: 240 fights
+
+--------------------------------------------------------------------------------
+
+Fight #6: manon fiorot vs jasmine jasudavicius
+Ensemble Weighted Avg Prob Prediction: jasmine jasudavicius
+Confidence: 58.1%
+Accuracy: 67.9%
+Accuracy Sample: 240 fights
+
+--------------------------------------------------------------------------------
+
+Fight #7: kevin holland vs mike malott
+Ensemble Weighted Avg Prob Prediction: mike malott
+Confidence: 50.8%
+Accuracy: 53.3%
+Accuracy Sample: 285 fights
+
+--------------------------------------------------------------------------------
+
+Fight #8: reinier de ridder vs brendan allen
+Ensemble Weighted Avg Prob Prediction: brendan allen
+Confidence: 56.4%
+Accuracy: 66.8%
+Accuracy Sample: 250 fights
+
+--------------------------------------------------------------------------------
+
+Fight #9: kyle prepolec vs drew dober
+Ensemble Weighted Avg Prob Prediction: drew dober
+Confidence: 50.2%
+Accuracy: 53.3%
+Accuracy Sample: 285 fights
+
+--------------------------------------------------------------------------------
+

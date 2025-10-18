@@ -13,10 +13,11 @@ def main():
     #         continue
     #     events_arr.extend(events)
     # events_arr = sorted(set(events_arr), reverse=False) # terminal 2
-    events = get_all_events(past=False)
+    events = get_all_events(past=True)
     events_arr.extend(events)
     print(f"Found {len(events_arr)} events")
     print(f'Pushing to SQL set to {PUSHVAR}')
+    events_arr = ['https://www.tapology.com/fightcenter/events/130995-ufc-fight-night']
     for event_url in events_arr:
         event_idtemp= event_url.rstrip("/").split("/")[-1]
         query = "SELECT * FROM ufc.events WHERE event_id = %s"
@@ -27,7 +28,7 @@ def main():
             # continue
         else:
             print(f'event {event_idtemp} not in SQL yet, continuing..')
-        data = get_event_data(event_url, getting_old_data=False)
+        data = get_event_data(event_url, getting_old_data=True)
         idx = EventNameIndex(data)
         if PUSHVAR:
             push_events(data, conn)

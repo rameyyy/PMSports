@@ -5,6 +5,7 @@ import numpy as np
 from typing import Dict, List
 from datetime import date
 
+
 def extract_features_from_snapshots(df: pl.DataFrame) -> pl.DataFrame:
     """
     Simple wrapper to extract fight features from fight_snapshots dataframe.
@@ -32,6 +33,7 @@ def extract_fight_history_features(df: pl.DataFrame) -> pl.DataFrame:
     """
     Extract aggregate features from fight history lists in fight_snapshots.parquet.
     Enhanced with RECENCY WEIGHTING - recent fights matter more!
+    Uses career stats from fighters table where available.
     """
     
     def safe_get(fight_dict, key, default=0):
@@ -258,42 +260,12 @@ def extract_fight_history_features(df: pl.DataFrame) -> pl.DataFrame:
         wins = sum(1 for f in recent if f.get('result') == 'win')
         return wins / len(recent)
     
-    def calc_win_rate(fights_list):
-        """Overall career win rate"""
-        if not fights_list or len(fights_list) == 0:
-            return None
-        wins = sum(1 for f in fights_list if f.get('result') == 'win')
-        return wins / len(fights_list)
-    
     def calc_avg_stat(fights_list, stat_name):
         """Average of a specific stat across all fights"""
         if not fights_list or len(fights_list) == 0:
             return None
         values = [safe_get(f, stat_name, 0) for f in fights_list]
         return float(np.mean(values)) if values else None
-    
-    def calc_accuracy(fights_list, landed_stat, attempts_stat):
-        """Calculate accuracy % for a stat"""
-        if not fights_list or len(fights_list) == 0:
-            return None
-        total_landed = sum(safe_get(f, landed_stat, 0) for f in fights_list)
-        total_attempts = sum(safe_get(f, attempts_stat, 0) for f in fights_list)
-        return float(total_landed / total_attempts) if total_attempts > 0 else None
-    
-    def calc_avg_fight_pace(fights_list):
-        """Average strikes per minute"""
-        if not fights_list or len(fights_list) == 0:
-            return None
-        total_strikes = sum(safe_get(f, 'total_str_attempts', 0) for f in fights_list)
-        return float(total_strikes / (len(fights_list) * 15)) if len(fights_list) > 0 else None
-    
-    def calc_defensive_stats(fights_list):
-        """Average opponent striking accuracy (lower is better defense)"""
-        if not fights_list or len(fights_list) == 0:
-            return None
-        total_landed = sum(safe_get(f, 'opp_sig_str_landed', 0) for f in fights_list)
-        total_attempts = sum(safe_get(f, 'opp_sig_str_attempts', 0) for f in fights_list)
-        return float(total_landed / total_attempts) if total_attempts > 0 else None
     
     # Process each row
     features_list = []
@@ -314,6 +286,37 @@ def extract_fight_history_features(df: pl.DataFrame) -> pl.DataFrame:
         # Calculate recency weights
         f1_weights = calc_recency_weights(prior_f1, current_date, half_life_days=365)
         f2_weights = calc_recency_weights(prior_f2, current_date, half_life_days=365)
+        
+        # Calculate career win rate from fighters table
+        f1_wins = row.get('f1_win', 0) or 0
+        f1_losses = row.get('f1_loss', 0) or 0
+        f1_total_fights = f1_wins + f1_losses
+        f1_win_rate = float(f1_wins / f1_total_fights) if f1_total_fights > 0 else None
+        
+        f2_wins = row.get('f2_win', 0) or 0
+        f2_losses = row.get('f2_loss', 0) or 0
+        f2_total_fights = f2_wins + f2_losses
+        f2_win_rate = float(f2_wins / f2_total_fights) if f2_total_fights > 0 else None
+        
+        # Get career stats from fighters table (already float from our earlier conversion)
+        f1_str_acc = row.get('f1_str_acc')
+        f2_str_acc = row.get('f2_str_acc')
+        f1_td_acc = row.get('f1_td_acc')
+        f2_td_acc = row.get('f2_td_acc')
+        f1_slpm = row.get('f1_slpm')
+        f2_slpm = row.get('f2_slpm')
+        f1_sapm = row.get('f1_sapm')
+        f2_sapm = row.get('f2_sapm')
+        f1_str_def = row.get('f1_str_def')
+        f2_str_def = row.get('f2_str_def')
+        f1_td_avg = row.get('f1_td_avg')
+        f2_td_avg = row.get('f2_td_avg')
+        f1_sub_avg = row.get('f1_sub_avg')
+        f2_sub_avg = row.get('f2_sub_avg')
+        
+        # Calculate defensive accuracy from str_def (str_def is defense %, so 1-str_def is opponent accuracy)
+        f1_defensive_accuracy = float(1 - f1_str_def) if f1_str_def is not None else None
+        f2_defensive_accuracy = float(1 - f2_str_def) if f2_str_def is not None else None
         
         features = {
             # Basic info
@@ -351,22 +354,26 @@ def extract_fight_history_features(df: pl.DataFrame) -> pl.DataFrame:
             'f1_dominant_decision_rate': calc_dominant_decision_rate(prior_f1),
             'f1_been_kod_rate': calc_been_kod_rate(prior_f1),
             'f1_been_subbed_rate': calc_been_subbed_rate(prior_f1),
-            'f1_win_rate': calc_win_rate(prior_f1),
-            'f1_sig_str_accuracy': calc_accuracy(prior_f1, 'sig_str_landed', 'sig_str_attempts'),
-            'f1_avg_sig_str_landed': calc_avg_stat(prior_f1, 'sig_str_landed'),
+            
+            # REPLACED: Career stats from fighters table
+            'f1_win_rate': f1_win_rate,
+            'f1_sig_str_accuracy': f1_str_acc,
+            'f1_td_accuracy': f1_td_acc,
+            'f1_avg_sig_str_landed': f1_slpm,
+            'f1_avg_opp_sig_str_landed': f1_sapm,
+            'f1_defensive_accuracy': f1_defensive_accuracy,
+            'f1_avg_td_landed': f1_td_avg,
+            'f1_avg_sub_attempts': f1_sub_avg,
+            
+            # KEPT: Calculated from fight history (not in career stats)
             'f1_avg_sig_str_attempts': calc_avg_stat(prior_f1, 'sig_str_attempts'),
             'f1_avg_head_str_landed': calc_avg_stat(prior_f1, 'head_landed'),
             'f1_avg_body_str_landed': calc_avg_stat(prior_f1, 'body_landed'),
             'f1_avg_leg_str_landed': calc_avg_stat(prior_f1, 'leg_landed'),
-            'f1_td_accuracy': calc_accuracy(prior_f1, 'td_landed', 'td_attempts'),
-            'f1_avg_td_landed': calc_avg_stat(prior_f1, 'td_landed'),
             'f1_avg_td_attempts': calc_avg_stat(prior_f1, 'td_attempts'),
             'f1_avg_ctrl_time': calc_avg_stat(prior_f1, 'ctrl_time_s'),
-            'f1_avg_sub_attempts': calc_avg_stat(prior_f1, 'sub_att'),
             'f1_avg_kds': calc_avg_stat(prior_f1, 'kd'),
-            'f1_defensive_accuracy': calc_defensive_stats(prior_f1),
-            'f1_avg_opp_sig_str_landed': calc_avg_stat(prior_f1, 'opp_sig_str_landed'),
-            'f1_fight_pace': calc_avg_fight_pace(prior_f1),
+            'f1_fight_pace': calc_avg_stat(prior_f1, 'total_str_attempts') / 15 if calc_avg_stat(prior_f1, 'total_str_attempts') else None,
             
             # Fighter 2 Features (same as F1)
             'f2_weighted_win_rate': calc_weighted_win_rate(prior_f2, f2_weights),
@@ -388,22 +395,26 @@ def extract_fight_history_features(df: pl.DataFrame) -> pl.DataFrame:
             'f2_dominant_decision_rate': calc_dominant_decision_rate(prior_f2),
             'f2_been_kod_rate': calc_been_kod_rate(prior_f2),
             'f2_been_subbed_rate': calc_been_subbed_rate(prior_f2),
-            'f2_win_rate': calc_win_rate(prior_f2),
-            'f2_sig_str_accuracy': calc_accuracy(prior_f2, 'sig_str_landed', 'sig_str_attempts'),
-            'f2_avg_sig_str_landed': calc_avg_stat(prior_f2, 'sig_str_landed'),
+            
+            # REPLACED: Career stats from fighters table
+            'f2_win_rate': f2_win_rate,
+            'f2_sig_str_accuracy': f2_str_acc,
+            'f2_td_accuracy': f2_td_acc,
+            'f2_avg_sig_str_landed': f2_slpm,
+            'f2_avg_opp_sig_str_landed': f2_sapm,
+            'f2_defensive_accuracy': f2_defensive_accuracy,
+            'f2_avg_td_landed': f2_td_avg,
+            'f2_avg_sub_attempts': f2_sub_avg,
+            
+            # KEPT: Calculated from fight history (not in career stats)
             'f2_avg_sig_str_attempts': calc_avg_stat(prior_f2, 'sig_str_attempts'),
             'f2_avg_head_str_landed': calc_avg_stat(prior_f2, 'head_landed'),
             'f2_avg_body_str_landed': calc_avg_stat(prior_f2, 'body_landed'),
             'f2_avg_leg_str_landed': calc_avg_stat(prior_f2, 'leg_landed'),
-            'f2_td_accuracy': calc_accuracy(prior_f2, 'td_landed', 'td_attempts'),
-            'f2_avg_td_landed': calc_avg_stat(prior_f2, 'td_landed'),
             'f2_avg_td_attempts': calc_avg_stat(prior_f2, 'td_attempts'),
             'f2_avg_ctrl_time': calc_avg_stat(prior_f2, 'ctrl_time_s'),
-            'f2_avg_sub_attempts': calc_avg_stat(prior_f2, 'sub_att'),
             'f2_avg_kds': calc_avg_stat(prior_f2, 'kd'),
-            'f2_defensive_accuracy': calc_defensive_stats(prior_f2),
-            'f2_avg_opp_sig_str_landed': calc_avg_stat(prior_f2, 'opp_sig_str_landed'),
-            'f2_fight_pace': calc_avg_fight_pace(prior_f2),
+            'f2_fight_pace': calc_avg_stat(prior_f2, 'total_str_attempts') / 15 if calc_avg_stat(prior_f2, 'total_str_attempts') else None,
         }
         
         features_list.append(features)
@@ -437,3 +448,20 @@ def calculate_feature_differentials(df: pl.DataFrame) -> pl.DataFrame:
             ])
     
     return df
+
+
+def process_snapshots_to_features(snapshots_df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Simple one-function call to transform snapshots into fight features for homemade model
+    """
+    print(f"\n{'='*80}")
+    print("PROCESSING SNAPSHOTS TO FEATURES")
+    print(f"{'='*80}\n")
+    
+    features_df = extract_features_from_snapshots(snapshots_df)
+    
+    print(f"\n{'='*80}")
+    print(f"COMPLETE: {len(features_df)} fights processed")
+    print(f"{'='*80}\n")
+    
+    return features_df

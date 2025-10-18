@@ -95,18 +95,18 @@ def train_final_models_no_split(differential_df, combined_df):
     print("\n5. Saving models to disk...")
     
     # Save scaler
-    with open('models/scaler.pkl', 'wb') as f:
+    with open('models/ufc_mma/scaler.pkl', 'wb') as f:
         pickle.dump(scaler, f)
-    print("   ✅ Saved: models/scaler.pkl")
+    print("   ✅ Saved: models/ufc_mma/scaler.pkl")
     
     # Save feature columns
-    with open('models/feature_columns.pkl', 'wb') as f:
+    with open('models/ufc_mma/feature_columns.pkl', 'wb') as f:
         pickle.dump(feature_cols, f)
-    print("   ✅ Saved: models/feature_columns.pkl")
+    print("   ✅ Saved: models/ufc_mma/feature_columns.pkl")
     
     # Save each ML model
     for name, model in trained_models.items():
-        filename = f'models/{name}_model.pkl'
+        filename = f'models/ufc_mma/{name}_model.pkl'
         with open(filename, 'wb') as f:
             pickle.dump(model, f)
         print(f"   ✅ Saved: {filename}")
@@ -131,9 +131,9 @@ def train_final_models_no_split(differential_df, combined_df):
         }
     }
         
-    with open('models/model_metadata.pkl', 'wb') as f:
+    with open('models/ufc_mma/model_metadata.pkl', 'wb') as f:
         pickle.dump(metadata, f)
-    print("   ✅ Saved: models/model_metadata.pkl")
+    print("   ✅ Saved: models/ufc_mma/model_metadata.pkl")
     
     print("\n" + "="*80)
     print("✅ ALL MODELS SAVED SUCCESSFULLY!")
@@ -165,21 +165,21 @@ def load_models_for_prediction():
     print("Loading models from disk...")
     
     # Load scaler
-    with open('models/scaler.pkl', 'rb') as f:
+    with open('models/ufc_mma/scaler.pkl', 'rb') as f:
         scaler = pickle.load(f)
     
     # Load feature columns
-    with open('models/feature_columns.pkl', 'rb') as f:
+    with open('models/ufc_mma/feature_columns.pkl', 'rb') as f:
         feature_cols = pickle.load(f)
     
     # Load ML models
     models = {}
     for name in ['logistic', 'xgboost', 'gradient_boost']:
-        with open(f'models/{name}_model.pkl', 'rb') as f:
+        with open(f'models/ufc_mma/{name}_model.pkl', 'rb') as f:
             models[name] = pickle.load(f)
     
     # Load metadata
-    with open('models/model_metadata.pkl', 'rb') as f:
+    with open('models/ufc_mma/model_metadata.pkl', 'rb') as f:
         metadata = pickle.load(f)
     
     print("✅ All models loaded!")
