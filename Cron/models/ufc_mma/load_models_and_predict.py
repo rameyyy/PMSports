@@ -1,6 +1,36 @@
 import polars as pl
 import pickle
 import numpy as np
+from .utils import create_connection, fetch_query
+
+def get_model_accuracies() -> dict:
+    """
+    Calculates accuracy for each model (logistic, gradient_boost, xgboost)
+    as SUM(correct=1)/COUNT(non-null correct), ignoring NULLs.
+    """
+
+    query = """
+    SELECT 
+        CAST(SUM(CASE WHEN logistic_correct = 1 THEN 1 ELSE 0 END) AS DECIMAL(10,6)) 
+            / NULLIF(COUNT(logistic_correct), 0) AS logistic_acc,
+
+        CAST(SUM(CASE WHEN gradient_correct = 1 THEN 1 ELSE 0 END) AS DECIMAL(10,6)) 
+            / NULLIF(COUNT(gradient_correct), 0) AS gradient_boost_acc,
+
+        CAST(SUM(CASE WHEN xgboost_correct = 1 THEN 1 ELSE 0 END) AS DECIMAL(10,6)) 
+            / NULLIF(COUNT(xgboost_correct), 0) AS xgboost_acc
+    FROM ufc.predictions;
+    """
+    
+    conn = create_connection()
+    df = fetch_query(conn, query)
+
+    return {
+        "logistic": float(df[0, "logistic_acc"]),
+        "xgboost": float(df[0, "xgboost_acc"]),
+        "gradient_boost": float(df[0, "gradient_boost_acc"])
+    }
+
 
 def load_saved_models():
     """
@@ -139,11 +169,7 @@ def predict_with_saved_models(flat_df, loaded_models=None):
     print("\n3. Creating ensemble predictions...")
     
     # Model accuracies (from training/validation)
-    accuracies = {
-        'logistic': 0.6351,
-        'xgboost': 0.6517,
-        'gradient_boost': 0.6611
-    }
+    accuracies = get_model_accuracies()
     
     # Ensemble 1: Majority Vote (with probability tiebreaker)
     votes = np.array([predictions[name] for name in predictions.keys()])

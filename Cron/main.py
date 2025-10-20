@@ -17,7 +17,7 @@ def main():
     events_arr.extend(events)
     print(f"Found {len(events_arr)} events")
     print(f'Pushing to SQL set to {PUSHVAR}')
-    events_arr = ['https://www.tapology.com/fightcenter/events/130995-ufc-fight-night']
+    events_arr = ['https://www.tapology.com/fightcenter/events/129312-ufc-fight-night']
     for event_url in events_arr:
         event_idtemp= event_url.rstrip("/").split("/")[-1]
         query = "SELECT * FROM ufc.events WHERE event_id = %s"
