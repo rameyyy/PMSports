@@ -4,3 +4,5 @@ config*.json
 .env
 /Cron/temp/
 *.parquet
+*.pkl
+*.csv
