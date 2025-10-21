@@ -235,16 +235,48 @@ def predict_with_saved_models(flat_df, loaded_models=None):
     ])
     
     # Add correctness if target exists
+    # Add correctness if target exists AND is not null
     if 'target' in result_df.columns:
         result_df = result_df.with_columns([
-            (pl.col('logistic_pred') == pl.col('target')).alias('logistic_correct'),
-            (pl.col('xgboost_pred') == pl.col('target')).alias('xgboost_correct'),
-            (pl.col('gradient_boost_pred') == pl.col('target')).alias('gradient_boost_correct'),
-            (pl.col('ensemble_majorityvote_pred') == pl.col('target')).alias('ensemble_majorityvote_correct'),
-            (pl.col('ensemble_weightedvote_pred') == pl.col('target')).alias('ensemble_weightedvote_correct'),
-            (pl.col('ensemble_avgprob_pred') == pl.col('target')).alias('ensemble_avgprob_correct'),
-            (pl.col('ensemble_weightedavgprob_pred') == pl.col('target')).alias('ensemble_weightedavgprob_correct'),
-            (pl.col('predicted_winner') == pl.col('target')).alias('correct'),
+            pl.when(pl.col('target').is_null())
+            .then(None)
+            .otherwise(pl.col('logistic_pred') == pl.col('target'))
+            .alias('logistic_correct'),
+            
+            pl.when(pl.col('target').is_null())
+            .then(None)
+            .otherwise(pl.col('xgboost_pred') == pl.col('target'))
+            .alias('xgboost_correct'),
+            
+            pl.when(pl.col('target').is_null())
+            .then(None)
+            .otherwise(pl.col('gradient_boost_pred') == pl.col('target'))
+            .alias('gradient_boost_correct'),
+            
+            pl.when(pl.col('target').is_null())
+            .then(None)
+            .otherwise(pl.col('ensemble_majorityvote_pred') == pl.col('target'))
+            .alias('ensemble_majorityvote_correct'),
+            
+            pl.when(pl.col('target').is_null())
+            .then(None)
+            .otherwise(pl.col('ensemble_weightedvote_pred') == pl.col('target'))
+            .alias('ensemble_weightedvote_correct'),
+            
+            pl.when(pl.col('target').is_null())
+            .then(None)
+            .otherwise(pl.col('ensemble_avgprob_pred') == pl.col('target'))
+            .alias('ensemble_avgprob_correct'),
+            
+            pl.when(pl.col('target').is_null())
+            .then(None)
+            .otherwise(pl.col('ensemble_weightedavgprob_pred') == pl.col('target'))
+            .alias('ensemble_weightedavgprob_correct'),
+            
+            pl.when(pl.col('target').is_null())
+            .then(None)
+            .otherwise(pl.col('predicted_winner') == pl.col('target'))
+            .alias('correct'),
         ])
         
         print("\n" + "="*80)

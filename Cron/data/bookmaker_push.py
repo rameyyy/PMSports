@@ -190,9 +190,10 @@ class OddsProcessor:
         # Convert implied probabilities to percentages (e.g., 0.6923 -> 69.23)
         fighter1_odds_percent = fighter1_data['implied_prob'] * 100
         fighter2_odds_percent = fighter2_data['implied_prob'] * 100
-        
-        # Convert EV to percentage (e.g., -0.0542 -> -5.42)
-        ev_percent = (fighter1_data['ev'] * 100) if fighter1_data['ev'] is not None else None
+        print('up to date')
+        # Convert EV to percentage for both fighters (e.g., -0.0542 -> -5.42)
+        fighter1_ev_percent = (fighter1_data['ev']*100) if fighter1_data['ev'] is not None else None
+        fighter2_ev_percent = (fighter2_data['ev']*100) if fighter2_data['ev'] is not None else None
         
         # Check if record exists
         check_query = """
@@ -214,7 +215,8 @@ class OddsProcessor:
                     fighter2_id = %s,
                     fighter2_odds = %s,
                     fighter2_odds_percent = %s,
-                    ev = %s,
+                    fighter1_ev = %s,
+                    fighter2_ev = %s,
                     vigor = %s
                 WHERE fight_id = %s AND bookmaker = %s
             """
@@ -226,7 +228,8 @@ class OddsProcessor:
                 fighter2_data['fighter_id'],
                 fighter2_data['odds'],
                 fighter2_odds_percent,
-                ev_percent,
+                fighter1_ev_percent,
+                fighter2_ev_percent,
                 vigor,
                 fight_id,
                 bookmaker
@@ -236,8 +239,8 @@ class OddsProcessor:
             insert_query = """
                 INSERT INTO ufc.bookmaker_odds
                 (fight_id, bookmaker, fighter1_id, fighter1_odds, fighter1_odds_percent,
-                 fighter2_id, fighter2_odds, fighter2_odds_percent, ev, vigor)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 fighter2_id, fighter2_odds, fighter2_odds_percent, fighter1_ev, fighter2_ev, vigor)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             
             cursor.execute(insert_query, (
@@ -249,14 +252,15 @@ class OddsProcessor:
                 fighter2_data['fighter_id'],
                 fighter2_data['odds'],
                 fighter2_odds_percent,
-                ev_percent,
+                fighter1_ev_percent,
+                fighter2_ev_percent,
                 vigor
             ))
         
         self.conn.commit()
         cursor.close()
     
-    def process_odds(self, target_date: Optional[str] = None) -> None:
+    def process_odds(self) -> None:
         """Main processing function"""
         data = self.load_odds_data()
         
@@ -273,11 +277,6 @@ class OddsProcessor:
                 
                 # Extract date from ISO format
                 event_date = event_time.split('T')[0]
-                
-                # # Filter by date if specified
-                # if target_date and not event_time.startswith(target_date):
-                #     skipped += 1
-                #     continue
                 
                 if not bookmakers:
                     skipped += 1
@@ -403,11 +402,8 @@ def run():
     processor = OddsProcessor(conn, "ufc_odds.json")
     
     try:
-        # Process all odds for a specific date
-        processor.process_odds(target_date="2025-10-24")
-        
-        # Or process all odds regardless of date
-        # processor.process_odds()
+        # Process all odds
+        processor.process_odds()
         
     finally:
         processor.close()
