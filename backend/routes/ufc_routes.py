@@ -64,14 +64,6 @@ def get_stats():
         return jsonify({'error': 'Database error'}), 500
     return jsonify(stats)
 
-@ufc_bp.route('/fights/<fight_id>/odds', methods=['GET'])
-def get_odds(fight_id):
-    """Get bookmaker odds for a fight"""
-    odds = get_fight_odds(fight_id)
-    if odds is None:
-        return jsonify({'error': 'Database error'}), 500
-    return jsonify(odds)
-
 @ufc_bp.route('/fights/<fight_id>/prediction', methods=['GET'])
 def get_prediction(fight_id):
     """Get the prediction for a specific fight"""
@@ -106,3 +98,28 @@ def get_fighter(fighter_id):
     if fighter is None:
         return jsonify({'error': 'Fighter not found'}), 404
     return jsonify(fighter)
+
+@ufc_bp.route('/fights/<fight_id>/odds', methods=['GET'])
+def get_odds(fight_id):
+    """Get bookmaker odds for a fight with EV calculations"""
+    odds = get_fight_odds(fight_id)
+    if odds is None:
+        return jsonify({'error': 'Database error'}), 500
+    
+    # Transform the data to include EV and format properly
+    formatted_odds = []
+    for odd in odds:
+        formatted_odds.append({
+            'fight_id': odd['fight_id'],
+            'bookmaker': odd['bookmaker'],
+            'fighter1_id': odd['fighter1_id'],
+            'fighter2_id': odd['fighter2_id'],
+            'fighter1_odds': odd['fighter1_odds'],
+            'fighter2_odds': odd['fighter2_odds'],
+            'fighter1_odds_percent': round(float(odd['fighter1_odds_percent']), 2),
+            'fighter2_odds_percent': round(float(odd['fighter2_odds_percent']), 2),
+            'ev': round(float(odd['ev']), 2) if odd.get('ev') is not None else None,
+            'vigor': round(float(odd['vigor']), 2)
+        })
+    
+    return jsonify(formatted_odds)

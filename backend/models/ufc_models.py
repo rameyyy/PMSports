@@ -106,6 +106,7 @@ def get_fight_odds(fight_id):
             fighter2_odds,
             fighter1_odds_percent,
             fighter2_odds_percent,
+            ev,
             vigor
         FROM ufc.bookmaker_odds
         WHERE fight_id = %s
