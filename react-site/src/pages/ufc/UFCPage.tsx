@@ -5,36 +5,21 @@ type Fight = {
   event_id: string;
   fighter1_id: string;
   fighter2_id: string;
-  winner_id?: string;
-  loser_id?: string;
   fighter1_name: string;
   fighter2_name: string;
-  fight_date: string;
-  fight_link: string;
-  method?: string;
-  fight_format: string;
-  fight_type?: string;
-  referee?: string;
-  end_time?: string;
+  fighter1_nickname: string | null;
+  fighter2_nickname: string | null;
+  fighter1_img_link: string | null;
+  fighter2_img_link: string | null;
+  algopick_model: string | null;
+  algopick_prediction: number | null;
+  algopick_probability: number | null;
+  window_sample: number | null;
+  correct: number | null;
+  date: string;
+  end_time: string | null;
   weight_class: string;
-  fighter1_nickname?: string;
-  fighter1_img?: string;
-  fighter2_nickname?: string;
-  fighter2_img?: string;
-  logistic_pred?: number;
-  logistic_f1_prob?: number;
-  logistic_correct?: number;
-  xgboost_pred?: number;
-  xgboost_f1_prob?: number;
-  xgboost_correct?: number;
-  gradient_pred?: number;
-  gradient_f1_prob?: number;
-  gradient_correct?: number;
-  homemade_pred?: number;
-  homemade_f1_prob?: number;
-  homemade_correct?: number;
-  prediction_confidence?: number;
-  predicted_winner?: number;
+  win_method: string | null;
 };
 
 type Event = {
@@ -46,21 +31,6 @@ type Event = {
   date: string;
 };
 
-// Helper function to capitalize names including hyphens
-function capitalizeName(name: string): string {
-  return name
-    .split(' ')
-    .map(word => {
-      // Handle hyphenated names like "al-dew" -> "Al-Dew"
-      return word
-        .split('-')
-        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-        .join('-');
-    })
-    .join(' ');
-}
-
-// Helper function to format date
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   const options: Intl.DateTimeFormatOptions = { 
@@ -69,6 +39,19 @@ function formatDate(dateString: string): string {
     year: 'numeric' 
   };
   return date.toLocaleDateString('en-US', options);
+}
+
+function getModelDisplayName(modelKey: string): string {
+  const modelMap: { [key: string]: string } = {
+    'logistic': 'Logistic Regression',
+    'xgboost': 'XGBoost',
+    'gradient': 'Gradient Boosting',
+    'homemade': 'Homemade Model',
+    'ensemble_weightedvote': 'Ensemble Weighted Vote',
+    'ensemble_avgprob': 'Ensemble Avg Prob',
+    'ensemble_weightedavgprob': 'Ensemble Weighted Avg Prob'
+  };
+  return modelMap[modelKey] || modelKey;
 }
 
 export default function UFCPage() {
@@ -80,9 +63,7 @@ export default function UFCPage() {
   });
   const [eventFights, setEventFights] = useState<{ [key: string]: Fight[] }>({});
   const [loading, setLoading] = useState(true);
-  const [selectedModel, setSelectedModel] = useState<{ [key: string]: string }>({});
 
-  // Fetch events when component mounts
   useEffect(() => {
     const fetchEvents = async () => {
       try {
@@ -106,7 +87,6 @@ export default function UFCPage() {
     fetchEvents();
   }, []);
 
-  // Fetch fights when an event is expanded
   const handleEventClick = async (eventId: string) => {
     if (expandedEvent === eventId) {
       setExpandedEvent(null);
@@ -115,19 +95,25 @@ export default function UFCPage() {
 
     setExpandedEvent(eventId);
 
-    // Only fetch if we haven't already
     if (!eventFights[eventId]) {
       try {
+        console.log('Fetching fights for event:', eventId);
         const response = await fetch(`http://localhost:5000/api/ufc/events/${eventId}/fights`);
         const fights = await response.json();
-        setEventFights(prev => ({ ...prev, [eventId]: fights }));
+        console.log('Received fights:', fights);
+        console.log('First fight:', fights[0]);
         
-        // Initialize selected model for each fight as "ensemble_avg"
-        const initialModels: { [key: string]: string } = {};
-        fights.forEach((fight: Fight) => {
-          initialModels[fight.fight_id] = 'ensemble_avg';
+        // Sort fights: title first, then main, then rest
+        const sortedFights = fights.sort((a: Fight, b: Fight) => {
+          if (a.fight_type === 'title' && b.fight_type !== 'title') return -1;
+          if (a.fight_type !== 'title' && b.fight_type === 'title') return 1;
+          if (a.fight_type === 'main' && b.fight_type !== 'main') return -1;
+          if (a.fight_type !== 'main' && b.fight_type === 'main') return 1;
+          return 0;
         });
-        setSelectedModel(prev => ({ ...prev, ...initialModels }));
+        
+        setEventFights(prev => ({ ...prev, [eventId]: sortedFights }));
+        console.log('Successfully set event fights');
       } catch (error) {
         console.error('Error fetching fights:', error);
       }
@@ -135,6 +121,7 @@ export default function UFCPage() {
   };
 
   const currentEvents = events[activeTab as keyof typeof events];
+  const isPastTab = activeTab === 'past';
 
   if (loading) {
     return (
@@ -146,7 +133,6 @@ export default function UFCPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Top Navigation */}
       <nav className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="px-8">
           <div className="flex items-center justify-between h-16">
@@ -165,7 +151,6 @@ export default function UFCPage() {
         </div>
       </nav>
 
-      {/* Tab Bar */}
       <div className="border-b border-slate-700 bg-slate-900/30 sticky top-16 z-40">
         <div className="px-8 flex items-center space-x-6">
           <button
@@ -188,16 +173,9 @@ export default function UFCPage() {
           >
             Past
           </button>
-          <button
-            onClick={() => alert('Model Results page coming soon!')}
-            className="py-4 px-4 font-semibold text-slate-400 hover:text-slate-300 transition-colors ml-auto"
-          >
-            Model Results →
-          </button>
         </div>
       </div>
 
-      {/* Events List */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentEvents.length === 0 ? (
           <div className="text-center text-slate-400 py-12">
@@ -210,7 +188,6 @@ export default function UFCPage() {
                 key={event.event_id}
                 className="bg-slate-800/50 rounded-lg border border-slate-700 overflow-hidden"
               >
-                {/* Event Header */}
                 <button
                   onClick={() => handleEventClick(event.event_id)}
                   className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-800/80 transition-colors"
@@ -232,7 +209,6 @@ export default function UFCPage() {
                   </svg>
                 </button>
 
-                {/* Expanded Fights */}
                 {expandedEvent === event.event_id && (
                   <div className="border-t border-slate-700">
                     {!eventFights[event.event_id] ? (
@@ -242,90 +218,61 @@ export default function UFCPage() {
                     ) : eventFights[event.event_id].length === 0 ? (
                       <div className="px-6 py-8 text-center text-slate-400">
                         No fights available for this event
+                        <div className="text-xs mt-2">Debug: {JSON.stringify(eventFights[event.event_id])}</div>
                       </div>
                     ) : (
                       eventFights[event.event_id].map((fight) => {
-                        const isPastFight = fight.winner_id !== null;
+                        console.log('Rendering fight:', fight);
+                        const hasPrediction = fight.algopick_prediction !== null && 
+                                            fight.algopick_prediction !== undefined &&
+                                            fight.algopick_probability !== null;
                         
-                        // Get current selected model for this fight
-                        const currentModel = selectedModel[fight.fight_id] || 'ensemble_avg';
-                        
-                        // Get probabilities based on selected model
-                        let fighter1Prob = 0.5;
-                        let predictedWinner = 0;
-                        
-                        if (currentModel === 'logistic') {
-                          fighter1Prob = fight.logistic_f1_prob || 0.5;
-                          predictedWinner = fight.logistic_pred || 0;
-                        } else if (currentModel === 'xgboost') {
-                          fighter1Prob = fight.xgboost_f1_prob || 0.5;
-                          predictedWinner = fight.xgboost_pred || 0;
-                        } else if (currentModel === 'gradient') {
-                          fighter1Prob = fight.gradient_f1_prob || 0.5;
-                          predictedWinner = fight.gradient_pred || 0;
-                        } else if (currentModel === 'homemade') {
-                          fighter1Prob = fight.homemade_f1_prob || 0.5;
-                          predictedWinner = fight.homemade_pred || 0;
-                        } else if (currentModel === 'ensemble_weighted') {
-                          fighter1Prob = fight.prediction_confidence || 0.5;
-                          predictedWinner = fight.predicted_winner || 0;
-                        } else { // ensemble_avg
-                          // Calculate average of all models
-                          const probs = [
-                            fight.logistic_f1_prob,
-                            fight.xgboost_f1_prob,
-                            fight.gradient_f1_prob,
-                            fight.homemade_f1_prob
-                          ].filter(p => p !== null && p !== undefined) as number[];
-                          
-                          fighter1Prob = probs.length > 0 ? probs.reduce((a, b) => a + b, 0) / probs.length : 0.5;
-                          predictedWinner = fighter1Prob >= 0.5 ? 1 : 0;
+                        if (!hasPrediction) {
+                          return (
+                            <div key={fight.fight_id} className="px-6 py-4 border-b border-slate-700/50 last:border-0">
+                              <div className="grid grid-cols-3 gap-4 items-center mb-2">
+                                <p className="text-white font-semibold text-right">{fight.fighter1_name}</p>
+                                <span className="text-slate-500 font-bold text-center">VS</span>
+                                <p className="text-white font-semibold text-left">{fight.fighter2_name}</p>
+                              </div>
+                              <div className="text-center text-slate-500 text-sm mt-2">
+                                No prediction available
+                              </div>
+                            </div>
+                          );
                         }
-                        
-                        const fighter2Prob = 1 - fighter1Prob;
-                        
-                        // Determine predicted winner based on prediction (1 = fighter1, 0 = fighter2)
-                        const predictedWinnerId = predictedWinner === 1 ? fight.fighter1_id : fight.fighter2_id;
-                        const predictedWinnerName = predictedWinner === 1 ? fight.fighter1_name : fight.fighter2_name;
-                        
-                        // Calculate confidence (higher probability)
-                        const confidence = Math.max(fighter1Prob, fighter2Prob) * 100;
-                        
-                        // Check if prediction was correct
-                        const predictionCorrect = (predictedWinner === 1 && fight.winner_id === fight.fighter1_id) || 
-                                                 (predictedWinner === 0 && fight.winner_id === fight.fighter2_id);
 
-                        // Model display names
-                        const models = [
-                          { value: 'ensemble_avg', label: '⭐ Ensemble Avg', isDefault: true },
-                          { value: 'ensemble_weighted', label: 'Ensemble Weighted Avg', isDefault: false },
-                          { value: 'xgboost', label: 'XGBoost', isDefault: false },
-                          { value: 'gradient', label: 'Gradient Boosting', isDefault: false },
-                          { value: 'logistic', label: 'Logistic Regression', isDefault: false }
-                        ];
+                        const predictedWinnerName = fight.algopick_prediction === 0 
+                          ? fight.fighter1_name 
+                          : fight.fighter2_name;
+                        
+                        // Convert probability from string to number
+                        const confidence = parseFloat(fight.algopick_probability);
+                        const fighter1Prob = fight.algopick_prediction === 0 ? confidence : (100 - confidence);
+                        const fighter2Prob = 100 - fighter1Prob;
+                        
+                        const showResult = isPastTab && fight.correct !== null;
+                        const predictionCorrect = fight.correct === 1;
 
                         return (
-                          <div
-                            key={fight.fight_id}
-                            className="px-6 py-4 border-b border-slate-700/50 last:border-0"
-                          >
+                          <div key={fight.fight_id} className="px-6 py-4 border-b border-slate-700/50 last:border-0">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center space-x-2">
                                 <span className="text-xs font-semibold text-orange-500 uppercase tracking-wide">
                                   {fight.weight_class}
                                 </span>
                                 {fight.fight_type === 'title' && (
-                                  <span className="text-xs font-semibold px-2 py-1 rounded bg-yellow-500/20 text-yellow-400">
-                                    TITLE FIGHT
+                                  <span className="text-xs font-semibold px-3 py-1 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                                    🏆 TITLE FIGHT
                                   </span>
                                 )}
                                 {fight.fight_type === 'main' && (
-                                  <span className="text-xs font-semibold px-2 py-1 rounded bg-blue-500/20 text-blue-400">
-                                    MAIN EVENT
+                                  <span className="text-xs font-semibold px-3 py-1 rounded bg-red-500/20 text-red-400 border border-red-500/30">
+                                    ⭐ MAIN EVENT
                                   </span>
                                 )}
                               </div>
-                              {isPastFight && (
+                              {showResult && (
                                 <span
                                   className={`text-xs font-semibold px-2 py-1 rounded ${
                                     predictionCorrect
@@ -339,102 +286,95 @@ export default function UFCPage() {
                             </div>
 
                             <div className="grid grid-cols-3 gap-4 items-center mb-4">
-                              {/* Fighter 1 */}
                               <div className="flex flex-col items-end">
-                                {fight.fighter1_img && (
+                                {fight.fighter1_img_link && (
                                   <img 
-                                    src={fight.fighter1_img} 
+                                    src={fight.fighter1_img_link} 
                                     alt={fight.fighter1_name}
-                                    className="w-16 h-16 rounded-full object-cover mb-2 border-2 border-slate-600"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                    }}
+                                    className={`w-16 h-16 rounded-full object-cover mb-2 ${
+                                      fight.algopick_prediction === 0 
+                                        ? 'border-4 border-purple-500 shadow-lg shadow-purple-500/50' 
+                                        : 'border-2 border-slate-600'
+                                    }`}
+                                    onError={(e) => e.currentTarget.style.display = 'none'}
                                   />
                                 )}
-                                <p className="text-white font-semibold text-lg text-right">{capitalizeName(fight.fighter1_name)}</p>
+                                <p className={`font-semibold text-lg text-right ${
+                                  fight.algopick_prediction === 0 ? 'text-purple-400' : 'text-white'
+                                }`}>
+                                  {fight.fighter1_name}
+                                </p>
                                 {fight.fighter1_nickname && (
-                                  <p className="text-slate-400 text-sm italic text-right">{capitalizeName(fight.fighter1_nickname)}</p>
+                                  <p className="text-slate-400 text-sm italic text-right">
+                                    "{fight.fighter1_nickname}"
+                                  </p>
                                 )}
                               </div>
                               
-                              {/* VS */}
                               <div className="text-center">
                                 <span className="text-slate-500 font-bold text-xl">VS</span>
                               </div>
                               
-                              {/* Fighter 2 */}
                               <div className="flex flex-col items-start">
-                                {fight.fighter2_img && (
+                                {fight.fighter2_img_link && (
                                   <img 
-                                    src={fight.fighter2_img} 
+                                    src={fight.fighter2_img_link} 
                                     alt={fight.fighter2_name}
-                                    className="w-16 h-16 rounded-full object-cover mb-2 border-2 border-slate-600"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                    }}
+                                    className={`w-16 h-16 rounded-full object-cover mb-2 ${
+                                      fight.algopick_prediction === 1 
+                                        ? 'border-4 border-cyan-500 shadow-lg shadow-cyan-500/50' 
+                                        : 'border-2 border-slate-600'
+                                    }`}
+                                    onError={(e) => e.currentTarget.style.display = 'none'}
                                   />
                                 )}
-                                <p className="text-white font-semibold text-lg text-left">{capitalizeName(fight.fighter2_name)}</p>
+                                <p className={`font-semibold text-lg text-left ${
+                                  fight.algopick_prediction === 1 ? 'text-cyan-400' : 'text-white'
+                                }`}>
+                                  {fight.fighter2_name}
+                                </p>
                                 {fight.fighter2_nickname && (
-                                  <p className="text-slate-400 text-sm italic text-left">{capitalizeName(fight.fighter2_nickname)}</p>
+                                  <p className="text-slate-400 text-sm italic text-left">
+                                    "{fight.fighter2_nickname}"
+                                  </p>
                                 )}
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-between text-sm mb-3">
-                              <div>
-                                <span className="text-slate-400">Prediction: </span>
-                                <span className="text-orange-400 font-semibold">
-                                  {capitalizeName(predictedWinnerName)}
-                                </span>
-                                <span className="text-slate-500 ml-2">({confidence.toFixed(1)}% confidence)</span>
-                              </div>
+                            <div className="text-sm mb-3">
+                              <span className="text-slate-400 font-bold">AlgoPick: </span>
+                              <span className={`font-bold text-lg ${
+                                fight.algopick_prediction === 0 ? 'text-purple-400' : 'text-cyan-400'
+                              }`}>
+                                {predictedWinnerName}
+                              </span>
+                              <span className="text-slate-500 ml-2 text-base">
+                                ({confidence.toFixed(1)}%)
+                              </span>
                             </div>
 
-                            {/* Model Selector */}
-                            <div className="mb-3">
-                              <div className="flex flex-wrap gap-2">
-                                {models.map((model) => (
-                                  <button
-                                    key={model.value}
-                                    onClick={() => setSelectedModel(prev => ({
-                                      ...prev,
-                                      [fight.fight_id]: model.value
-                                    }))}
-                                    className={`text-xs px-3 py-1 rounded-full transition-colors ${
-                                      currentModel === model.value
-                                        ? 'bg-orange-500 text-white font-semibold'
-                                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                                    }`}
-                                  >
-                                    {model.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Model Prediction Bar */}
                             <div className="mt-4">
                               <div className="relative h-8 bg-slate-700/50 rounded-lg overflow-hidden">
                                 <div 
-                                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-500"
-                                  style={{ width: `${fighter1Prob * 100}%` }}
+                                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-all"
+                                  style={{ width: `${fighter1Prob}%` }}
                                 ></div>
                                 <div 
-                                  className="absolute top-0 right-0 h-full bg-gradient-to-r from-slate-600 to-slate-700 transition-all duration-500"
-                                  style={{ width: `${fighter2Prob * 100}%` }}
+                                  className="absolute top-0 right-0 h-full bg-gradient-to-r from-cyan-500 to-cyan-600 transition-all"
+                                  style={{ width: `${fighter2Prob}%` }}
                                 ></div>
                                 <div className="absolute inset-0 flex items-center justify-between px-3 text-xs font-semibold text-white">
-                                  <span>{capitalizeName(fight.fighter1_name.split(' ').pop() || '')} {(fighter1Prob * 100).toFixed(1)}%</span>
-                                  <span>{capitalizeName(fight.fighter2_name.split(' ').pop() || '')} {(fighter2Prob * 100).toFixed(1)}%</span>
+                                  <span>{fighter1Prob.toFixed(1)}%</span>
+                                  <span>{fighter2Prob.toFixed(1)}%</span>
                                 </div>
                               </div>
                             </div>
 
-                            {isPastFight && fight.method && (
-                              <div className="mt-3 text-sm text-slate-400">
-                                Result: <span className="text-slate-300">{fight.method}</span>
-                                {fight.end_time && <span> at {fight.end_time}</span>}
+                            {showResult && fight.win_method && (
+                              <div className="mt-3 text-sm">
+                                <span className="text-slate-400">Finish: </span>
+                                <span className="text-slate-200 font-medium">{fight.win_method}</span>
+                                {fight.end_time && <span className="text-slate-400"> ({fight.end_time})</span>}
                               </div>
                             )}
                           </div>

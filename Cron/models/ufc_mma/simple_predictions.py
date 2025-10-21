@@ -1,0 +1,399 @@
+from .utils import create_connection, fetch_query
+from .get_accuracies import get_model_accuracies_batched, get_all_model_accuracies
+import re, math
+from typing import Optional, List, Dict, Tuple
+import polars as pl
+
+# ------------------------
+# Model config / helpers
+# ------------------------
+
+MODELS = [
+    "logistic",
+    "xgboost",
+    "gradient",
+    "homemade",
+    # "ensemble_majorityvote",  # explicitly excluded
+    "ensemble_weightedvote",
+    "ensemble_avgprob",
+    "ensemble_weightedavgprob",
+]
+
+def _colnames_for(model: str) -> tuple[str, str]:
+    """Return (pred_col, f1_prob_col) for a model key."""
+    return f"{model}_pred", f"{model}_f1_prob"
+
+def _choose_best_model(acc: dict) -> str:
+    """Pick argmax accuracy, excluding ensemble_majorityvote if present."""
+    filtered = {k: v for k, v in acc.items() if k != "ensemble_majorityvote" and v is not None}
+    return max(filtered, key=filtered.get) if filtered else "logistic"
+
+# ---- Calibration helpers ----
+
+def _weighted_true_accuracy_with_n(model: str, p_f1: float, window: float = 0.01):
+    # Call once for both p and (1-p)
+    results = get_model_accuracies_batched(model, [p_f1, 1.0 - p_f1], window)
+    
+    a = results[p_f1]
+    b = results[1.0 - p_f1]
+    
+    n1 = a["prob_range"]
+    c1 = a["correct"]
+    n2 = b["prob_range"]
+    c2 = b["correct"]
+    
+    N = n1 + n2
+    if N == 0:
+        return (None, 0)
+    p_hat = (c1 + c2) / N
+    return (round(p_hat, 4), N)
+
+# ------------------------
+# Name normalization (Polars-friendly)
+# ------------------------
+
+def _cap_segment(seg: str) -> str:
+    if not seg:
+        return seg
+    return seg[0].upper() + seg[1:].lower()
+
+def _cap_apostrophes(token: str) -> str:
+    parts = token.split("'")
+    parts = [_cap_segment(p) for p in parts]
+    return "'".join(parts)
+
+def _cap_hyphens(token: str) -> str:
+    parts = token.split("-")
+    parts = [_cap_apostrophes(p) for p in parts]  # handles O'Neil style inside
+    return "-".join(parts)
+
+_INITIAL_RE = re.compile(r"^[A-Za-z]\.$")
+def _cap_initials(token: str) -> str:
+    # a. -> A. ; b. -> B.
+    if _INITIAL_RE.fullmatch(token):
+        return token[0].upper() + "."
+    return token
+
+def _smart_title_name_py(name: Optional[str]) -> Optional[str]:
+    if name is None:
+        return None
+    s = re.sub(r"\s+", " ", name.strip())
+    if not s:
+        return s
+
+    out_tokens = []
+    for tok in s.split(" "):
+        t = _cap_initials(tok)
+        if t == tok:  # not an initial
+            t = _cap_hyphens(t)
+            if "-" not in t and "'" not in t:
+                t = _cap_segment(t)
+        out_tokens.append(t)
+    return " ".join(out_tokens)
+
+def _normalize_name_expr(col: str) -> pl.Expr:
+    return (
+        pl.col(col)
+          .cast(pl.Utf8, strict=False)
+          .str.replace_all(r"\s+", " ")
+          .str.strip_chars()
+          .map_elements(_smart_title_name_py, return_dtype=pl.Utf8)
+    )
+
+def _normalize_names(df: pl.DataFrame) -> pl.DataFrame:
+    name_cols = [c for c in df.columns if c in (
+        "fighter1_name", "fighter2_name",
+        "fighter1_nickname", "fighter2_nickname"
+    )]
+    if not name_cols:
+        return df
+    return df.with_columns([_normalize_name_expr(c).alias(c) for c in name_cols])
+
+# ------------------------
+# Main builder (Polars)
+# ------------------------
+
+def push_algopicks_to_sql(df: pl.DataFrame, truncate: bool = True):
+    """
+    Push algopicks DataFrame to the predictions_simplified table.
+    
+    Args:
+        df: Polars DataFrame from build_algopicks_rows()
+        truncate: If True, truncate table before inserting
+    """
+    from .utils import create_connection
+    
+    conn = create_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Optional: truncate table first
+        if truncate:
+            cursor.execute("TRUNCATE TABLE ufc.prediction_simplified;")
+            print("Truncated prediction_simplified table")
+        
+        # Prepare insert query
+        insert_query = """
+        INSERT INTO ufc.prediction_simplified (
+            fight_id, event_id, fighter1_id, fighter2_id,
+            fighter1_name, fighter2_name,
+            fighter1_nickname, fighter2_nickname,
+            fighter1_img_link, fighter2_img_link,
+            algopick_model, algopick_prediction,
+            algopick_probability, correct,
+            date, end_time, weight_class, fight_type, win_method, window_sample
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+        );
+        """
+        
+        # Convert DataFrame to list of tuples
+        rows = df.to_dicts()
+        
+        insert_count = 0
+        for row in rows:
+            prob = row.get("final_calibrated_confidence")
+            if prob is not None:
+                prob = round(prob * 100, 2)
+            
+            values = (
+                str(row.get("fight_id")),
+                row.get("event_id"),
+                row.get("fighter1_id"),
+                row.get("fighter2_id"),
+                row.get("fighter1_name"),
+                row.get("fighter2_name"),
+                row.get("fighter1_nickname"),
+                row.get("fighter2_nickname"),
+                row.get("fighter1_img_link"),
+                row.get("fighter2_img_link"),
+                row.get("algopick_model"),
+                row.get("algopick_prediction"),
+                prob,
+                row.get("correct"),
+                row.get("date"),
+                row.get("end_time"),
+                row.get("weight_class"),
+                row.get("fight_type"),  # Added fight_type
+                row.get("win_method"),
+                row.get("algopick_calib_n"),
+            )
+            
+            cursor.execute(insert_query, values)
+            insert_count += 1
+        
+        conn.commit()
+        print(f"Successfully inserted {insert_count} rows into predictions_simplified")
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"Error inserting data: {e}")
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# Usage:
+def build_algopicks_rows(
+    date_min: str = "2025-10-03",
+    include_legacy_for_model_choice: bool = False,
+    prob_window: float = 0.005,
+) -> pl.DataFrame:
+    """
+    Returns Polars DataFrame for your algopicks table.
+
+    - Chooses best model by overall accuracy (excluding ensemble_majorityvote)
+    - Pulls fights with fight_date > date_min AND event_id IS NOT NULL
+    - Normalizes names (smart title case)
+    - algopick_prediction: 0 if model predicts F1, 1 if model predicts F2 (NO FLIPPING)
+    - confidence_ge: raw model confidence (distance from 50%)
+    - final_calibrated_confidence: calibrated probability, floored at 50.5% if below 50%
+    - algopick_calib_n: N used to compute calibrated probability
+    """
+    # 1) Pick best model from full table accuracies (toggle legacy)
+    acc = get_all_model_accuracies(include_legacy=include_legacy_for_model_choice)
+    best_model = _choose_best_model(acc)
+    pred_col, prob_col = _colnames_for(best_model)
+
+    # 2) Pull necessary rows/columns in one query
+    conn = create_connection()
+    query = f"""
+    SELECT 
+        p.fight_id,
+        f.event_id,
+        f.fighter1_id,
+        f.fighter2_id,
+        f.fighter1_name,
+        f.fighter2_name,
+        f.fight_date   AS date,
+        f.end_time,
+        f.weight_class,
+        f.fight_type,
+        f.method       AS win_method,
+        p.actual_winner,
+        p.{pred_col}   AS model_pred,        -- 1 = predict F1 wins, 0 = predict F2 wins
+        p.{prob_col}   AS model_f1_prob,     -- probability F1 wins from chosen model
+
+        f1.img_link    AS fighter1_img_link,
+        f1.nickname    AS fighter1_nickname,
+        f2.img_link    AS fighter2_img_link,
+        f2.nickname    AS fighter2_nickname
+    FROM ufc.predictions p
+    JOIN ufc.fights f
+      ON f.fight_id = p.fight_id
+    LEFT JOIN ufc.fighters f1
+      ON f1.fighter_id = f.fighter1_id
+    LEFT JOIN ufc.fighters f2
+      ON f2.fighter_id = f.fighter2_id
+    WHERE f.fight_date > '{date_min}'
+      AND f.event_id IS NOT NULL;
+    """
+    rows = fetch_query(conn, query)
+    if not rows:
+        return pl.DataFrame()
+
+    df = pl.DataFrame(rows)
+
+    # 3) Polars transformations
+    df = _normalize_names(df)
+
+    # chosen model name
+    df = df.with_columns(pl.lit(best_model).alias("algopick_model"))
+
+    # algopick_prediction: flip encoding (model_pred 1->0, 0->1) - NO FLIPPING BASED ON CALIBRATION
+    df = df.with_columns(
+        pl.when(pl.col("model_pred").is_null())
+          .then(None)
+          .otherwise(pl.when(pl.col("model_pred") == 1).then(0).otherwise(1))
+          .cast(pl.Int8)
+          .alias("algopick_prediction")
+    )
+
+    # confidence_ge: distance from 50% (raw model confidence)
+    df = df.with_columns(
+        pl.when(pl.col("model_f1_prob").is_null())
+          .then(None)
+          .otherwise(
+              (pl.col("model_f1_prob") - 0.5).abs()
+          )
+          .cast(pl.Float64)
+          .alias("confidence_ge")
+    )
+
+    # ---- Calibration: algopick_probability & algopick_calib_n ----
+    def _prob_and_n(p):
+        if p is None:
+            return {"prob": None, "n": 0}
+        prob, n = _weighted_true_accuracy_with_n(best_model, float(p), window=prob_window)
+        return {"prob": prob, "n": n}
+
+    df = df.with_columns(
+        pl.col("model_f1_prob")
+        .map_elements(_prob_and_n,
+                        return_dtype=pl.Struct({"prob": pl.Float64, "n": pl.Int64}))
+        .alias("calib")
+    ).with_columns(
+        pl.col("calib").struct.field("prob").alias("algopick_probability"),
+        pl.col("calib").struct.field("n").alias("algopick_calib_n")
+    ).drop("calib")
+
+    # final_calibrated_confidence: floor at 50.5% if calibrated probability < 50%
+    df = df.with_columns(
+        pl.when(pl.col("algopick_probability").is_null())
+          .then(None)
+          .when(pl.col("algopick_probability") < 0.5)
+          .then(0.505)
+          .otherwise(pl.col("algopick_probability"))
+          .cast(pl.Float64)
+          .alias("final_calibrated_confidence")
+    )
+
+    # correctness vs prediction (no flipping):
+    # if actual_winner==1 => should_be=0 ; if ==0 => should_be=1
+    df = df.with_columns(
+        pl.when(pl.col("actual_winner").is_null())
+          .then(None)
+          .otherwise(
+              (pl.col("algopick_prediction") ==
+               pl.when(pl.col("actual_winner") == 1).then(0).otherwise(1))
+              .cast(pl.Int8)
+          )
+          .alias("correct")
+    )
+
+    # Normalize win_method values
+    df = df.with_columns(
+        pl.when(pl.col("win_method") == "d_unan")
+          .then(pl.lit("Unanimous Decision"))
+          .when(pl.col("win_method") == "sub")
+          .then(pl.lit("Submission"))
+          .when(pl.col("win_method") == "unknown")
+          .then(pl.lit("Unknown"))
+          .when(pl.col("win_method") == "kotko")
+          .then(pl.lit("KO/TKO"))
+          .when(pl.col("win_method") == "d_split")
+          .then(pl.lit("Split Decision"))
+          .when(pl.col("win_method") == "d_maj")
+          .then(pl.lit("Majority Decision"))
+          .otherwise(pl.col("win_method"))
+          .alias("win_method")
+    )
+
+    # Convert end_time to round format (e.g., "15:00" -> "Round 3", "4:58" -> "Round 1 at 4:58")
+    def _format_end_time(time_str):
+        if time_str is None:
+            return None
+        
+        # Parse time string (format: "M:SS" or "MM:SS")
+        parts = time_str.split(":")
+        if len(parts) != 2:
+            return time_str
+        
+        try:
+            minutes = int(parts[0])
+            seconds = int(parts[1])
+        except ValueError:
+            return time_str
+        
+        # UFC rounds are 5 minutes each
+        # If time is exactly 5:00, 10:00, 15:00, etc., it's end of a round
+        total_seconds = minutes * 60 + seconds
+        
+        if total_seconds % 300 == 0:  # Exactly at round end (5:00, 10:00, 15:00, etc.)
+            round_num = total_seconds // 300
+            return f"Round {round_num}"
+        else:
+            # Determine which round based on total time
+            round_num = (total_seconds // 300) + 1
+            time_in_round = total_seconds % 300
+            mins_in_round = time_in_round // 60
+            secs_in_round = time_in_round % 60
+            return f"Round {round_num} at {mins_in_round}:{secs_in_round:02d}"
+    
+    df = df.with_columns(
+        pl.col("end_time")
+          .map_elements(_format_end_time, return_dtype=pl.Utf8)
+          .alias("end_time")
+    )
+
+    # Final selection
+    out_cols = [
+        "fight_id", "event_id",
+        "fighter1_id", "fighter2_id",
+        "fighter1_name", "fighter2_name",
+        "fighter1_img_link", "fighter2_img_link",
+        "fighter1_nickname", "fighter2_nickname",
+        "algopick_model",
+        "algopick_prediction",
+        "confidence_ge",
+        "final_calibrated_confidence",
+        "algopick_probability",
+        "algopick_calib_n",
+        "correct",
+        "date", "end_time", "weight_class", "fight_type", "win_method",
+    ]
+    out_cols = [c for c in out_cols if c in df.columns]
+
+    return df.select(out_cols)

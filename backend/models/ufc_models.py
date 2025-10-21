@@ -33,7 +33,7 @@ def get_upcoming_events():
     return execute_query(query)
 
 def get_past_events():
-    """Get past UFC events"""
+    """Get past UFC events (only events after 2025-10-03)"""
     query = """
         SELECT 
             event_id,
@@ -44,6 +44,7 @@ def get_past_events():
             date
         FROM ufc.events
         WHERE date < CURDATE()
+          AND date > '2025-10-03'
         ORDER BY date DESC
     """
     return execute_query(query)
@@ -64,49 +65,32 @@ def get_event_by_id(event_id):
     return execute_query(query, (event_id,), fetch_one=True)
 
 def get_fights_by_event(event_id):
-    """Get all fights for a specific event with fighter details and predictions"""
+    """Get all fights for a specific event from prediction_simplified"""
     query = """
         SELECT 
-            f.fight_id,
-            f.event_id,
-            f.fighter1_id,
-            f.fighter2_id,
-            f.winner_id,
-            f.loser_id,
-            f.fighter1_name,
-            f.fighter2_name,
-            f.fight_date,
-            f.fight_link,
-            f.method,
-            f.fight_format,
-            f.fight_type,
-            f.referee,
-            f.end_time,
-            f.weight_class,
-            f1.nickname as fighter1_nickname,
-            f1.img_link as fighter1_img,
-            f2.nickname as fighter2_nickname,
-            f2.img_link as fighter2_img,
-            p.logistic_pred,
-            p.logistic_f1_prob,
-            p.xgboost_pred,
-            p.xgboost_f1_prob,
-            p.gradient_pred,
-            p.gradient_f1_prob,
-            p.homemade_pred,
-            p.homemade_f1_prob,
-            p.prediction_confidence,
-            p.predicted_winner,
-            p.logistic_correct,
-            p.xgboost_correct,
-            p.gradient_correct,
-            p.homemade_correct
-        FROM ufc.fights f
-        LEFT JOIN ufc.fighters f1 ON f.fighter1_id = f1.fighter_id
-        LEFT JOIN ufc.fighters f2 ON f.fighter2_id = f2.fighter_id
-        LEFT JOIN ufc.predictions p ON f.fight_id = p.fight_id
-        WHERE f.event_id = %s
-        ORDER BY f.fight_date DESC
+            fight_id,
+            event_id,
+            fighter1_id,
+            fighter2_id,
+            fighter1_name,
+            fighter2_name,
+            fighter1_nickname,
+            fighter2_nickname,
+            fighter1_img_link,
+            fighter2_img_link,
+            algopick_model,
+            algopick_prediction,
+            algopick_probability,
+            window_sample,
+            correct,
+            date,
+            end_time,
+            weight_class,
+            fight_type,
+            win_method
+        FROM ufc.prediction_simplified
+        WHERE event_id = %s
+        ORDER BY date DESC
     """
     return execute_query(query, (event_id,))
 
@@ -129,116 +113,151 @@ def get_fight_odds(fight_id):
     return execute_query(query, (fight_id,))
 
 def get_model_stats():
-    """Get overall model performance statistics for each model type"""
+    """Get overall model performance statistics from prediction_simplified (post Oct 3, 2025)"""
     query = """
         SELECT 
-            'Logistic Regression' as model_name,
+            algopick_model as model_name,
             COUNT(*) as total_predictions,
-            SUM(CASE WHEN logistic_correct = 1 THEN 1 ELSE 0 END) as correct_predictions,
+            SUM(CASE WHEN correct = 1 THEN 1 ELSE 0 END) as correct_predictions,
             ROUND(
-                (SUM(CASE WHEN logistic_correct = 1 THEN 1 ELSE 0 END) / COUNT(*)) * 100, 
+                (SUM(CASE WHEN correct = 1 THEN 1 ELSE 0 END) / COUNT(*)) * 100, 
                 2
-            ) as accuracy_percentage
-        FROM ufc.predictions
-        WHERE logistic_correct IS NOT NULL
-        
-        UNION ALL
-        
-        SELECT 
-            'XGBoost' as model_name,
-            COUNT(*) as total_predictions,
-            SUM(CASE WHEN xgboost_correct = 1 THEN 1 ELSE 0 END) as correct_predictions,
-            ROUND(
-                (SUM(CASE WHEN xgboost_correct = 1 THEN 1 ELSE 0 END) / COUNT(*)) * 100, 
-                2
-            ) as accuracy_percentage
-        FROM ufc.predictions
-        WHERE xgboost_correct IS NOT NULL
-        
-        UNION ALL
-        
-        SELECT 
-            'Gradient Boosting' as model_name,
-            COUNT(*) as total_predictions,
-            SUM(CASE WHEN gradient_correct = 1 THEN 1 ELSE 0 END) as correct_predictions,
-            ROUND(
-                (SUM(CASE WHEN gradient_correct = 1 THEN 1 ELSE 0 END) / COUNT(*)) * 100, 
-                2
-            ) as accuracy_percentage
-        FROM ufc.predictions
-        WHERE gradient_correct IS NOT NULL
-        
-        UNION ALL
-        
-        SELECT 
-            'Homemade Model' as model_name,
-            COUNT(*) as total_predictions,
-            SUM(CASE WHEN homemade_correct = 1 THEN 1 ELSE 0 END) as correct_predictions,
-            ROUND(
-                (SUM(CASE WHEN homemade_correct = 1 THEN 1 ELSE 0 END) / COUNT(*)) * 100, 
-                2
-            ) as accuracy_percentage
-        FROM ufc.predictions
-        WHERE homemade_correct IS NOT NULL
+            ) as accuracy_percentage,
+            ROUND(AVG(algopick_probability), 2) as avg_confidence,
+            ROUND(AVG(window_sample), 0) as avg_sample_size
+        FROM ufc.prediction_simplified
+        WHERE correct IS NOT NULL
+          AND date > '2025-10-03'
+        GROUP BY algopick_model
     """
     return execute_query(query)
 
-def get_calibrated_probability(model_name, raw_probability):
-    """
-    Get calibrated probability based on historical accuracy at that confidence level
-    Uses ±1% range around the raw probability
-    """
-    # Map model names to database columns
-    prob_column_map = {
-        'logistic': 'logistic_f1_prob',
-        'xgboost': 'xgboost_f1_prob',
-        'gradient': 'gradient_f1_prob',
-        'homemade': 'homemade_f1_prob'
-    }
-    
-    pred_column_map = {
-        'logistic': 'logistic_pred',
-        'xgboost': 'xgboost_pred',
-        'gradient': 'gradient_pred',
-        'homemade': 'homemade_pred'
-    }
-    
-    prob_col = prob_column_map.get(model_name.lower())
-    pred_col = pred_column_map.get(model_name.lower())
-    
-    if not prob_col or not pred_col:
-        return raw_probability
-    
-    # Get predictions within ±1% of the raw probability
-    lower_bound = raw_probability - 0.01
-    upper_bound = raw_probability + 0.01
-    
-    query = f"""
+def get_fight_prediction(fight_id):
+    """Get the simplified prediction for a specific fight (post Oct 3, 2025)"""
+    query = """
         SELECT 
-            COUNT(*) as total_predictions,
-            SUM(CASE 
-                WHEN ({pred_col} = 1 AND actual_winner = 1) OR ({pred_col} = 0 AND actual_winner = 0)
-                THEN 1 ELSE 0 
-            END) as correct_predictions,
-            ROUND(
-                (SUM(CASE 
-                    WHEN ({pred_col} = 1 AND actual_winner = 1) OR ({pred_col} = 0 AND actual_winner = 0)
-                    THEN 1 ELSE 0 
-                END) / COUNT(*)) * 100, 
-                1
-            ) as calibrated_probability
-        FROM ufc.predictions
-        WHERE {prob_col} >= %s 
-        AND {prob_col} <= %s
-        AND actual_winner IS NOT NULL
+            fight_id,
+            fighter1_name,
+            fighter2_name,
+            fighter1_nickname,
+            fighter2_nickname,
+            fighter1_img_link,
+            fighter2_img_link,
+            algopick_model,
+            algopick_prediction,
+            algopick_probability,
+            window_sample,
+            correct,
+            date,
+            end_time,
+            weight_class,
+            fight_type,
+            win_method
+        FROM ufc.prediction_simplified
+        WHERE fight_id = %s
+          AND date > '2025-10-03'
     """
-    
-    result = execute_query(query, (lower_bound, upper_bound), fetch_one=True)
-    
-    if result and result['total_predictions'] >= 5:  # Need at least 5 samples
-        return result['calibrated_probability']
-    else:
-        return round(raw_probability * 100, 1)  # Fall back to raw if not enough data
+    return execute_query(query, (fight_id,), fetch_one=True)
+
+def get_recent_predictions(limit=10):
+    """Get most recent predictions (post Oct 3, 2025)"""
+    query = """
+        SELECT 
+            fight_id,
+            event_id,
+            fighter1_name,
+            fighter2_name,
+            fighter1_img_link,
+            fighter2_img_link,
+            algopick_model,
+            algopick_prediction,
+            algopick_probability,
+            window_sample,
+            correct,
+            date,
+            weight_class,
+            fight_type
+        FROM ufc.prediction_simplified
+        WHERE date > '2025-10-03'
+        ORDER BY date DESC
+        LIMIT %s
+    """
+    return execute_query(query, (limit,))
+
+def get_predictions_by_confidence(min_confidence=60.0, limit=20):
+    """Get predictions above a certain confidence threshold (post Oct 3, 2025)"""
+    query = """
+        SELECT 
+            fight_id,
+            event_id,
+            fighter1_name,
+            fighter2_name,
+            fighter1_img_link,
+            fighter2_img_link,
+            algopick_model,
+            algopick_prediction,
+            algopick_probability,
+            window_sample,
+            correct,
+            date,
+            weight_class,
+            fight_type
+        FROM ufc.prediction_simplified
+        WHERE algopick_probability >= %s
+          AND date > '2025-10-03'
+        ORDER BY algopick_probability DESC, date DESC
+        LIMIT %s
+    """
+    return execute_query(query, (min_confidence, limit))
+
+def get_recent_predictions(limit=10):
+    """Get most recent predictions (post Oct 3, 2025)"""
+    query = """
+        SELECT 
+            fight_id,
+            event_id,
+            fighter1_name,
+            fighter2_name,
+            fighter1_img_link,
+            fighter2_img_link,
+            algopick_model,
+            algopick_prediction,
+            algopick_probability,
+            window_sample,
+            correct,
+            date,
+            weight_class
+        FROM ufc.prediction_simplified
+        WHERE date > '2025-10-03'
+        ORDER BY date DESC
+        LIMIT %s
+    """
+    return execute_query(query, (limit,))
+
+def get_predictions_by_confidence(min_confidence=60.0, limit=20):
+    """Get predictions above a certain confidence threshold (post Oct 3, 2025)"""
+    query = """
+        SELECT 
+            fight_id,
+            event_id,
+            fighter1_name,
+            fighter2_name,
+            fighter1_img_link,
+            fighter2_img_link,
+            algopick_model,
+            algopick_prediction,
+            algopick_probability,
+            window_sample,
+            correct,
+            date,
+            weight_class
+        FROM ufc.prediction_simplified
+        WHERE algopick_probability >= %s
+          AND date > '2025-10-03'
+        ORDER BY algopick_probability DESC, date DESC
+        LIMIT %s
+    """
+    return execute_query(query, (min_confidence, limit))
 
 def get_fighter_stats(fighter_id):
     """Get fighter statistics"""

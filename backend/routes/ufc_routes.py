@@ -7,7 +7,9 @@ from models.ufc_models import (
     get_fights_by_event,
     get_model_stats,
     get_fight_odds,
-    get_calibrated_probability,
+    get_fight_prediction,
+    get_recent_predictions,
+    get_predictions_by_confidence,
     get_fighter_stats
 )
 
@@ -70,6 +72,33 @@ def get_odds(fight_id):
         return jsonify({'error': 'Database error'}), 500
     return jsonify(odds)
 
+@ufc_bp.route('/fights/<fight_id>/prediction', methods=['GET'])
+def get_prediction(fight_id):
+    """Get the prediction for a specific fight"""
+    prediction = get_fight_prediction(fight_id)
+    if prediction is None:
+        return jsonify({'error': 'Prediction not found'}), 404
+    return jsonify(prediction)
+
+@ufc_bp.route('/predictions/recent', methods=['GET'])
+def get_recent():
+    """Get recent predictions"""
+    limit = request.args.get('limit', default=10, type=int)
+    predictions = get_recent_predictions(limit)
+    if predictions is None:
+        return jsonify({'error': 'Database error'}), 500
+    return jsonify(predictions)
+
+@ufc_bp.route('/predictions/high-confidence', methods=['GET'])
+def get_high_confidence():
+    """Get high confidence predictions"""
+    min_confidence = request.args.get('min_confidence', default=60.0, type=float)
+    limit = request.args.get('limit', default=20, type=int)
+    predictions = get_predictions_by_confidence(min_confidence, limit)
+    if predictions is None:
+        return jsonify({'error': 'Database error'}), 500
+    return jsonify(predictions)
+
 @ufc_bp.route('/fighters/<fighter_id>', methods=['GET'])
 def get_fighter(fighter_id):
     """Get fighter details"""
@@ -77,16 +106,3 @@ def get_fighter(fighter_id):
     if fighter is None:
         return jsonify({'error': 'Fighter not found'}), 404
     return jsonify(fighter)
-
-@ufc_bp.route('/calibrate', methods=['POST'])
-def calibrate_probability():
-    """Get calibrated probability for a model prediction"""
-    data = request.json
-    model_name = data.get('model_name')
-    raw_prob = data.get('probability')
-    
-    calibrated = get_calibrated_probability(model_name, raw_prob)
-    return jsonify({
-        'raw_probability': raw_prob,
-        'calibrated_probability': calibrated
-    })
