@@ -131,7 +131,13 @@ class OddsProcessor:
         EV = (true_probability * decimal_odds) - 1
         Positive EV means profitable bet
         """
+
+            
+        print(true_prob, odds)
         decimal_odds = self.american_to_decimal(odds)
+        print(decimal_odds)
+        ans = (true_prob * decimal_odds) - 1
+        print(ans)
         return (true_prob * decimal_odds) - 1
     
     def get_fighter_probabilities(self, fight_data: Dict) -> Optional[Dict]:
@@ -350,6 +356,7 @@ class OddsProcessor:
                             ev_val = None
                             if fighter_probs and fighter_id in fighter_probs:
                                 ev_val = self.calculate_ev(fighter_probs[fighter_id], odds)
+                                print(ev_val)
                                 ev_percent = ev_val * 100
                                 ev_indicator = "🟢" if ev_val > 0 else "🔴"
                                 print(f"      {api_fighter_name}: {odds:+d} (Implied: {implied_prob*100:.2f}%, EV: {ev_indicator} {ev_percent:+.2f}%)")

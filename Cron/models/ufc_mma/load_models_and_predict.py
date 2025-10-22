@@ -26,9 +26,9 @@ def get_model_accuracies() -> dict:
     df = fetch_query(conn, query)
 
     return {
-        "logistic": float(df[0, "logistic_acc"]),
-        "xgboost": float(df[0, "xgboost_acc"]),
-        "gradient_boost": float(df[0, "gradient_boost_acc"])
+        "logistic": float(df[0]["logistic_acc"]),
+        "xgboost": float(df[0]["xgboost_acc"]),
+        "gradient_boost": float(df[0]["gradient_boost_acc"])
     }
 
 

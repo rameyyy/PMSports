@@ -118,8 +118,11 @@ def get_odds(fight_id):
             'fighter2_odds': odd['fighter2_odds'],
             'fighter1_odds_percent': round(float(odd['fighter1_odds_percent']), 2),
             'fighter2_odds_percent': round(float(odd['fighter2_odds_percent']), 2),
-            'ev': round(float(odd['ev']), 2) if odd.get('ev') is not None else None,
-            'vigor': round(float(odd['vigor']), 2)
+            'fighter1_ev': round(float(odd['fighter1_ev']), 2) if odd.get('fighter1_ev') is not None else None,
+            'fighter2_ev': round(float(odd['fighter2_ev']), 2) if odd.get('fighter2_ev') is not None else None,
+            'vigor': round(float(odd['vigor']), 2),
+            'algopick_prediction': odd['algopick_prediction'],
+            'algopick_probability': round(float(odd['algopick_probability']), 2) if odd.get('algopick_probability') is not None else None
         })
     
     return jsonify(formatted_odds)

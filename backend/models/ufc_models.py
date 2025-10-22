@@ -95,21 +95,26 @@ def get_fights_by_event(event_id):
     return execute_query(query, (event_id,))
 
 def get_fight_odds(fight_id):
-    """Get bookmaker odds for a specific fight"""
+    """Get bookmaker odds for a specific fight with EV calculations"""
     query = """
         SELECT 
-            fight_id,
-            bookmaker,
-            fighter1_id,
-            fighter2_id,
-            fighter1_odds,
-            fighter2_odds,
-            fighter1_odds_percent,
-            fighter2_odds_percent,
-            ev,
-            vigor
-        FROM ufc.bookmaker_odds
-        WHERE fight_id = %s
+            bo.fight_id,
+            bo.bookmaker,
+            bo.fighter1_id,
+            bo.fighter2_id,
+            bo.fighter1_odds,
+            bo.fighter2_odds,
+            bo.fighter1_odds_percent,
+            bo.fighter2_odds_percent,
+            bo.fighter1_ev,
+            bo.vigor,
+            bo.fighter2_ev,
+            ps.algopick_prediction,
+            ps.algopick_probability
+        FROM ufc.bookmaker_odds bo
+        LEFT JOIN ufc.prediction_simplified ps 
+            ON bo.fight_id = ps.fight_id
+        WHERE bo.fight_id = %s
     """
     return execute_query(query, (fight_id,))
 

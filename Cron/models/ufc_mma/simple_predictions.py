@@ -199,7 +199,7 @@ def push_algopicks_to_sql(df: pl.DataFrame, truncate: bool = True):
 def build_algopicks_rows(
     date_min: str = "2025-10-03",
     include_legacy_for_model_choice: bool = False,
-    prob_window: float = 0.005,
+    prob_window: float = 0.0065,
 ) -> pl.DataFrame:
     """
     Returns Polars DataFrame for your algopicks table.
@@ -396,4 +396,5 @@ def build_algopicks_rows(
     ]
     out_cols = [c for c in out_cols if c in df.columns]
 
-    return df.select(out_cols)
+    finaldf = df.select(out_cols)
+    push_algopicks_to_sql(finaldf)

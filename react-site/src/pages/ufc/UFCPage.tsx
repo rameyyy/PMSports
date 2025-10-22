@@ -1,4 +1,9 @@
-import { useState, useEffect } from 'react';
+// 1) Imports: add React + Suspense + lazy, and remove modelStats if you want Models.tsx to own its data
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+
+// 2) Lazy import the Models tab UI (code-splitting FTW)
+const Models = lazy(() => import('./Models'));
+
 
 type Fight = {
   fight_id: string;
@@ -31,8 +36,11 @@ type BookmakerOdds = {
   fighter2_odds: number;
   fighter1_odds_percent: number;
   fighter2_odds_percent: number;
-  ev: number | null;
+  fighter1_ev: number | null;
+  fighter2_ev: number | null;
   vigor: number;
+  algopick_prediction: number | null;
+  algopick_probability: number | null;
 };
 
 type Event = {
@@ -42,6 +50,15 @@ type Event = {
   event_datestr: string;
   location: string;
   date: string;
+};
+
+type ModelStats = {
+  model_name: string;
+  total_predictions: number;
+  correct_predictions: number;
+  accuracy_percentage: number;
+  avg_confidence: number;
+  avg_sample_size: number;
 };
 
 function formatDate(dateString: string): string {
@@ -80,6 +97,8 @@ export default function UFCPage() {
   });
   const [eventFights, setEventFights] = useState<{ [key: string]: Fight[] }>({});
   const [fightOdds, setFightOdds] = useState<{ [key: string]: BookmakerOdds[] }>({});
+  const [expandedOdds, setExpandedOdds] = useState<{ [key: string]: boolean }>({});
+  const [modelStats, setModelStats] = useState<ModelStats[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -87,14 +106,17 @@ export default function UFCPage() {
       try {
         const upcomingRes = await fetch('http://localhost:5000/api/ufc/events/upcoming');
         const pastRes = await fetch('http://localhost:5000/api/ufc/events/past');
+        const statsRes = await fetch('http://localhost:5000/api/ufc/stats');
         
         const upcomingData = await upcomingRes.json();
         const pastData = await pastRes.json();
+        const statsData = await statsRes.json();
         
         setEvents({
           upcoming: upcomingData,
           past: pastData
         });
+        setModelStats(statsData);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching events:', error);
@@ -156,37 +178,37 @@ export default function UFCPage() {
     let bestFighter2: { bookmaker: string; odds: number; ev: number } | null = null;
 
     odds.forEach(bookmaker => {
-      // For fighter1 - we want positive EV when fighter1 is predicted to win
-      if (fight.algopick_prediction === 0 && bookmaker.ev !== null) {
-        if (!bestFighter1 || bookmaker.ev > bestFighter1.ev) {
+      // For fighter1 - use backend calculated EV
+      if (bookmaker.fighter1_ev !== null) {
+        if (!bestFighter1 || bookmaker.fighter1_ev > bestFighter1.ev) {
           bestFighter1 = {
             bookmaker: getBookmakerDisplayName(bookmaker.bookmaker),
             odds: bookmaker.fighter1_odds,
-            ev: bookmaker.ev
+            ev: bookmaker.fighter1_ev
           };
         }
       }
       
-      // For fighter2 - we need to calculate EV based on their implied probability
-      // EV for fighter2 = (fighter2_probability * fighter2_decimal_odds) - 1
-      if (fight.algopick_prediction === 1) {
-        const fighter2Prob = (100 - (fight.algopick_probability || 0)) / 100;
-        const fighter2DecimalOdds = bookmaker.fighter2_odds > 0 
-          ? (bookmaker.fighter2_odds / 100) + 1 
-          : (100 / Math.abs(bookmaker.fighter2_odds)) + 1;
-        const fighter2EV = (fighter2Prob * fighter2DecimalOdds) - 1;
-        
-        if (!bestFighter2 || fighter2EV > bestFighter2.ev) {
+      // For fighter2 - use backend calculated EV
+      if (bookmaker.fighter2_ev !== null) {
+        if (!bestFighter2 || bookmaker.fighter2_ev > bestFighter2.ev) {
           bestFighter2 = {
             bookmaker: getBookmakerDisplayName(bookmaker.bookmaker),
             odds: bookmaker.fighter2_odds,
-            ev: fighter2EV
+            ev: bookmaker.fighter2_ev
           };
         }
       }
     });
 
     return { bestFighter1, bestFighter2 };
+  };
+
+  const toggleOdds = (fightId: string) => {
+    setExpandedOdds(prev => ({
+      ...prev,
+      [fightId]: !prev[fightId]
+    }));
   };
 
   const currentEvents = events[activeTab as keyof typeof events];
@@ -242,11 +264,82 @@ export default function UFCPage() {
           >
             Past
           </button>
+          <button
+            onClick={() => setActiveTab('models')}
+            className={`py-4 px-2 font-semibold transition-colors border-b-2 ${
+              activeTab === 'models'
+                ? 'text-orange-500 border-orange-500'
+                : 'text-slate-400 border-transparent hover:text-slate-300'
+            }`}
+          >
+            Models
+          </button>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {currentEvents.length === 0 ? (
+        {activeTab === 'models' ? (
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-8">Model Performance</h1>
+            {modelStats.length === 0 ? (
+              <div className="text-center text-slate-400 py-12">
+                No model statistics available
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {modelStats.map((model) => (
+                  <div
+                    key={model.model_name}
+                    className="bg-slate-800/50 rounded-lg border border-slate-700 overflow-hidden p-6"
+                  >
+                    <div className="mb-4">
+                      <h2 className="text-2xl font-bold text-orange-400 mb-2">
+                        {model.model_name}
+                      </h2>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      <div className="bg-slate-700/30 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Total Predictions</p>
+                        <p className="text-white text-2xl font-bold">{model.total_predictions}</p>
+                      </div>
+
+                      <div className="bg-slate-700/30 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Correct</p>
+                        <p className="text-green-400 text-2xl font-bold">{model.correct_predictions}</p>
+                      </div>
+
+                      <div className="bg-slate-700/30 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Accuracy</p>
+                        <p className="text-orange-400 text-2xl font-bold">{model.accuracy_percentage}%</p>
+                      </div>
+
+                      <div className="bg-slate-700/30 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Avg Confidence</p>
+                        <p className="text-white text-2xl font-bold">{model.avg_confidence}%</p>
+                      </div>
+
+                      <div className="bg-slate-700/30 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Avg Sample Size</p>
+                        <p className="text-white text-2xl font-bold">{model.avg_sample_size}</p>
+                      </div>
+                    </div>
+
+                    {/* Visual accuracy bar */}
+                    <div className="mt-6">
+                      <div className="relative h-4 bg-slate-700/50 rounded-lg overflow-hidden">
+                        <div 
+                          className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-500 to-orange-600"
+                          style={{ width: `${model.accuracy_percentage}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : currentEvents.length === 0 ? (
           <div className="text-center text-slate-400 py-12">
             No {activeTab} events found
           </div>
@@ -487,99 +580,115 @@ export default function UFCPage() {
 
                             {/* Bookmaker Odds Section */}
                             {odds.length > 0 && (
-                              <div className="mt-4 space-y-2">
-                                <p className="text-sm font-semibold text-slate-300 mb-2">Bookmaker Odds:</p>
-                                {odds.map((bookmaker) => {
-                                  // Calculate EV for both fighters
-                                  const fighter1Prob = (fight.algopick_prediction === 0 ? confidence : 100 - confidence) / 100;
-                                  const fighter2Prob = (fight.algopick_prediction === 1 ? confidence : 100 - confidence) / 100;
-                                  
-                                  const fighter1DecimalOdds = bookmaker.fighter1_odds > 0 
-                                    ? (bookmaker.fighter1_odds / 100) + 1 
-                                    : (100 / Math.abs(bookmaker.fighter1_odds)) + 1;
-                                  const fighter2DecimalOdds = bookmaker.fighter2_odds > 0 
-                                    ? (bookmaker.fighter2_odds / 100) + 1 
-                                    : (100 / Math.abs(bookmaker.fighter2_odds)) + 1;
-                                  
-                                  const fighter1EV = ((fighter1Prob * fighter1DecimalOdds) - 1) * 100;
-                                  const fighter2EV = ((fighter2Prob * fighter2DecimalOdds) - 1) * 100;
+                              <div className="mt-4">
+                                <button
+                                  onClick={() => toggleOdds(fight.fight_id)}
+                                  className="w-full flex items-center justify-between px-4 py-3 bg-slate-700/50 hover:bg-slate-700/70 rounded-lg transition-colors"
+                                >
+                                  <span className="text-base font-semibold text-white">
+                                    View Bookmaker Odds ({odds.length})
+                                  </span>
+                                  <svg
+                                    className={`w-5 h-5 text-slate-400 transition-transform ${
+                                      expandedOdds[fight.fight_id] ? 'rotate-180' : ''
+                                    }`}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
 
-                                  return (
-                                    <div key={bookmaker.bookmaker} className="bg-slate-700/30 rounded-lg p-3">
-                                      <div className="flex items-center justify-between mb-2">
-                                        <p className="text-xs font-semibold text-slate-300">
-                                          {getBookmakerDisplayName(bookmaker.bookmaker)}
-                                        </p>
-                                      </div>
-                                      
-                                      {/* Fighter labels */}
-                                      <div className="flex justify-between text-[10px] text-slate-400 mb-1 px-1">
-                                        <span>{fight.fighter1_name}</span>
-                                        <span>{fight.fighter2_name}</span>
-                                      </div>
+                                {expandedOdds[fight.fight_id] && (
+                                  <div className="mt-2 space-y-2">
+                                    {odds.map((bookmaker) => {
+                                      // Use backend-calculated EV values
+                                      const fighter1EV = bookmaker.fighter1_ev ?? 0;
+                                      const fighter2EV = bookmaker.fighter2_ev ?? 0;
 
-                                      <div className="relative h-8 bg-slate-900 rounded overflow-hidden mb-2">
-                                        {/* Fighter 1 section */}
-                                        <div 
-                                          className="absolute top-0 left-0 h-full bg-blue-500"
-                                          style={{ width: `${bookmaker.fighter1_odds_percent}%` }}
-                                        ></div>
-                                        
-                                        {/* Vigor section */}
-                                        <div 
-                                          className="absolute top-0 h-full bg-yellow-500"
-                                          style={{ 
-                                            left: `${bookmaker.fighter1_odds_percent}%`,
-                                            width: `${bookmaker.vigor}%`
-                                          }}
-                                        ></div>
-                                        
-                                        {/* Fighter 2 section */}
-                                        <div 
-                                          className="absolute top-0 right-0 h-full bg-red-500"
-                                          style={{ width: `${bookmaker.fighter2_odds_percent}%` }}
-                                        ></div>
-                                        
-                                        {/* Text overlay */}
-                                        <div className="absolute inset-0 flex items-center justify-between px-3">
-                                          <span className="text-sm font-bold text-white drop-shadow-lg">
-                                            {formatOdds(bookmaker.fighter1_odds)}
-                                          </span>
-                                          <span className="text-[10px] font-bold text-slate-900 bg-yellow-300 px-2 py-0.5 rounded">
-                                            Vig: {bookmaker.vigor.toFixed(1)}%
-                                          </span>
-                                          <span className="text-sm font-bold text-white drop-shadow-lg">
-                                            {formatOdds(bookmaker.fighter2_odds)}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      
-                                      {/* EV display */}
-                                      <div className="flex justify-between text-xs font-semibold">
-                                        <div className="flex items-center space-x-1">
-                                          <span className={fighter1EV > 0 ? 'text-green-400' : 'text-red-400'}>
-                                            EV: {fighter1EV > 0 ? '+' : ''}{fighter1EV.toFixed(1)}%
-                                          </span>
-                                          {fighter1EV > 5 && (
-                                            <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded font-bold">
-                                              +EV BET
+                                      return (
+                                        <div key={bookmaker.bookmaker} className="bg-slate-700/30 rounded-lg p-3">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <p className="text-xs font-semibold text-slate-300">
+                                              {getBookmakerDisplayName(bookmaker.bookmaker)}
+                                            </p>
+                                          </div>
+                                          
+                                          {/* Fighter labels */}
+                                          <div className="flex justify-between text-sm font-semibold mb-1 px-1">
+                                            <span className={fight.algopick_prediction === 0 ? 'text-orange-400' : 'text-white'}>
+                                              {fight.fighter1_name}
                                             </span>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center space-x-1">
-                                          <span className={fighter2EV > 0 ? 'text-green-400' : 'text-red-400'}>
-                                            EV: {fighter2EV > 0 ? '+' : ''}{fighter2EV.toFixed(1)}%
-                                          </span>
-                                          {fighter2EV > 5 && (
-                                            <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded font-bold">
-                                              +EV BET
+                                            <span className={fight.algopick_prediction === 1 ? 'text-orange-400' : 'text-white'}>
+                                              {fight.fighter2_name}
                                             </span>
-                                          )}
+                                          </div>
+
+                                          <div className="relative h-8 bg-slate-900 rounded overflow-hidden mb-2">
+                                            {/* Fighter 1 section */}
+                                            <div 
+                                              className="absolute top-0 left-0 h-full bg-blue-500"
+                                              style={{ width: `${bookmaker.fighter1_odds_percent}%` }}
+                                            ></div>
+                                            
+                                            {/* Vigor section */}
+                                            <div 
+                                              className="absolute top-0 h-full bg-yellow-500"
+                                              style={{ 
+                                                left: `${bookmaker.fighter1_odds_percent}%`,
+                                                width: `${bookmaker.vigor}%`
+                                              }}
+                                            ></div>
+                                            
+                                            {/* Fighter 2 section */}
+                                            <div 
+                                              className="absolute top-0 right-0 h-full bg-red-500"
+                                              style={{ width: `${bookmaker.fighter2_odds_percent}%` }}
+                                            ></div>
+                                            
+                                            {/* Text overlay */}
+                                            <div className="absolute inset-0 flex items-center justify-between px-3">
+                                              <span className="text-sm font-bold text-white drop-shadow-lg">
+                                                {formatOdds(bookmaker.fighter1_odds)}
+                                              </span>
+                                              <span className="text-[10px] font-bold text-slate-900 bg-yellow-300 px-2 py-0.5 rounded">
+                                                Vig: {bookmaker.vigor.toFixed(1)}%
+                                              </span>
+                                              <span className="text-sm font-bold text-white drop-shadow-lg">
+                                                {formatOdds(bookmaker.fighter2_odds)}
+                                              </span>
+                                            </div>
+                                          </div>
+                                          
+                                          {/* EV display */}
+                                          <div className="flex justify-between text-xs font-semibold">
+                                            <div className="flex items-center space-x-1">
+                                              <span className={fighter1EV > 0 ? 'text-green-400' : 'text-red-400'}>
+                                                EV: {fighter1EV > 0 ? '+' : ''}{fighter1EV.toFixed(1)}%
+                                              </span>
+                                              {fighter1EV > 5 && (
+                                                <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded font-bold">
+                                                  +EV BET
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="flex items-center space-x-1">
+                                              <span className={fighter2EV > 0 ? 'text-green-400' : 'text-red-400'}>
+                                                EV: {fighter2EV > 0 ? '+' : ''}{fighter2EV.toFixed(1)}%
+                                              </span>
+                                              {fighter2EV > 5 && (
+                                                <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded font-bold">
+                                                  +EV BET
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
                                         </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
                             )}
 

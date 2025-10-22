@@ -578,7 +578,22 @@ def push_predictions_to_mysql(predictions_df, connection):
     column_names = ', '.join(columns)
     
     # Build UPDATE clause for ON DUPLICATE KEY
-    update_clause = ', '.join([f"{col} = VALUES({col})" for col in columns if col != 'fight_id'])
+    # Don't update actual_winner or correctness columns - those should only be set by update_predictions_with_results()
+    exclude_from_update = [
+        'fight_id', 
+        # 'actual_winner', 
+        'correct', 
+        'logistic_correct', 
+        'xgboost_correct', 
+        'gradient_correct', 
+        'homemade_correct',
+        'ensemble_majorityvote_correct', 
+        'ensemble_weightedvote_correct', 
+        'ensemble_avgprob_correct', 
+        'ensemble_weightedavgprob_correct'
+    ]
+    
+    update_clause = ', '.join([f"{col} = VALUES({col})" for col in columns if col not in exclude_from_update])
     
     insert_query = f"""
         INSERT INTO ufc.predictions ({column_names})
