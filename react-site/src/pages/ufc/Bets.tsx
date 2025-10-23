@@ -33,6 +33,13 @@ interface BettingStats {
   roi: number | null;
 }
 
+function calculateROI(total_staked: number, total_profit: number): number | null {
+  if (total_staked === null || total_staked === 0 || total_profit === null) {
+    return null;
+  }
+  return Number((total_staked + total_profit) / total_staked) * 100 - 100;
+}
+
 function getBookmakerDisplayName(key: string): string {
   const names: { [key: string]: string } = {
     'bovada': 'Bovada',
@@ -126,8 +133,8 @@ export default function Bets() {
         </div>
         <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
           <p className="text-slate-400 text-sm mb-1">ROI</p>
-          <p className={`text-2xl font-bold ${(stats?.roi ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {Number(stats?.roi ?? 0).toFixed(1)}%
+          <p className={`text-2xl font-bold ${(calculateROI(Number(stats?.total_staked), Number(netProfit)) ?? 0) >= 1 ? 'text-green-400' : 'text-red-400'}`}>
+            {((calculateROI(Number(stats?.total_staked), Number(netProfit)) ?? 1)).toFixed(1)}%
           </p>
         </div>
       </div>
