@@ -170,7 +170,7 @@ export default function Bets() {
                 {/* Quick stats */}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-300">Bet On: <span className="font-semibold text-white">{fighterBetOn}</span></span>
-                  <span className="text-slate-300">Odds: <span className="font-semibold text-white">{oddsValue}</span></span>
+                  <span className="text-slate-300">Odds: <span className="font-semibold text-white">+{oddsValue}</span></span>
                   <span className="text-slate-300">Stake: <span className="font-semibold text-white">${Number(bet.stake ?? 0).toFixed(2)}</span></span>
                   <span className="text-slate-300">To Win: <span className="font-semibold text-green-400">${Number(bet.potential_profit ?? 0).toFixed(2)}</span></span>
                 </div>
