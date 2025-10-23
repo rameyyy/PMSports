@@ -1,41 +1,133 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+interface ModelAccuracy {
+  model_name: string;
+  total_predictions: number;
+  correct_predictions: number;
+  accuracy: number;
+  avg_confidence: number;
+  avg_sample_size: number;
+}
 
 export default function ModelsPage() {
-  // Dummy data for the 6 models
-  const dummyModels = [
-    { name: 'AlgoPicks', accuracy: 85, color: 'from-orange-600 to-orange-400' },
-    { name: 'XGBoost', accuracy: 82, color: 'from-blue-600 to-blue-400' },
-    { name: 'Gradient', accuracy: 78, color: 'from-purple-600 to-purple-400' },
-    { name: 'Logistic', accuracy: 75, color: 'from-green-600 to-green-400' },
-    { name: 'Ensemble Weight Avg Prob', accuracy: 80, color: 'from-red-600 to-red-400' },
-    { name: 'Ensemble Avg Prob', accuracy: 77, color: 'from-yellow-600 to-yellow-400' }
-  ];
+  const [expandedModel, setExpandedModel] = useState<string | null>(null);
+  const [models, setModels] = useState<ModelAccuracy[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchModelAccuracies = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/ufc/model-accuracies');
+        const data = await res.json();
+        setModels(data);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching model accuracies:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchModelAccuracies();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="w-full p-8 flex items-center justify-center">
+        <p className="text-white text-lg">Loading model accuracies...</p>
+      </div>
+    );
+  }
+
+  // Find the best model (highest accuracy)
+  const bestAccuracy = Math.max(...models.map(m => m.accuracy));
+
+  const toggleModel = (modelName: string) => {
+    setExpandedModel(expandedModel === modelName ? null : modelName);
+  };
 
   return (
-    <div className="w-full h-full flex items-end justify-around gap-8 p-8">
-      {dummyModels.map((model) => (
-        <div key={model.name} className="flex flex-col items-center flex-1 h-full">
-          {/* Bar container */}
-          <div className="w-full bg-slate-700/30 rounded-t-lg relative flex-1 flex items-end">
-            <div 
-              className={`w-full bg-gradient-to-t ${model.color} rounded-t-lg transition-all duration-500 hover:opacity-90 flex items-center justify-center`}
-              style={{ height: `${model.accuracy}%` }}
-            >
-              <span className="text-white font-bold text-4xl drop-shadow-lg">{model.accuracy}%</span>
+    <div className="w-full p-8">
+      <h1 className="text-2xl font-bold text-white mb-6">Model Accuracies</h1>
+      
+      <div className="space-y-4">
+        {models.map((model) => {
+          const isBest = model.accuracy === bestAccuracy;
+          const isExpanded = expandedModel === model.model_name;
+          const incorrectPredictions = model.total_predictions - model.correct_predictions;
+          
+          return (
+            <div key={model.model_name} className="w-full">
+              {/* Model name and accuracy */}
+              <div className="flex items-center justify-between mb-2">
+                <h3 className={`text-base font-semibold ${isBest ? 'text-orange-500' : 'text-white'}`}>
+                  {model.model_name}
+                </h3>
+                <span className={`text-xl font-bold ${isBest ? 'text-orange-500' : 'text-orange-400/70'}`}>
+                  {model.accuracy.toFixed(1)}%
+                </span>
+              </div>
+              
+              {/* Horizontal bar - now clickable */}
+              <button
+                onClick={() => toggleModel(model.model_name)}
+                className="w-full bg-slate-700/30 rounded-lg h-8 overflow-hidden cursor-pointer hover:bg-slate-700/40 transition-colors"
+              >
+                <div 
+                  className={`h-full rounded-lg transition-all duration-500 flex items-center justify-start px-4 ${
+                    isBest 
+                      ? 'bg-gradient-to-r from-orange-500 to-orange-600' 
+                      : 'bg-gradient-to-r from-orange-400/60 to-orange-500/60'
+                  }`}
+                  style={{ width: `${model.accuracy}%` }}
+                >
+                </div>
+              </button>
+
+              {/* Visual indicator */}
+              <div className="flex items-center justify-center mt-2">
+                <button
+                  onClick={() => toggleModel(model.model_name)}
+                  className="text-slate-400 text-xs hover:text-slate-300 transition-colors flex items-center gap-1"
+                >
+                  <span>{isExpanded ? 'Hide' : 'See'} Model Info</span>
+                  <svg
+                    className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Expanded stats dropdown */}
+              {isExpanded && (
+                <div className="mt-3 bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div>
+                      <p className="text-slate-400 text-xs mb-1">Total Predictions</p>
+                      <p className="text-white text-lg font-semibold">{model.total_predictions}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 text-xs mb-1">Correct Predictions</p>
+                      <p className="text-green-400 text-lg font-semibold">{model.correct_predictions}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 text-xs mb-1">Incorrect Predictions</p>
+                      <p className="text-red-400 text-lg font-semibold">{incorrectPredictions}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 text-xs mb-1">Avg Confidence</p>
+                      <p className="text-white text-lg font-semibold">{model.avg_confidence.toFixed(1)}%</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-          {/* Label */}
-          <p className="text-white font-semibold mt-4 text-center text-lg leading-tight">
-            {model.name.includes('Ensemble') ? (
-              <>
-                {model.name.split(' ')[0]}<br/>{model.name.split(' ').slice(1).join(' ')}
-              </>
-            ) : (
-              model.name
-            )}
-          </p>
-        </div>
-      ))}
+          );
+        })}
+      </div>
     </div>
   );
 }

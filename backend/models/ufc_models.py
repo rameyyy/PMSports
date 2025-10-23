@@ -16,6 +16,130 @@ def get_all_events():
     """
     return execute_query(query)
 
+def get_model_accuracies():
+    """Get model accuracy statistics from the model_accuracies table"""
+    query = """
+        SELECT 
+            model_name,
+            total_predictions,
+            correct_predictions,
+            accuracy,
+            avg_confidence,
+            avg_sample_size
+        FROM ufc.model_accuracies
+        ORDER BY accuracy DESC
+    """
+    return execute_query(query)
+
+def get_all_bets():
+    """Get all user bets"""
+    query = """
+        SELECT 
+            bet_date,
+            bet_outcome,
+            bet_type,
+            event_name,
+            fight_date,
+            fighter1_name,
+            fighter2_name,
+            fighter1_odds,
+            fighter2_odds,
+            fighter1_ev,
+            fighter2_ev,
+            fighter1_pred,
+            fighter2_pred,
+            fighter_bet_on,
+            sportsbook,
+            stake,
+            potential_profit,
+            potential_loss
+        FROM ufc.bets
+        ORDER BY fight_date DESC, bet_date DESC
+    """
+    return execute_query(query)
+
+def get_pending_bets():
+    """Get pending bets"""
+    query = """
+        SELECT 
+            bet_date,
+            bet_outcome,
+            bet_type,
+            event_name,
+            fight_date,
+            fighter1_name,
+            fighter2_name,
+            fighter1_odds,
+            fighter2_odds,
+            fighter1_ev,
+            fighter2_ev,
+            fighter1_pred,
+            fighter2_pred,
+            fighter_bet_on,
+            sportsbook,
+            stake,
+            potential_profit,
+            potential_loss
+        FROM ufc.bets
+        WHERE bet_outcome = 'pending'
+        ORDER BY fight_date ASC
+    """
+    return execute_query(query)
+
+def get_settled_bets():
+    """Get settled bets (won/lost)"""
+    query = """
+        SELECT 
+            bet_date,
+            bet_outcome,
+            bet_type,
+            event_name,
+            fight_date,
+            fighter1_name,
+            fighter2_name,
+            fighter1_odds,
+            fighter2_odds,
+            fighter1_ev,
+            fighter2_ev,
+            fighter1_pred,
+            fighter2_pred,
+            fighter_bet_on,
+            sportsbook,
+            stake,
+            potential_profit,
+            potential_loss
+        FROM ufc.bets
+        WHERE bet_outcome IN ('won', 'lost', 'push')
+        ORDER BY fight_date DESC
+    """
+    return execute_query(query)
+
+def get_betting_stats():
+    """Get overall betting statistics"""
+    query = """
+        SELECT 
+            COUNT(*) as total_bets,
+            SUM(stake) as total_staked,
+            SUM(CASE WHEN bet_outcome = 'won' THEN potential_profit ELSE 0 END) as total_profit,
+            SUM(CASE WHEN bet_outcome = 'lost' THEN potential_loss ELSE 0 END) as total_loss,
+            COUNT(CASE WHEN bet_outcome = 'won' THEN 1 END) as bets_won,
+            COUNT(CASE WHEN bet_outcome = 'lost' THEN 1 END) as bets_lost,
+            COUNT(CASE WHEN bet_outcome = 'pending' THEN 1 END) as bets_pending,
+            ROUND(
+                (COUNT(CASE WHEN bet_outcome = 'won' THEN 1 END) * 100.0 / 
+                NULLIF(COUNT(CASE WHEN bet_outcome IN ('won', 'lost') THEN 1 END), 0)), 
+                2
+            ) as win_rate,
+            ROUND(
+                ((SUM(CASE WHEN bet_outcome = 'won' THEN potential_profit ELSE 0 END) - 
+                  SUM(CASE WHEN bet_outcome = 'lost' THEN potential_loss ELSE 0 END)) * 100.0 / 
+                NULLIF(SUM(CASE WHEN bet_outcome IN ('won', 'lost') THEN stake END), 0)),
+                2
+            ) as roi
+        FROM ufc.bets
+    """
+    return execute_query(query, fetch_one=True)
+
 def get_upcoming_events():
     """Get upcoming UFC events"""
     query = """

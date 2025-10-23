@@ -2,6 +2,7 @@ import mysql.connector
 from mysql.connector import Error
 from dotenv import load_dotenv
 import os
+from typing import List
 
 # load environment variables from .env
 load_dotenv()
@@ -48,3 +49,46 @@ def fetch_query(connection, query, params=None):
         return []
     finally:
         cursor.close()
+        
+def get_model_accuracies_batched(model: str, probs: List[float], window: float = 0.01) -> dict:
+    """
+    Get accuracies for multiple probability values in one query.
+    Returns dict: {prob: {"correct": int, "prob_range": int}}
+    """
+    # Build CASE statements for each probability band
+    cases = []
+    for i, prob in enumerate(probs):
+        lower = prob - window
+        upper = prob + window
+        cases.append(f"""
+            SUM(CASE 
+                WHEN {model}_f1_prob BETWEEN {lower} AND {upper} 
+                     AND {model}_correct IS NOT NULL 
+                THEN 1 ELSE 0 
+            END) AS band_{i}_total,
+            SUM(CASE 
+                WHEN {model}_f1_prob BETWEEN {lower} AND {upper} 
+                     AND {model}_correct = 1 
+                THEN 1 ELSE 0 
+            END) AS band_{i}_correct
+        """)
+    
+    query = f"""
+    SELECT {','.join(cases)}
+    FROM ufc.predictions
+    WHERE {model}_f1_prob IS NOT NULL;
+    """
+    
+    conn = create_connection()
+    df = fetch_query(conn, query)
+    
+    if not df:
+        return {prob: {"correct": 0, "prob_range": 0} for prob in probs}
+    
+    result = {}
+    for i, prob in enumerate(probs):
+        total = int(df[0].get(f"band_{i}_total", 0))
+        correct = int(df[0].get(f"band_{i}_correct", 0))
+        result[prob] = {"correct": correct, "prob_range": total}
+    
+    return result

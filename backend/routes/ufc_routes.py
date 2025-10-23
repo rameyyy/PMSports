@@ -10,7 +10,12 @@ from models.ufc_models import (
     get_fight_prediction,
     get_recent_predictions,
     get_predictions_by_confidence,
-    get_fighter_stats
+    get_fighter_stats,
+    get_model_accuracies,
+    get_all_bets,
+    get_pending_bets,
+    get_settled_bets,
+    get_betting_stats
 )
 
 # CREATE THE BLUEPRINT FIRST
@@ -31,6 +36,46 @@ def get_upcoming():
     if events is None:
         return jsonify({'error': 'Database error'}), 500
     return jsonify(events)
+
+@ufc_bp.route('/bets', methods=['GET'])
+def get_bets():
+    """Get all user bets"""
+    bets = get_all_bets()
+    if bets is None:
+        return jsonify({'error': 'Database error'}), 500
+    return jsonify(bets)
+
+@ufc_bp.route('/bets/pending', methods=['GET'])
+def get_pending():
+    """Get pending bets"""
+    bets = get_pending_bets()
+    if bets is None:
+        return jsonify({'error': 'Database error'}), 500
+    return jsonify(bets)
+
+@ufc_bp.route('/bets/settled', methods=['GET'])
+def get_settled():
+    """Get settled bets"""
+    bets = get_settled_bets()
+    if bets is None:
+        return jsonify({'error': 'Database error'}), 500
+    return jsonify(bets)
+
+@ufc_bp.route('/bets/stats', methods=['GET'])
+def get_bet_stats():
+    """Get betting statistics"""
+    stats = get_betting_stats()
+    if stats is None:
+        return jsonify({'error': 'Database error'}), 500
+    return jsonify(stats)
+
+@ufc_bp.route('/model-accuracies', methods=['GET'])
+def get_accuracies():
+    """Get model accuracy statistics"""
+    accuracies = get_model_accuracies()
+    if accuracies is None:
+        return jsonify({'error': 'Database error'}), 500
+    return jsonify(accuracies)
 
 @ufc_bp.route('/events/past', methods=['GET'])
 def get_past():
