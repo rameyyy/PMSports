@@ -71,8 +71,8 @@ export default function Bets() {
     const fetchBetsAndStats = async () => {
       try {
         const [betsRes, statsRes] = await Promise.all([
-          fetch('http://localhost:5000/api/ufc/bets'),
-          fetch('http://localhost:5000/api/ufc/bets/stats')
+          fetch('/api/ufc/bets'),
+          fetch('/api/ufc/bets/stats')
         ]);
         
         const betsData = await betsRes.json();
@@ -150,7 +150,6 @@ export default function Bets() {
           
           // Determine which fighter was bet on and get their odds
           const fighterBetOn = bet.fighter_bet_on === '0' ? bet.fighter1_name : bet.fighter2_name;
-          const opponentName = bet.fighter_bet_on === '0' ? bet.fighter2_name : bet.fighter1_name;
           const oddsValue = bet.fighter_bet_on === '0' ? bet.fighter1_odds : bet.fighter2_odds;
           const evValue = Number(bet.fighter_bet_on === '0' ? (bet.fighter1_ev ?? 0) : (bet.fighter2_ev ?? 0));
           const predValue = Number(bet.fighter_bet_on === '0' ? (bet.fighter1_pred ?? 0) : (bet.fighter2_pred ?? 0));

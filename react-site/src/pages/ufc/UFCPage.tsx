@@ -1,5 +1,5 @@
 // 1) Imports: add React + Suspense + lazy, and remove modelStats if you want Models.tsx to own its data
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 
 // 2) Lazy import the Models tab UI (code-splitting FTW)
 const Models = lazy(() => import('./Models'));
@@ -26,6 +26,7 @@ type Fight = {
   end_time: string | null;
   weight_class: string;
   win_method: string | null;
+  fight_type: string | null;
 };
 
 type BookmakerOdds = {
@@ -51,15 +52,6 @@ type Event = {
   event_datestr: string;
   location: string;
   date: string;
-};
-
-type ModelStats = {
-  model_name: string;
-  total_predictions: number;
-  correct_predictions: number;
-  accuracy_percentage: number;
-  avg_confidence: number;
-  avg_sample_size: number;
 };
 
 function formatDate(dateString: string): string {
@@ -99,25 +91,21 @@ export default function UFCPage() {
   const [eventFights, setEventFights] = useState<{ [key: string]: Fight[] }>({});
   const [fightOdds, setFightOdds] = useState<{ [key: string]: BookmakerOdds[] }>({});
   const [expandedOdds, setExpandedOdds] = useState<{ [key: string]: boolean }>({});
-  const [modelStats, setModelStats] = useState<ModelStats[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const upcomingRes = await fetch('http://localhost:5000/api/ufc/events/upcoming');
-        const pastRes = await fetch('http://localhost:5000/api/ufc/events/past');
-        const statsRes = await fetch('http://localhost:5000/api/ufc/stats');
+        const upcomingRes = await fetch('/api/ufc/events/upcoming');
+        const pastRes = await fetch('/api/ufc/events/past');
         
         const upcomingData = await upcomingRes.json();
         const pastData = await pastRes.json();
-        const statsData = await statsRes.json();
         
         setEvents({
           upcoming: upcomingData,
           past: pastData
         });
-        setModelStats(statsData);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching events:', error);
@@ -138,7 +126,7 @@ export default function UFCPage() {
 
     if (!eventFights[eventId]) {
       try {
-        const response = await fetch(`http://localhost:5000/api/ufc/events/${eventId}/fights`);
+        const response = await fetch(`/api/ufc/events/${eventId}/fights`);
         const fights = await response.json();
         
         const sortedFights = fights.sort((a: Fight, b: Fight) => {
@@ -153,7 +141,7 @@ export default function UFCPage() {
 
         // Fetch odds for all fights
         const oddsPromises = sortedFights.map((fight: Fight) =>
-          fetch(`http://localhost:5000/api/ufc/fights/${fight.fight_id}/odds`)
+          fetch(`/api/ufc/fights/${fight.fight_id}/odds`)
             .then(res => res.json())
             .then(odds => ({ fightId: fight.fight_id, odds }))
             .catch(() => ({ fightId: fight.fight_id, odds: [] }))
@@ -171,8 +159,7 @@ export default function UFCPage() {
       }
     }
   };
-
-  const getBestEVOdds = (fight: Fight, odds: BookmakerOdds[]) => {
+  const getBestEVOdds = (odds: BookmakerOdds[]): { bestFighter1: { bookmaker: string; odds: number; ev: number } | null; bestFighter2: { bookmaker: string; odds: number; ev: number } | null } | null => {
     if (!odds || odds.length === 0) return null;
 
     let bestFighter1: { bookmaker: string; odds: number; ev: number } | null = null;
@@ -295,7 +282,7 @@ export default function UFCPage() {
               Loading Models...
             </div>
           }>
-            <Models modelStats={modelStats} />
+            <Models />
           </Suspense>
         ) : activeTab === 'bets' ? (
           <Suspense fallback={
@@ -354,7 +341,7 @@ export default function UFCPage() {
                                             fight.algopick_probability !== null;
                         
                         const odds = fightOdds[fight.fight_id] || [];
-                        const bestOdds = hasPrediction ? getBestEVOdds(fight, odds) : null;
+                        const bestOdds = hasPrediction ? getBestEVOdds(odds) : null;
 
                         if (!hasPrediction) {
                           return (
@@ -375,7 +362,7 @@ export default function UFCPage() {
                           ? fight.fighter1_name 
                           : fight.fighter2_name;
                         
-                        const confidence = parseFloat(fight.algopick_probability);
+                        const confidence = fight.algopick_probability == null ? 0: parseFloat(String(fight.algopick_probability));
                         const predictedProb = confidence;
                         const underDogProb = 100 - confidence;
                         

@@ -17,7 +17,7 @@ export default function ModelsPage() {
   useEffect(() => {
     const fetchModelAccuracies = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/ufc/model-accuracies');
+        const res = await fetch('/api/ufc/model-accuracies');
         const data = await res.json();
         setModels(data);
         setLoading(false);

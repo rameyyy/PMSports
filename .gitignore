@@ -1,8 +1,9 @@
 __pycache__/
 *.pyc
 config*.json
-.env
+**/*.env
 /Cron/temp/
 *.parquet
 *.pkl
 *.csv
+/react-site/src/Captcha.tsx
