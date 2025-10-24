@@ -5,7 +5,6 @@ from models.ufc_models import (
     get_past_events,
     get_event_by_id,
     get_fights_by_event,
-    get_model_stats,
     get_fight_odds,
     get_fight_prediction,
     get_recent_predictions,
@@ -100,14 +99,6 @@ def get_fights(event_id):
     if fights is None:
         return jsonify({'error': 'Database error'}), 500
     return jsonify(fights)
-
-@ufc_bp.route('/stats', methods=['GET'])
-def get_stats():
-    """Get model performance statistics"""
-    stats = get_model_stats()
-    if stats is None:
-        return jsonify({'error': 'Database error'}), 500
-    return jsonify(stats)
 
 @ufc_bp.route('/fights/<fight_id>/prediction', methods=['GET'])
 def get_prediction(fight_id):
