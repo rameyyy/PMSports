@@ -2,6 +2,8 @@ import ufc.models.build_df_create_predictions as prediction_handler
 import ufc.models.simple_predictions as simple_preds
 import ufc.bets.bets as bets
 import ufc.bookmakers.update_accuracies as accuracy_update
+import ufc.bookmakers.bookmaker_push as bookie_handle
+import ufc.bookmakers.sportsbook_api as bookie_get
 from ufc.scrapes import *
 
 def update_predictions_winners(conn):
@@ -27,11 +29,22 @@ def update_accuracies():
     accuracy_update.calculate_model_accuracies()
     
 def make_predictions(conn):
-    future_event_urls = get_last_two_past_events(conn)
-    # future_event_urls = get_future_event_urls(conn)
+    future_event_urls = get_future_event_urls(conn)
     event_ids_arr = [event_url.rstrip("/").split("/")[-1] for event_url in future_event_urls]
     if not event_ids_arr:
         return
     for event in event_ids_arr:
         prediction_handler.run(event)
         simple_preds.build_algopicks_rows(event)
+        
+def update_bookmakers():
+    data = bookie_get.get_mma_odds()
+    bookie_handle.run(data)
+    
+def make_bets_upcoming_events(conn):
+    future_event_urls = get_future_event_urls(conn)
+    event_ids_arr = [event_url.rstrip("/").split("/")[-1] for event_url in future_event_urls]
+    if not event_ids_arr:
+        return
+    for event in event_ids_arr:
+        bets.insert_bets_for_event(event_id=event)

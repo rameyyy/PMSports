@@ -47,8 +47,7 @@ def get_model_accuracies_batched(model: str, probs: List[float], window: float =
 
 def get_all_model_accuracies(include_legacy: bool = True) -> dict:
     """
-    Computes accuracy (correct / total) for every *_correct column
-    in the ufc.predictions table.
+    Retrieves accuracy from the ufc.accuracies table for specified models.
     """
     conn = create_connection()
 
@@ -56,35 +55,41 @@ def get_all_model_accuracies(include_legacy: bool = True) -> dict:
         "logistic",
         "xgboost",
         "gradient",
-        "homemade",
-        "ensemble_majorityvote",
-        "ensemble_weightedvote",
         "ensemble_avgprob",
         "ensemble_weightedavgprob",
     ]
 
-    select_exprs = ",\n".join(
-        [f"AVG(CASE WHEN p.{m}_correct = 1 THEN 1.0 ELSE 0 END) AS {m}_accuracy" for m in models]
-    )
+    # Convert model names to match table format
+    model_mapping = {
+        "logistic": "Logistic",
+        "xgboost": "XGBoost",
+        "gradient": "Gradient",
+        "ensemble_avgprob": "Ensemble Avg Prob",
+        "ensemble_weightedavgprob": "Ensemble Weight Avg Prob",
+    }
 
-    if not include_legacy:
-        where_clause = "WHERE p.legacy = 0 AND p.actual_winner IS NOT NULL AND f.fight_date > '2025-10-03'"
-    else:
-        where_clause = "WHERE p.actual_winner IS NOT NULL AND f.fight_date > '2025-10-03'"
-    
+    # Build list of model names for the query
+    table_model_names = [model_mapping.get(m, m) for m in models]
+    placeholders = ','.join(['%s'] * len(table_model_names))
+
     query = f"""
-    SELECT {select_exprs} 
-    FROM ufc.predictions p
-    JOIN ufc.fights f ON f.fight_id = p.fight_id
-    {where_clause};
+    SELECT model_name, accuracy 
+    FROM ufc.model_accuracies
+    WHERE model_name IN ({placeholders})
     """
 
-    df = fetch_query(conn, query)
+    df = fetch_query(conn, query, tuple(table_model_names))
 
     if not df:
         return {}
 
-    row = df[0]
-    accuracies = {m: round(float(row[f"{m}_accuracy"]), 4) for m in models}
+    # Create result dict, mapping back to original model names
+    reverse_mapping = {v: k for k, v in model_mapping.items()}
+    accuracies = {}
+    for row in df:
+        table_name = row['model_name']
+        original_name = reverse_mapping.get(table_name, table_name.lower().replace(' ', '_'))
+        if original_name in models:
+            accuracies[original_name] = round(float(row['accuracy']), 4)
 
     return accuracies

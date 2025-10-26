@@ -59,7 +59,8 @@ function formatDate(dateString: string): string {
   const options: Intl.DateTimeFormatOptions = { 
     month: 'short', 
     day: 'numeric', 
-    year: 'numeric' 
+    year: 'numeric',
+    timeZone: 'UTC'
   };
   return date.toLocaleDateString('en-US', options);
 }

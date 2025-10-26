@@ -5,15 +5,10 @@ from typing import Dict, List, Optional, Tuple
 
 
 class OddsProcessor:
-    def __init__(self, conn, json_file: str = "ufc_odds.json"):
+    def __init__(self, conn, json_data):
         self.conn = conn
-        self.json_file = json_file
+        self.json_data = json_data
         
-    def load_odds_data(self) -> List[Dict]:
-        """Load odds data from JSON file"""
-        with open(self.json_file, "r", encoding="utf-8") as f:
-            return json.load(f)
-    
     def find_fight_by_names(self, name1: str, name2: str, event_date: str) -> Optional[Dict]:
         """Find fight in prediction_simplified by fighter names and date
         Returns the full fight row if found
@@ -268,7 +263,7 @@ class OddsProcessor:
     
     def process_odds(self) -> None:
         """Main processing function"""
-        data = self.load_odds_data()
+        data = self.json_data
         
         processed = 0
         skipped = 0
@@ -404,9 +399,9 @@ class OddsProcessor:
         pass
 
 
-def run():
+def run(json_data):
     conn = create_connection()
-    processor = OddsProcessor(conn, "ufc_odds.json")
+    processor = OddsProcessor(conn, json_data)
     
     try:
         # Process all odds
