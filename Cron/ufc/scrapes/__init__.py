@@ -3,6 +3,7 @@ from .utils import ufc_weight_class
 from .fighter import get_fighter_data
 from .sqlpush import push_events, push_fighter, create_connection, push_fights_upcoming
 from .sqlpush import push_fights, push_totals, push_rounds, fetch_query
+from .extra_utils import filter_new_events, get_future_event_urls, get_last_two_past_events
 from .namematch import EventNameIndex
 
 __all__ = [
@@ -18,5 +19,8 @@ __all__ = [
     "push_fights",
     "push_totals",
     "push_rounds",
-    "fetch_query"
+    "fetch_query",
+    "filter_new_events",
+    "get_future_event_urls",
+    "get_last_two_past_events"
 ]

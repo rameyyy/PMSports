@@ -166,6 +166,3 @@ def calculate_model_accuracies():
     finally:
         if conn:
             conn.close()
-
-def run():
-    calculate_model_accuracies()

@@ -615,12 +615,12 @@ def least_similar(given: str, candidates: list[str]) -> str:
 
 
 ### Scrape Requests
-
+    
 def get_single_fight_stats(url: str, date, og_link, fname):
     response = requests.get(url, headers=HEADERS)
     soup = BeautifulSoup(response.text, 'html.parser')
     resp_code = response.status_code
-
+    
     # Collect all the different dicts
     fighter_links = get_fighter_links(soup)
     ops_url = ''
@@ -708,7 +708,6 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname, conn):
             else:
                 # If it's some other ValueError, re-raise so you don’t hide real bugs
                 raise
-    print(f'Skipped {skipped} fight(s) as those fight_ids were already in SQL...')
     return fighter_career_stats, fights_arr, upcoming, resp_code
 
 

@@ -194,18 +194,48 @@ def push_algopicks_to_sql(df: pl.DataFrame, truncate: bool = True):
         cursor.close()
         conn.close()
 
+# Convert end_time to round format (e.g., "15:00" -> "Round 3", "4:58" -> "Round 1 at 4:58")
+def _format_end_time(time_str):
+    if time_str is None:
+        return None
+    
+    # Parse time string (format: "M:SS" or "MM:SS")
+    parts = time_str.split(":")
+    if len(parts) != 2:
+        return time_str
+    
+    try:
+        minutes = int(parts[0])
+        seconds = int(parts[1])
+    except ValueError:
+        return time_str
+    
+    # UFC rounds are 5 minutes each
+    # If time is exactly 5:00, 10:00, 15:00, etc., it's end of a round
+    total_seconds = minutes * 60 + seconds
+    
+    if total_seconds % 300 == 0:  # Exactly at round end (5:00, 10:00, 15:00, etc.)
+        round_num = total_seconds // 300
+        return f"Round {round_num}"
+    else:
+        # Determine which round based on total time
+        round_num = (total_seconds // 300) + 1
+        time_in_round = total_seconds % 300
+        mins_in_round = time_in_round // 60
+        secs_in_round = time_in_round % 60
+        return f"Round {round_num} at {mins_in_round}:{secs_in_round:02d}"
 
 # Usage:
 def build_algopicks_rows(
-    date_min: str = "2025-10-03",
+    event_id: str,
     include_legacy_for_model_choice: bool = False,
     prob_window: float = 0.0065,
 ) -> pl.DataFrame:
     """
-    Returns Polars DataFrame for your algopicks table.
+    Returns Polars DataFrame for your algopicks table for a specific event.
 
     - Chooses best model by overall accuracy (excluding ensemble_majorityvote)
-    - Pulls fights with fight_date > date_min AND event_id IS NOT NULL
+    - Pulls fights with specified event_id
     - Normalizes names (smart title case)
     - algopick_prediction: 0 if model predicts F1, 1 if model predicts F2 (NO FLIPPING)
     - confidence_ge: raw model confidence (distance from 50%)
@@ -247,10 +277,9 @@ def build_algopicks_rows(
       ON f1.fighter_id = f.fighter1_id
     LEFT JOIN ufc.fighters f2
       ON f2.fighter_id = f.fighter2_id
-    WHERE f.fight_date > '{date_min}'
-      AND f.event_id IS NOT NULL;
+    WHERE f.event_id = %s;
     """
-    rows = fetch_query(conn, query)
+    rows = fetch_query(conn, query, [event_id])
     if not rows:
         return pl.DataFrame()
 
@@ -340,37 +369,6 @@ def build_algopicks_rows(
           .otherwise(pl.col("win_method"))
           .alias("win_method")
     )
-
-    # Convert end_time to round format (e.g., "15:00" -> "Round 3", "4:58" -> "Round 1 at 4:58")
-    def _format_end_time(time_str):
-        if time_str is None:
-            return None
-        
-        # Parse time string (format: "M:SS" or "MM:SS")
-        parts = time_str.split(":")
-        if len(parts) != 2:
-            return time_str
-        
-        try:
-            minutes = int(parts[0])
-            seconds = int(parts[1])
-        except ValueError:
-            return time_str
-        
-        # UFC rounds are 5 minutes each
-        # If time is exactly 5:00, 10:00, 15:00, etc., it's end of a round
-        total_seconds = minutes * 60 + seconds
-        
-        if total_seconds % 300 == 0:  # Exactly at round end (5:00, 10:00, 15:00, etc.)
-            round_num = total_seconds // 300
-            return f"Round {round_num}"
-        else:
-            # Determine which round based on total time
-            round_num = (total_seconds // 300) + 1
-            time_in_round = total_seconds % 300
-            mins_in_round = time_in_round // 60
-            secs_in_round = time_in_round % 60
-            return f"Round {round_num} at {mins_in_round}:{secs_in_round:02d}"
     
     df = df.with_columns(
         pl.col("end_time")
@@ -398,3 +396,148 @@ def build_algopicks_rows(
 
     finaldf = df.select(out_cols)
     push_algopicks_to_sql(finaldf)
+    
+def update_prediction_simplified_with_results(connection, event_id: str):
+    """
+    Update prediction_simplified table with results for all fights in a given event.
+    
+    Updates:
+    - correct: if algopick_prediction==0, check if ps.fighter1_id==winner_id
+               if algopick_prediction==1, check if ps.fighter2_id==winner_id
+               if winner_id is NULL or 'drawornc', set correct=NULL
+    - win_method: normalized from fights table, or "No Contest" if draw/nc
+    - end_time: formatted as "Round X" or "Round X at M:SS"
+    
+    Parameters:
+    -----------
+    connection : mysql.connector.connection.MySQLConnection
+        Active MySQL connection
+    event_id : str
+        The event_id to update predictions for
+    
+    Returns:
+    --------
+    int : Number of predictions updated
+    """
+    
+    print("\n" + "="*80)
+    print(f"UPDATING PREDICTION_SIMPLIFIED FOR EVENT: {event_id}")
+    print("="*80)
+    
+    cursor = connection.cursor(dictionary=True)
+    
+    # Get all fights from this event with their results
+    query = """
+    SELECT 
+        f.fight_id,
+        f.winner_id,
+        f.method,
+        f.end_time,
+        ps.fighter1_id,
+        ps.fighter2_id,
+        ps.algopick_prediction
+    FROM ufc.fights f
+    JOIN ufc.prediction_simplified ps ON ps.fight_id = f.fight_id
+    WHERE f.event_id = %s;
+    """
+    
+    cursor.execute(query, (event_id,))
+    fights = cursor.fetchall()
+    
+    if not fights:
+        print(f"\n⚠️  No fights found for event_id: {event_id}")
+        cursor.close()
+        return 0
+    
+    print(f"\nFound {len(fights)} fights to update\n")
+    
+    updates_made = 0
+    no_contests = 0
+    
+    for fight in fights:
+        fight_id = fight['fight_id']
+        winner_id = fight['winner_id']
+        fighter1_id = fight['fighter1_id']  # From prediction_simplified
+        fighter2_id = fight['fighter2_id']  # From prediction_simplified
+        method = fight['method']
+        end_time = fight['end_time']
+        algopick_prediction = fight['algopick_prediction']
+        
+        # Handle draw/no contest - explicitly set correct to NULL
+        if winner_id is None or winner_id == 'drawornc':
+            formatted_end_time = _format_end_time(end_time)
+            
+            update_query = """
+            UPDATE ufc.prediction_simplified
+            SET 
+                correct = NULL,
+                win_method = 'No Contest',
+                end_time = %s
+            WHERE fight_id = %s;
+            """
+            
+            cursor.execute(update_query, (formatted_end_time, fight_id))
+            no_contests += 1
+            print(f"   ⚪ Fight {fight_id}: No Contest/Draw (correct set to NULL)")
+            continue
+        
+        # Calculate correctness using winner_id and fighter IDs from prediction_simplified
+        # algopick_prediction: 0 = predict Fighter 1, 1 = predict Fighter 2
+        if algopick_prediction is not None:
+            if algopick_prediction == 0:
+                # Predicted Fighter 1 to win - compare ps.fighter1_id to winner_id
+                correct = 1 if winner_id == fighter1_id else 0
+            else:  # algopick_prediction == 1
+                # Predicted Fighter 2 to win - compare ps.fighter2_id to winner_id
+                correct = 1 if winner_id == fighter2_id else 0
+        else:
+            correct = None
+        
+        # Normalize win_method
+        method_map = {
+            'd_unan': 'Unanimous Decision',
+            'sub': 'Submission',
+            'unknown': 'Unknown',
+            'kotko': 'KO/TKO',
+            'd_split': 'Split Decision',
+            'd_maj': 'Majority Decision'
+        }
+        normalized_method = method_map.get(method, method)
+        
+        # Format end_time
+        formatted_end_time = _format_end_time(end_time)
+        
+        # Update the prediction_simplified row
+        update_query = """
+        UPDATE ufc.prediction_simplified
+        SET 
+            correct = %s,
+            win_method = %s,
+            end_time = %s
+        WHERE fight_id = %s;
+        """
+        
+        cursor.execute(update_query, (
+            correct,
+            normalized_method,
+            formatted_end_time,
+            fight_id
+        ))
+        
+        updates_made += 1
+        winner_name = "Fighter 1" if winner_id == fighter1_id else "Fighter 2"
+        print(f"   ✅ Updated fight {fight_id}: {winner_name} won, Prediction {'✓ correct' if correct else '✗ incorrect'}")
+    
+    # Commit all updates
+    connection.commit()
+    cursor.close()
+    
+    print("\n" + "="*80)
+    print("UPDATE SUMMARY")
+    print("="*80)
+    print(f"✅ Updated: {updates_made} predictions")
+    print(f"⚪ No Contests: {no_contests} fights")
+    print(f"📊 Total processed: {len(fights)} fights")
+    print("="*80)
+    
+    return updates_made

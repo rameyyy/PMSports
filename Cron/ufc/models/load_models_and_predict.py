@@ -50,23 +50,23 @@ def load_saved_models():
     models = {}
     
     # Load scaler
-    with open('models/ufc_mma/scaler.pkl', 'rb') as f:
+    with open('ufc/models/scaler.pkl', 'rb') as f:
         scaler = pickle.load(f)
     print("   ✅ Loaded scaler")
     
     # Load feature columns
-    with open('models/ufc_mma/feature_columns.pkl', 'rb') as f:
+    with open('ufc/models/feature_columns.pkl', 'rb') as f:
         feature_cols = pickle.load(f)
     print("   ✅ Loaded feature columns")
     
     # Load ML models
     for name in ['logistic', 'xgboost', 'gradient_boost']:
-        with open(f'models/ufc_mma/{name}_model.pkl', 'rb') as f:
+        with open(f'ufc/models/{name}_model.pkl', 'rb') as f:
             models[name] = pickle.load(f)
         print(f"   ✅ Loaded {name} model")
     
     # Load metadata
-    with open('models/ufc_mma/model_metadata.pkl', 'rb') as f:
+    with open('ufc/models/model_metadata.pkl', 'rb') as f:
         metadata = pickle.load(f)
     print("   ✅ Loaded metadata")
     

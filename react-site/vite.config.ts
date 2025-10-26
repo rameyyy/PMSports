@@ -9,7 +9,8 @@ export default defineConfig({
     proxy: {
       '/api': {
         // target: 'http://localhost:5000', // Replace with your API server URL
-        target: 'http://host.docker.internal:5000/',
+        // target: 'http://host.docker.internal:5000/', for prod
+        target: 'http://100.70.106.27:5000/', // For npm run dev (development)
         changeOrigin: true,
         secure: false,
       },
