@@ -49,7 +49,7 @@ def get_last_two_past_events(conn) -> list[str]:
         FROM ufc.events 
         WHERE date < CURDATE()
         ORDER BY date DESC
-        LIMIT 2
+        LIMIT 4
     """
     
     results = fetch_query(conn, query, [])

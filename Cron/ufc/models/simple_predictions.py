@@ -113,7 +113,7 @@ def _normalize_names(df: pl.DataFrame) -> pl.DataFrame:
 # Main builder (Polars)
 # ------------------------
 
-def push_algopicks_to_sql(df: pl.DataFrame, truncate: bool = True):
+def push_algopicks_to_sql(df: pl.DataFrame):
     """
     Push algopicks DataFrame to the predictions_simplified table.
     
@@ -127,10 +127,6 @@ def push_algopicks_to_sql(df: pl.DataFrame, truncate: bool = True):
     cursor = conn.cursor()
     
     try:
-        # Optional: truncate table first
-        if truncate:
-            cursor.execute("TRUNCATE TABLE ufc.prediction_simplified;")
-            print("Truncated prediction_simplified table")
         
         # Prepare insert query
         insert_query = """
@@ -145,7 +141,27 @@ def push_algopicks_to_sql(df: pl.DataFrame, truncate: bool = True):
         ) VALUES (
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-        );
+        )
+        ON DUPLICATE KEY UPDATE
+            event_id = VALUES(event_id),
+            fighter1_id = VALUES(fighter1_id),
+            fighter2_id = VALUES(fighter2_id),
+            fighter1_name = VALUES(fighter1_name),
+            fighter2_name = VALUES(fighter2_name),
+            fighter1_nickname = VALUES(fighter1_nickname),
+            fighter2_nickname = VALUES(fighter2_nickname),
+            fighter1_img_link = VALUES(fighter1_img_link),
+            fighter2_img_link = VALUES(fighter2_img_link),
+            algopick_model = VALUES(algopick_model),
+            algopick_prediction = VALUES(algopick_prediction),
+            algopick_probability = VALUES(algopick_probability),
+            correct = VALUES(correct),
+            date = VALUES(date),
+            end_time = VALUES(end_time),
+            weight_class = VALUES(weight_class),
+            fight_type = VALUES(fight_type),
+            win_method = VALUES(win_method),
+            window_sample = VALUES(window_sample);
         """
         
         # Convert DataFrame to list of tuples

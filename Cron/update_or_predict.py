@@ -27,7 +27,8 @@ def update_accuracies():
     accuracy_update.calculate_model_accuracies()
     
 def make_predictions(conn):
-    future_event_urls = get_future_event_urls(conn)
+    future_event_urls = get_last_two_past_events(conn)
+    # future_event_urls = get_future_event_urls(conn)
     event_ids_arr = [event_url.rstrip("/").split("/")[-1] for event_url in future_event_urls]
     if not event_ids_arr:
         return
