@@ -2,6 +2,7 @@ import undetected_chromedriver as uc
 import pandas as pd
 import time
 import os
+from . import sqlconn
 
 def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
     # Column headers - raw CSV columns (will be reordered and renamed)
@@ -52,7 +53,12 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
     begin_date = f"{int(year)-1}1101"  # November 1st of previous year
     if end_date:
         # end_date should be in format "MMDD" (e.g., "0109" for January 9th)
-        end_date_full = f"{year}{end_date}"
+        # Season spans two calendar years: Nov-Dec uses previous year, Jan+ uses current year
+        month = int(end_date[:2])
+        if month >= 11:  # November or December
+            end_date_full = f"{int(year)-1}{end_date}"
+        else:  # January through October
+            end_date_full = f"{year}{end_date}"
     else:
         # Default to current year's date (for simplicity, use end of season)
         end_date_full = f"{year}0630"  # June 30th as default
@@ -110,8 +116,21 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
             # Sort by barthag (largest to smallest) to get proper ranking
             df = df.sort_values('barthag', ascending=False).reset_index(drop=True)
 
+            # Format date from year and end_date (e.g., '2025' + '0214' -> '2025-02-14')
+            if end_date:
+                # end_date is in format MMDD
+                month = end_date[:2]
+                day = end_date[2:4]
+                date_str = f"{year}-{month}-{day}"
+            else:
+                # Default to June 30th
+                date_str = f"{year}-06-30"
+
+            # Add date column as first column
+            df.insert(0, 'date', date_str)
+
             # Add rank column (1-indexed)
-            df.insert(0, 'rank', range(1, len(df) + 1))
+            df.insert(1, 'rank', range(1, len(df) + 1))
 
             # Split record (rec) into wins and losses BEFORE dropping it
             # Handle both regular hyphen (-) and en-dash (–)
@@ -134,23 +153,74 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
             ]
             df = df.drop(columns=[col for col in cols_to_drop if col in df.columns])
 
-            # Reorder columns: rank, team, conf, g, barthag, wins, losses, then all stat columns
+            # Reorder columns: date, rank, team, conf, g, barthag, wins, losses, then all stat columns
             stat_cols = [
                 'efg_off_prcnt', 'efg_def_prcnt', 'ftr', 'ftrd', 'tor', 'tord',
                 'orb', 'drb', 'adj_t', '2p_prcnt_off', '2p_prcnt_def', '3p_prcnt_off',
                 '3p_prcnt_def', '3pr', '3prd', 'wab'
             ]
-            col_order = ['rank', 'team', 'conf', 'g', 'barthag', 'wins', 'losses'] + stat_cols
+            col_order = ['date', 'rank', 'team', 'conf', 'g', 'barthag', 'wins', 'losses'] + stat_cols
             df = df[[col for col in col_order if col in df.columns]]
 
-            # Save with proper headers, sorted by rank
-            final_name = f'barttorvik_{year}.csv'
-            final_path = os.path.join(download_dir, final_name)
-            df.to_csv(final_path, index=False)
+            # Check if data is the same as previous day
+            try:
+                conn = sqlconn.create_connection()
+                if conn:
+                    # Get the most recent date in the database
+                    query = "SELECT MAX(date) as max_date FROM leaderboard"
+                    result = sqlconn.fetch(conn, query)
 
-            # Delete the original headerless file if different
-            if latest_file != final_path:
-                os.remove(latest_file)
+                    if result and result[0]['max_date']:
+                        prev_date = result[0]['max_date']
+
+                        # Fetch previous day's data
+                        prev_query = "SELECT * FROM leaderboard WHERE date = %s ORDER BY team"
+                        prev_data = sqlconn.fetch(conn, prev_query, (prev_date,))
+
+                        if prev_data:
+                            # Convert to DataFrame for comparison
+                            prev_df = pd.DataFrame(prev_data)
+
+                            # Sort both dataframes by team for comparison
+                            current_compare = df.drop(columns=['date']).sort_values('team').reset_index(drop=True)
+                            prev_compare = prev_df.drop(columns=['date']).sort_values('team').reset_index(drop=True)
+
+                            # Check if dataframes are equal (excluding date)
+                            if current_compare.equals(prev_compare):
+                                print(f"⏭️  Skipping push - data unchanged from {prev_date}")
+                                conn.close()
+
+                                # Clean up CSV files
+                                csv_files = [f for f in os.listdir(download_dir) if f.endswith('.csv')]
+                                for csv_file in csv_files:
+                                    csv_path = os.path.join(download_dir, csv_file)
+                                    try:
+                                        os.remove(csv_path)
+                                    except Exception as e:
+                                        print(f"⚠️  Warning: Could not remove {csv_file}: {e}")
+
+                                return df
+
+                    conn.close()
+            except Exception as e:
+                print(f"⚠️  Warning: Could not check for duplicates: {e}")
+
+            # Push to database
+            success = sqlconn.execute_query(df=df, table_name='leaderboard', if_exists='append')
+
+            # Clean up: Remove ALL CSV files in the download directory
+            csv_files = [f for f in os.listdir(download_dir) if f.endswith('.csv')]
+            for csv_file in csv_files:
+                csv_path = os.path.join(download_dir, csv_file)
+                try:
+                    os.remove(csv_path)
+                except Exception as e:
+                    print(f"⚠️  Warning: Could not remove {csv_file}: {e}")
+
+            if success:
+                print(f"✅ Data pushed to ncaamb.leaderboard successfully")
+            else:
+                print(f"❌ Failed to push data to database")
 
             return df
 
