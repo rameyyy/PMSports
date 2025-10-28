@@ -1,10 +1,10 @@
-import ufc.models.build_df_create_predictions as prediction_handler
-import ufc.models.simple_predictions as simple_preds
-import ufc.bets.bets as bets
-import ufc.bookmakers.update_accuracies as accuracy_update
-import ufc.bookmakers.bookmaker_push as bookie_handle
-import ufc.bookmakers.sportsbook_api as bookie_get
-from ufc.scrapes import *
+import models.build_df_create_predictions as prediction_handler
+import models.simple_predictions as simple_preds
+import bets.bets as bets
+import bookmakers.update_accuracies as accuracy_update
+import bookmakers.bookmaker_push as bookie_handle
+import bookmakers.sportsbook_api as bookie_get
+from scrapes import *
 
 def update_predictions_winners(conn):
     prediction_handler.update_predictions_with_results(conn)

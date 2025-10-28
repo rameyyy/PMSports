@@ -1,0 +1,165 @@
+import undetected_chromedriver as uc
+import pandas as pd
+import time
+import os
+
+def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
+    # Column headers - raw CSV columns (will be reordered and renamed)
+    raw_columns = [
+        'team',         # 0: Team name
+        'adjoe',        # 1: Adjusted Offensive Efficiency
+        'adjde',        # 2: Adjusted Defensive Efficiency
+        'barthag',      # 3: Power Rating
+        'rec',          # 4: Record (will split into wins/losses)
+        'wins',         # 5: Wins
+        'col6',         # 6: Total games (drop)
+        'efg_off_prcnt',# 7
+        'efg_def_prcnt',# 8
+        'ftr',          # 9
+        'ftrd',         # 10
+        'tor',          # 11
+        'tord',         # 12
+        'orb',          # 13
+        'drb',          # 14
+        'col15',        # 15: Drop
+        '2p_prcnt_off', # 16
+        '2p_prcnt_def', # 17
+        '3p_prcnt_off', # 18
+        '3p_prcnt_def', # 19
+        'col20',        # 20: Drop (the 0s)
+        'col21',        # 21: Drop (the 0s)
+        'col22',        # 22: Drop
+        'col23',        # 23: Drop
+        '3pr',          # 24: 3-Point Rate (40.2 in example)
+        '3prd',         # 25: 3-Point Rate Defense (32.9 in example)
+        'adj_t',        # 26: Adjusted Tempo (64.6459)
+        'col27',        # 27: Drop (dupe of adj_t)
+        'col28',        # 28: Drop (dupe)
+        'col29',        # 29: Drop (dupe)
+        'col30',        # 30: Drop (dupe)
+        'col31',        # 31: Drop (dupe)
+        'col32',        # 32: Drop (dupe)
+        'col33',        # 33: Drop (dupe)
+        'wab',          # 34: Wins Above Bubble
+        'col35',        # 35: Drop
+        'col36'         # 36: Drop
+    ]
+    
+    # Setup download directory
+    download_dir = os.path.abspath(output_dir)
+
+    # Build date parameters
+    begin_date = f"{int(year)-1}1101"  # November 1st of previous year
+    if end_date:
+        # end_date should be in format "MMDD" (e.g., "0109" for January 9th)
+        end_date_full = f"{year}{end_date}"
+    else:
+        # Default to current year's date (for simplicity, use end of season)
+        end_date_full = f"{year}0630"  # June 30th as default
+
+    options = uc.ChromeOptions()
+    options.add_argument('--headless=new')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--window-size=1920,1080')
+
+    # Set download preferences
+    prefs = {
+        "download.default_directory": download_dir,
+        "download.prompt_for_download": False,
+        "download.directory_upgrade": True,
+    }
+    options.add_experimental_option("prefs", prefs)
+
+    driver = uc.Chrome(options=options, version_main=None)
+
+    try:
+        # Visit main page first
+        driver.get("https://barttorvik.com/")
+        time.sleep(3)
+
+        # Trigger the CSV download with date filters
+        url = f"https://barttorvik.com/trank.php?year={year}&begin={begin_date}&end={end_date_full}&csv=1"
+        driver.get(url)
+
+        # Wait for download to complete
+        time.sleep(5)
+
+        # Find the downloaded file
+        downloaded_files = [f for f in os.listdir(download_dir) if f.endswith('.csv')]
+
+        if not downloaded_files:
+            print("❌ Error: No CSV file found in download directory")
+            return None
+
+        # Get the most recent CSV
+        latest_file = max([os.path.join(download_dir, f) for f in downloaded_files],
+                        key=os.path.getctime)
+        try:
+            # Load CSV with no headers, then assign our headers
+            df = pd.read_csv(latest_file, header=None)
+
+            # Assign column names
+            num_cols = len(df.columns)
+            if num_cols <= len(raw_columns):
+                df.columns = raw_columns[:num_cols]
+            else:
+                # More columns than we have names for
+                extra_cols = [f'col_{i}' for i in range(len(raw_columns), num_cols)]
+                df.columns = raw_columns + extra_cols
+
+            # Sort by barthag (largest to smallest) to get proper ranking
+            df = df.sort_values('barthag', ascending=False).reset_index(drop=True)
+
+            # Add rank column (1-indexed)
+            df.insert(0, 'rank', range(1, len(df) + 1))
+
+            # Split record (rec) into wins and losses BEFORE dropping it
+            # Handle both regular hyphen (-) and en-dash (–)
+            df['rec'] = df['rec'].astype(str).str.replace('–', '-')
+            df[['wins', 'losses']] = df['rec'].str.split('-', expand=True).astype(int)
+
+            # Rename columns
+            df = df.rename(columns={
+                'adjoe': 'conf',
+                'adjde': 'g',
+            })
+
+            # Drop unnecessary columns
+            cols_to_drop = [
+                'rec',  # Drop original rec column
+                'col6',  # Drop total games column
+                'col15', 'col20', 'col21', 'col22', 'col23',  # Drop
+                'col27', 'col28', 'col29', 'col30', 'col31', 'col32', 'col33',  # Drop dupes
+                'col35', 'col36',  # Drop
+            ]
+            df = df.drop(columns=[col for col in cols_to_drop if col in df.columns])
+
+            # Reorder columns: rank, team, conf, g, barthag, wins, losses, then all stat columns
+            stat_cols = [
+                'efg_off_prcnt', 'efg_def_prcnt', 'ftr', 'ftrd', 'tor', 'tord',
+                'orb', 'drb', 'adj_t', '2p_prcnt_off', '2p_prcnt_def', '3p_prcnt_off',
+                '3p_prcnt_def', '3pr', '3prd', 'wab'
+            ]
+            col_order = ['rank', 'team', 'conf', 'g', 'barthag', 'wins', 'losses'] + stat_cols
+            df = df[[col for col in col_order if col in df.columns]]
+
+            # Save with proper headers, sorted by rank
+            final_name = f'barttorvik_{year}.csv'
+            final_path = os.path.join(download_dir, final_name)
+            df.to_csv(final_path, index=False)
+
+            # Delete the original headerless file if different
+            if latest_file != final_path:
+                os.remove(latest_file)
+
+            return df
+
+        except Exception as e:
+            print(f"❌ Error processing CSV: {e}")
+            return None
+            
+    finally:
+        try:
+            driver.quit()
+        except:
+            pass

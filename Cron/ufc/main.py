@@ -1,6 +1,6 @@
 from update_ufc_db import *
 from update_or_predict import *
-from ufc.scrapes import create_connection
+from scrapes import create_connection
 import time
 
 if __name__ == "__main__":

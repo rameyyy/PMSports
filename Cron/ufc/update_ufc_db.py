@@ -1,4 +1,4 @@
-from ufc.scrapes import *
+from scrapes import *
 import time
 
 def get_new_upcoming_events(conn):
