@@ -213,31 +213,31 @@ export default function UFCPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <nav className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="px-8">
+      <nav className="border-b border-slate-700 bg-slate-900 sticky top-0 z-50">
+        <div className="px-4 sm:px-8">
           <div className="flex items-center justify-between h-16">
-            <button 
+            <button
               onClick={() => window.location.href = '/'}
               className="flex items-center hover:opacity-80 transition-opacity"
             >
-              <span className="text-2xl font-bold text-white">
+              <span className="text-lg sm:text-2xl font-bold text-white">
                 Algo<span className="text-orange-500">Picks</span>
               </span>
             </button>
             <div className="flex items-center">
-              <img src="/logo/ufc-logo.png" alt="UFC" className="h-8 object-contain" />
+              <img src="/logo/ufc-logo.png" alt="UFC" className="h-6 sm:h-8 object-contain" />
             </div>
           </div>
         </div>
       </nav>
 
-      <div className="border-b border-slate-700 bg-slate-900/30 sticky top-16 z-40">
-        <div className="px-8 flex items-center space-x-6">
+      <div className="border-b border-slate-700 bg-slate-800 sticky top-16 z-40">
+        <div className="px-4 sm:px-8 flex items-center space-x-3 sm:space-x-6 overflow-x-auto">
           <button
             onClick={() => setActiveTab('upcoming')}
-            className={`py-4 px-2 font-semibold transition-colors border-b-2 ${
+            className={`py-4 px-2 sm:px-3 text-sm sm:text-base font-semibold transition-colors border-b-2 whitespace-nowrap ${
               activeTab === 'upcoming'
-                ? 'text-orange-500 border-orange-500'
+                ? 'text-orange-500 border-orange-500 bg-slate-700/20'
                 : 'text-slate-400 border-transparent hover:text-slate-300'
             }`}
           >
@@ -245,9 +245,9 @@ export default function UFCPage() {
           </button>
           <button
             onClick={() => setActiveTab('past')}
-            className={`py-4 px-2 font-semibold transition-colors border-b-2 ${
+            className={`py-4 px-2 sm:px-3 text-sm sm:text-base font-semibold transition-colors border-b-2 whitespace-nowrap ${
               activeTab === 'past'
-                ? 'text-orange-500 border-orange-500'
+                ? 'text-orange-500 border-orange-500 bg-slate-700/20'
                 : 'text-slate-400 border-transparent hover:text-slate-300'
             }`}
           >
@@ -255,9 +255,9 @@ export default function UFCPage() {
           </button>
           <button
             onClick={() => setActiveTab('models')}
-            className={`py-4 px-2 font-semibold transition-colors border-b-2 ${
+            className={`py-4 px-2 sm:px-3 text-sm sm:text-base font-semibold transition-colors border-b-2 whitespace-nowrap ${
               activeTab === 'models'
-                ? 'text-orange-500 border-orange-500'
+                ? 'text-orange-500 border-orange-500 bg-slate-700/20'
                 : 'text-slate-400 border-transparent hover:text-slate-300'
             }`}
           >
@@ -265,9 +265,9 @@ export default function UFCPage() {
           </button>
           <button
             onClick={() => setActiveTab('bets')}
-            className={`py-4 px-2 font-semibold transition-colors border-b-2 ${
+            className={`py-4 px-2 sm:px-3 text-sm sm:text-base font-semibold transition-colors border-b-2 whitespace-nowrap ${
               activeTab === 'bets'
-                ? 'text-orange-500 border-orange-500'
+                ? 'text-orange-500 border-orange-500 bg-slate-700/20'
                 : 'text-slate-400 border-transparent hover:text-slate-300'
             }`}
           >

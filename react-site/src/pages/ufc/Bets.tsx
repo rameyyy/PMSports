@@ -206,35 +206,35 @@ export default function Bets() {
   const totalStaked = (Number(stats?.bets_won ?? 0) + Number(stats?.bets_lost ?? 0)) * 50;
 
   return (
-    <div className="w-full p-8">     
+    <div className="w-full p-4 sm:p-8">     
       {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
-        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-          <p className="text-slate-400 text-sm mb-1">Total Bets</p>
-          <p className="text-white text-2xl font-bold">{(stats?.bets_won || 0) + (stats?.bets_lost || 0) }</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 mb-8 sm:mb-12">
+        <div className="bg-slate-800/50 rounded-lg p-3 sm:p-4 border border-slate-700">
+          <p className="text-slate-400 text-xs sm:text-sm mb-1">Total Bets</p>
+          <p className="text-white text-lg sm:text-2xl font-bold">{(stats?.bets_won || 0) + (stats?.bets_lost || 0) }</p>
         </div>
-        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-          <p className="text-slate-400 text-sm mb-1">Total Staked</p>
-          <p className="text-white text-2xl font-bold">${totalStaked.toFixed(2)}</p>
+        <div className="bg-slate-800/50 rounded-lg p-3 sm:p-4 border border-slate-700">
+          <p className="text-slate-400 text-xs sm:text-sm mb-1">Total Staked</p>
+          <p className="text-white text-lg sm:text-2xl font-bold">${totalStaked.toFixed(2)}</p>
         </div>
-        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-          <p className="text-slate-400 text-sm mb-1">Total Won</p>
-          <p className="text-green-400 text-2xl font-bold">${Number(stats?.total_profit ?? 0).toFixed(2)}</p>
+        <div className="bg-slate-800/50 rounded-lg p-3 sm:p-4 border border-slate-700">
+          <p className="text-slate-400 text-xs sm:text-sm mb-1">Total Won</p>
+          <p className="text-green-400 text-lg sm:text-2xl font-bold">${Number(stats?.total_profit ?? 0).toFixed(2)}</p>
         </div>
-        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-          <p className="text-slate-400 text-sm mb-1">Net Profit</p>
-          <p className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+        <div className="bg-slate-800/50 rounded-lg p-3 sm:p-4 border border-slate-700">
+          <p className="text-slate-400 text-xs sm:text-sm mb-1">Net Profit</p>
+          <p className={`text-lg sm:text-2xl font-bold ${netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {formatNetProfit(netProfit)}
           </p>
         </div>
-        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-          <p className="text-slate-400 text-sm mb-1">Win Rate</p>
-          <p className="text-white text-2xl font-bold">{Number(stats?.win_rate ?? 0).toFixed(1)}%</p>
+        <div className="bg-slate-800/50 rounded-lg p-3 sm:p-4 border border-slate-700">
+          <p className="text-slate-400 text-xs sm:text-sm mb-1">Win Rate</p>
+          <p className="text-white text-lg sm:text-2xl font-bold">{Number(stats?.win_rate ?? 0).toFixed(1)}%</p>
         </div>
-        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-          <p className="text-slate-400 text-sm mb-1">ROI</p>
-          <p className={`text-2xl font-bold ${calculateROI(netProfit, totalStaked) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {calculateROI(netProfit, totalStaked).toFixed(1)}%
+        <div className="bg-slate-800/50 rounded-lg p-3 sm:p-4 border border-slate-700">
+          <p className="text-slate-400 text-xs sm:text-sm mb-1">ROI</p>
+          <p className={`text-lg sm:text-2xl font-bold ${calculateROI(netProfit, totalStaked) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {calculateROI(netProfit, totalStaked) >= 0 ? '+' : ''}{calculateROI(netProfit, totalStaked).toFixed(1)}%
           </p>
         </div>
       </div>
@@ -250,64 +250,64 @@ export default function Bets() {
               {/* Event Header */}
               <button
                 onClick={() => toggleEvent(eventKey)}
-                className="w-full p-6 hover:bg-slate-800/50 transition-colors rounded-lg"
+                className="w-full p-4 sm:p-6 hover:bg-slate-800/50 transition-colors rounded-lg"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="text-left">
-                    <h2 className="text-xl font-bold text-white mb-1">{eventGroup.event_name}</h2>
-                    <p className="text-sm text-slate-400">{formatDateLong(eventGroup.fight_date)}</p>
+                    <h2 className="text-base sm:text-xl font-bold text-white mb-1">{eventGroup.event_name}</h2>
+                    <p className="text-xs sm:text-sm text-slate-400">{formatDateLong(eventGroup.fight_date)}</p>
                   </div>
-                  <div className="flex items-center gap-8">
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-8">
                     {/* Show breakdown if event has settled bets */}
                     {eventGroup.has_settled_bets ? (
                       <>
                         <div className="text-right">
                           <p className="text-slate-400 text-xs mb-1">Won</p>
-                          <p className="text-green-400 text-lg font-semibold">{eventGroup.bets_won}</p>
+                          <p className="text-green-400 text-sm sm:text-lg font-semibold">{eventGroup.bets_won}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-slate-400 text-xs mb-1">Lost</p>
-                          <p className="text-red-400 text-lg font-semibold">{eventGroup.bets_lost}</p>
+                          <p className="text-red-400 text-sm sm:text-lg font-semibold">{eventGroup.bets_lost}</p>
                         </div>
                         {eventGroup.bets_void > 0 && (
                           <div className="text-right">
                             <p className="text-slate-400 text-xs mb-1">Void</p>
-                            <p className="text-slate-400 text-lg font-semibold">{eventGroup.bets_void}</p>
+                            <p className="text-slate-400 text-sm sm:text-lg font-semibold">{eventGroup.bets_void}</p>
                           </div>
                         )}
                       </>
                     ) : (
                       <div className="text-right">
                         <p className="text-slate-400 text-xs mb-1">Bets</p>
-                        <p className="text-white text-lg font-semibold">{eventGroup.bet_count}</p>
+                        <p className="text-white text-sm sm:text-lg font-semibold">{eventGroup.bet_count}</p>
                       </div>
                     )}
-                    <div className="text-right">
+                    <div className="text-right hidden sm:block">
                       <p className="text-slate-400 text-xs mb-1">Total Staked</p>
-                      <p className="text-white text-lg font-semibold">${eventGroup.total_stake.toFixed(2)}</p>
+                      <p className="text-white text-sm sm:text-lg font-semibold">${eventGroup.total_stake.toFixed(2)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-slate-400 text-xs mb-1">
-                        {eventGroup.has_settled_bets ? 'Net Profit' : 'Potential Profit'}
+                        {eventGroup.has_settled_bets ? 'Profit' : 'Potential'}
                       </p>
-                      <p className={`text-lg font-semibold ${
-                        eventGroup.has_settled_bets 
+                      <p className={`text-sm sm:text-lg font-semibold ${
+                        eventGroup.has_settled_bets
                           ? (eventGroup.net_profit >= 0 ? 'text-green-400' : 'text-red-400')
                           : 'text-green-400'
                       }`}>
-                        {eventGroup.has_settled_bets 
+                        {eventGroup.has_settled_bets
                           ? formatNetProfit(eventGroup.net_profit)
                           : `$${eventGroup.potential_profit.toFixed(2)}`
                         }
                       </p>
                     </div>
                     <svg
-                      className={`w-6 h-6 text-slate-400 transition-transform ${isEventExpanded ? 'rotate-180' : ''}`}
+                      className={`w-5 h-5 sm:w-6 sm:h-6 text-slate-400 transition-transform flex-shrink-0`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isEventExpanded ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
                     </svg>
                   </div>
                 </div>
@@ -315,7 +315,7 @@ export default function Bets() {
 
               {/* Event Bets */}
               {isEventExpanded && (
-                <div className="px-6 pb-6 space-y-4">
+                <div className="px-4 sm:px-6 pb-4 sm:pb-6 space-y-3 sm:space-y-4">
                   {eventGroup.bets.map((bet, index) => {
                     const betKey = `${bet.fight_date}-${bet.fighter1_name}-${index}`;
                     const isBetExpanded = expandedBet === betKey;
@@ -331,22 +331,22 @@ export default function Bets() {
                     return (
                       <div key={betKey} className="w-full">
                         {/* Bet header */}
-                        <div className="bg-slate-700/30 rounded-lg p-4 hover:bg-slate-700/40 transition-colors">
-                          <div className="flex items-center justify-between mb-2">
+                        <div className="bg-slate-700/30 rounded-lg p-3 sm:p-4 hover:bg-slate-700/40 transition-colors">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                             <div>
-                              <h3 className="text-base font-semibold text-white">
+                              <h3 className="text-sm sm:text-base font-semibold text-white">
                                 {bet.fighter1_name} vs {bet.fighter2_name}
                               </h3>
                             </div>
                             <div className="text-right">
-                              <p className={`text-lg font-bold ${statusColor}`}>
+                              <p className={`text-base sm:text-lg font-bold ${statusColor}`}>
                                 {bet.bet_outcome.toUpperCase()}
                               </p>
                             </div>
                           </div>
 
                           {/* Quick stats */}
-                          <div className="flex items-center justify-between text-sm">
+                          <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-between gap-2 text-xs sm:text-sm">
                             <span className="text-slate-300">Bet On: <span className="font-semibold text-white">{fighterBetOn}</span></span>
                             <span className="text-slate-300">
                               Odds: <span className="font-semibold text-white">
@@ -378,61 +378,61 @@ export default function Bets() {
 
                         {/* Expanded details */}
                         {isBetExpanded && (
-                          <div className="mt-3 bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="mt-3 bg-slate-800/50 rounded-lg p-3 sm:p-4 border border-slate-700">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                               <div>
                                 <p className="text-slate-400 text-xs mb-1">Sportsbook</p>
-                                <p className="text-white text-lg font-semibold">{getBookmakerDisplayName(bet.sportsbook)}</p>
+                                <p className="text-white text-sm sm:text-lg font-semibold">{getBookmakerDisplayName(bet.sportsbook)}</p>
                               </div>
                               <div>
                                 <p className="text-slate-400 text-xs mb-1">Bet Type</p>
-                                <p className="text-white text-lg font-semibold">
+                                <p className="text-white text-sm sm:text-lg font-semibold">
                                   {bet.bet_type === 'moneyline' ? 'MoneyLine' : bet.bet_type}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-slate-400 text-xs mb-1">Expected Value</p>
-                                <p className={`text-lg font-semibold ${evValue > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                <p className={`text-sm sm:text-lg font-semibold ${evValue > 0 ? 'text-green-400' : 'text-red-400'}`}>
                                   {evValue > 0 ? '+' : ''}{evValue.toFixed(2)}%
                                 </p>
                               </div>
                               <div>
                                 <p className="text-slate-400 text-xs mb-1">Model Confidence</p>
-                                <p className="text-white text-lg font-semibold">{predValue.toFixed(2)}%</p>
+                                <p className="text-white text-sm sm:text-lg font-semibold">{predValue.toFixed(2)}%</p>
                               </div>
                               <div>
                                 <p className="text-slate-400 text-xs mb-1">Bet Date</p>
-                                <p className="text-white text-lg font-semibold">{formatDate(bet.bet_date)}</p>
+                                <p className="text-white text-sm sm:text-lg font-semibold">{formatDate(bet.bet_date)}</p>
                               </div>
                               <div>
                                 <p className="text-slate-400 text-xs mb-1">Amount Staked</p>
-                                <p className="text-white text-lg font-semibold">${Number(bet.stake ?? 0).toFixed(2)}</p>
+                                <p className="text-white text-sm sm:text-lg font-semibold">${Number(bet.stake ?? 0).toFixed(2)}</p>
                               </div>
                               <div>
                                 <p className="text-slate-400 text-xs mb-1">Potential Profit</p>
-                                <p className="text-green-400 text-lg font-semibold">${Number(bet.potential_profit ?? 0).toFixed(2)}</p>
+                                <p className="text-green-400 text-sm sm:text-lg font-semibold">${Number(bet.potential_profit ?? 0).toFixed(2)}</p>
                               </div>
                               <div>
                                 <p className="text-slate-400 text-xs mb-1">Actual Result</p>
-                                <p className={`text-lg font-semibold ${bet.bet_outcome === 'won' ? 'text-green-400' : bet.bet_outcome === 'lost' ? 'text-red-400' : 'text-slate-400'}`}>
-                                  {bet.bet_outcome === 'won' ? `+$${Number(bet.potential_profit ?? 0).toFixed(2)}` : 
-                                   bet.bet_outcome === 'lost' ? `-$${Number(bet.potential_loss ?? 0).toFixed(2)}` : 
+                                <p className={`text-sm sm:text-lg font-semibold ${bet.bet_outcome === 'won' ? 'text-green-400' : bet.bet_outcome === 'lost' ? 'text-red-400' : 'text-slate-400'}`}>
+                                  {bet.bet_outcome === 'won' ? `+$${Number(bet.potential_profit ?? 0).toFixed(2)}` :
+                                   bet.bet_outcome === 'lost' ? `-$${Number(bet.potential_loss ?? 0).toFixed(2)}` :
                                    'Pending'}
                                 </p>
                               </div>
                             </div>
-                            
+
                             {/* Both fighters' odds for reference */}
-                            <div className="mt-4 pt-4 border-t border-slate-700">
+                            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-700">
                               <p className="text-slate-400 text-xs mb-2">Fight Odds</p>
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                 <div>
-                                  <p className="text-slate-300 text-sm">{bet.fighter1_name}</p>
-                                  <p className="text-white font-semibold">{bet.fighter1_odds} (EV: {Number(bet.fighter1_ev ?? 0).toFixed(2)}%)</p>
+                                  <p className="text-slate-300 text-xs sm:text-sm">{bet.fighter1_name}</p>
+                                  <p className="text-white text-xs sm:text-sm font-semibold">{bet.fighter1_odds} (EV: {Number(bet.fighter1_ev ?? 0).toFixed(2)}%)</p>
                                 </div>
                                 <div>
-                                  <p className="text-slate-300 text-sm">{bet.fighter2_name}</p>
-                                  <p className="text-white font-semibold">{bet.fighter2_odds} (EV: {Number(bet.fighter2_ev ?? 0).toFixed(2)}%)</p>
+                                  <p className="text-slate-300 text-xs sm:text-sm">{bet.fighter2_name}</p>
+                                  <p className="text-white text-xs sm:text-sm font-semibold">{bet.fighter2_odds} (EV: {Number(bet.fighter2_ev ?? 0).toFixed(2)}%)</p>
                                 </div>
                               </div>
                             </div>
@@ -450,21 +450,21 @@ export default function Bets() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-4 mt-8">
+        <div className="flex items-center justify-center gap-2 sm:gap-4 mt-8">
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Previous
           </button>
-          <span className="text-slate-300">
+          <span className="text-xs sm:text-base text-slate-300">
             Page {currentPage} of {totalPages}
           </span>
           <button
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Next
           </button>

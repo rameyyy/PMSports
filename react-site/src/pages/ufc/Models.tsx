@@ -19,7 +19,9 @@ export default function ModelsPage() {
       try {
         const res = await fetch('/api/ufc/model-accuracies');
         const data = await res.json();
-        setModels(data);
+        // Filter out AlgoPicks model
+        const filteredData = data.filter((model: ModelAccuracy) => model.model_name !== 'AlgoPicks');
+        setModels(filteredData);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching model accuracies:', error);
@@ -32,7 +34,7 @@ export default function ModelsPage() {
 
   if (loading) {
     return (
-      <div className="w-full p-8 flex items-center justify-center">
+      <div className="w-full p-4 sm:p-8 flex items-center justify-center">
         <p className="text-white text-lg">Loading model accuracies...</p>
       </div>
     );
@@ -46,8 +48,8 @@ export default function ModelsPage() {
   };
 
   return (
-    <div className="w-full p-8">
-      <h1 className="text-2xl font-bold text-white mb-6">Model Accuracies</h1>
+    <div className="w-full p-4 sm:p-8">
+      <h1 className="text-lg sm:text-2xl font-bold text-white mb-6">Model Accuracies</h1>
       
       <div className="space-y-4">
         {models.map((model) => {
@@ -59,10 +61,10 @@ export default function ModelsPage() {
             <div key={model.model_name} className="w-full">
               {/* Model name and accuracy */}
               <div className="flex items-center justify-between mb-2">
-                <h3 className={`text-base font-semibold ${isBest ? 'text-orange-500' : 'text-white'}`}>
+                <h3 className={`text-sm sm:text-base font-semibold ${isBest ? 'text-orange-500' : 'text-white'}`}>
                   {model.model_name}
                 </h3>
-                <span className={`text-xl font-bold ${isBest ? 'text-orange-500' : 'text-orange-400/70'}`}>
+                <span className={`text-lg sm:text-xl font-bold ${isBest ? 'text-orange-500' : 'text-orange-400/70'}`}>
                   {model.accuracy.toFixed(1)}%
                 </span>
               </div>
@@ -103,23 +105,23 @@ export default function ModelsPage() {
 
               {/* Expanded stats dropdown */}
               {isExpanded && (
-                <div className="mt-3 bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="mt-3 bg-slate-800/50 rounded-lg p-3 sm:p-4 border border-slate-700">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                     <div>
                       <p className="text-slate-400 text-xs mb-1">Total Predictions</p>
-                      <p className="text-white text-lg font-semibold">{model.total_predictions}</p>
+                      <p className="text-white text-sm sm:text-lg font-semibold">{model.total_predictions}</p>
                     </div>
                     <div>
                       <p className="text-slate-400 text-xs mb-1">Correct Predictions</p>
-                      <p className="text-green-400 text-lg font-semibold">{model.correct_predictions}</p>
+                      <p className="text-green-400 text-sm sm:text-lg font-semibold">{model.correct_predictions}</p>
                     </div>
                     <div>
                       <p className="text-slate-400 text-xs mb-1">Incorrect Predictions</p>
-                      <p className="text-red-400 text-lg font-semibold">{incorrectPredictions}</p>
+                      <p className="text-red-400 text-sm sm:text-lg font-semibold">{incorrectPredictions}</p>
                     </div>
                     <div>
                       <p className="text-slate-400 text-xs mb-1">Avg Confidence</p>
-                      <p className="text-white text-lg font-semibold">{model.avg_confidence.toFixed(1)}%</p>
+                      <p className="text-white text-sm sm:text-lg font-semibold">{model.avg_confidence.toFixed(1)}%</p>
                     </div>
                   </div>
                 </div>
