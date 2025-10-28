@@ -1,121 +1,71 @@
-// 1) Imports: add React + Suspense + lazy, and remove modelStats if you want Models.tsx to own its data
 import { useState, useEffect, Suspense, lazy } from 'react';
+import type { Fight, BookmakerOdds, Event } from './types';
+import {
+  formatDate,
+  formatOdds,
+  getBookmakerDisplayName
+} from './utils';
+import {
+  fetchUpcomingEvents,
+  fetchPastEvents,
+  fetchEventFights,
+  fetchMultipleFightOdds
+} from './api';
 
-// 2) Lazy import the Models tab UI (code-splitting FTW)
 const Models = lazy(() => import('./Models'));
 const Bets = lazy(() => import('./Bets'));
-
-
-type Fight = {
-  fight_id: string;
-  event_id: string;
-  fighter1_id: string;
-  fighter2_id: string;
-  fighter1_name: string;
-  fighter2_name: string;
-  fighter1_nickname: string | null;
-  fighter2_nickname: string | null;
-  fighter1_img_link: string | null;
-  fighter2_img_link: string | null;
-  algopick_model: string | null;
-  algopick_prediction: number | null;
-  algopick_probability: number | null;
-  window_sample: number | null;
-  correct: number | null;
-  date: string;
-  end_time: string | null;
-  weight_class: string;
-  win_method: string | null;
-  fight_type: string | null;
-};
-
-type BookmakerOdds = {
-  fight_id: string;
-  bookmaker: string;
-  fighter1_id: string;
-  fighter2_id: string;
-  fighter1_odds: number;
-  fighter2_odds: number;
-  fighter1_odds_percent: number;
-  fighter2_odds_percent: number;
-  fighter1_ev: number | null;
-  fighter2_ev: number | null;
-  vigor: number;
-  algopick_prediction: number | null;
-  algopick_probability: number | null;
-};
-
-type Event = {
-  event_id: string;
-  event_url: string;
-  title: string;
-  event_datestr: string;
-  location: string;
-  date: string;
-};
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  const options: Intl.DateTimeFormatOptions = { 
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric',
-    timeZone: 'UTC'
-  };
-  return date.toLocaleDateString('en-US', options);
-}
-
-function formatOdds(odds: number): string {
-  return odds > 0 ? `+${odds}` : `${odds}`;
-}
-
-function getBookmakerDisplayName(key: string): string {
-  const names: { [key: string]: string } = {
-    'bovada': 'Bovada',
-    'fanduel': 'FanDuel',
-    'draftkings': 'DraftKings',
-    'betmgm': 'BetMGM',
-    'betonlineag': 'BetOnline',
-    'betus': 'BetUS',
-    'betrivers': 'BetRivers'
-  };
-  return names[key] || key;
-}
 
 export default function UFCPage() {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
-  const [events, setEvents] = useState<{ upcoming: Event[]; past: Event[] }>({ 
-    upcoming: [], 
-    past: [] 
+  const [events, setEvents] = useState<{ upcoming: Event[]; past: Event[] }>({
+    upcoming: [],
+    past: []
   });
   const [eventFights, setEventFights] = useState<{ [key: string]: Fight[] }>({});
   const [fightOdds, setFightOdds] = useState<{ [key: string]: BookmakerOdds[] }>({});
   const [expandedOdds, setExpandedOdds] = useState<{ [key: string]: boolean }>({});
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [pastPage, setPastPage] = useState(1);
+  const [pendingPastPage, setPendingPastPage] = useState(1);
+  const [pastLoading, setPastLoading] = useState(false);
+  const [pastPagination, setPastPagination] = useState<{ total: number; total_pages: number; limit: number } | null>(null);
+  const eventsPerPage = 10;
 
+  // Fetch upcoming events once on mount
   useEffect(() => {
-    const fetchEvents = async () => {
+    const loadUpcomingEvents = async () => {
       try {
-        const upcomingRes = await fetch('/api/ufc/events/upcoming');
-        const pastRes = await fetch('/api/ufc/events/past');
-        
-        const upcomingData = await upcomingRes.json();
-        const pastData = await pastRes.json();
-        
-        setEvents({
-          upcoming: upcomingData,
-          past: pastData
-        });
-        setLoading(false);
+        const upcomingData = await fetchUpcomingEvents();
+        setEvents(prev => ({ ...prev, upcoming: upcomingData }));
       } catch (error) {
-        console.error('Error fetching events:', error);
-        setLoading(false);
+        console.error('Error fetching upcoming events:', error);
       }
     };
 
-    fetchEvents();
+    loadUpcomingEvents();
   }, []);
+
+  // Fetch past events when pending page changes
+  useEffect(() => {
+    const loadPastEvents = async () => {
+      setPastLoading(true);
+      try {
+        const pastData = await fetchPastEvents(pendingPastPage, eventsPerPage);
+        setEvents(prev => ({ ...prev, past: pastData.events }));
+        setPastPagination(pastData.pagination);
+        // Only update the displayed page number AFTER data loads
+        setPastPage(pendingPastPage);
+      } catch (error) {
+        console.error('Error fetching past events:', error);
+      } finally {
+        setPastLoading(false);
+        setInitialLoading(false);
+      }
+    };
+
+    loadPastEvents();
+  }, [pendingPastPage]);
 
   const handleEventClick = async (eventId: string) => {
     if (expandedEvent === eventId) {
@@ -127,9 +77,8 @@ export default function UFCPage() {
 
     if (!eventFights[eventId]) {
       try {
-        const response = await fetch(`/api/ufc/events/${eventId}/fights`);
-        const fights = await response.json();
-        
+        const fights = await fetchEventFights(eventId);
+
         const sortedFights = fights.sort((a: Fight, b: Fight) => {
           if (a.fight_type === 'title' && b.fight_type !== 'title') return -1;
           if (a.fight_type !== 'title' && b.fight_type === 'title') return 1;
@@ -137,22 +86,11 @@ export default function UFCPage() {
           if (a.fight_type !== 'main' && b.fight_type === 'main') return 1;
           return 0;
         });
-        
+
         setEventFights(prev => ({ ...prev, [eventId]: sortedFights }));
 
         // Fetch odds for all fights
-        const oddsPromises = sortedFights.map((fight: Fight) =>
-          fetch(`/api/ufc/fights/${fight.fight_id}/odds`)
-            .then(res => res.json())
-            .then(odds => ({ fightId: fight.fight_id, odds }))
-            .catch(() => ({ fightId: fight.fight_id, odds: [] }))
-        );
-
-        const allOdds = await Promise.all(oddsPromises);
-        const oddsMap: { [key: string]: BookmakerOdds[] } = {};
-        allOdds.forEach(({ fightId, odds }) => {
-          oddsMap[fightId] = odds;
-        });
+        const oddsMap = await fetchMultipleFightOdds(sortedFights);
         setFightOdds(prev => ({ ...prev, ...oddsMap }));
 
       } catch (error) {
@@ -203,7 +141,7 @@ export default function UFCPage() {
   const currentEvents = events[activeTab as keyof typeof events];
   const isPastTab = activeTab === 'past';
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-white text-xl">Loading events...</div>
@@ -277,7 +215,8 @@ export default function UFCPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'models' ? (
+        {/* Models Tab - Keep mounted but hidden for caching */}
+        <div className={activeTab === 'models' ? '' : 'hidden'}>
           <Suspense fallback={
             <div className="text-center text-white py-12">
               Loading Models...
@@ -285,7 +224,10 @@ export default function UFCPage() {
           }>
             <Models />
           </Suspense>
-        ) : activeTab === 'bets' ? (
+        </div>
+
+        {/* Bets Tab - Keep mounted but hidden for caching */}
+        <div className={activeTab === 'bets' ? '' : 'hidden'}>
           <Suspense fallback={
             <div className="text-center text-white py-12">
               Loading Bets...
@@ -293,12 +235,17 @@ export default function UFCPage() {
           }>
             <Bets />
           </Suspense>
-        ) : currentEvents.length === 0 ? (
-          <div className="text-center text-slate-400 py-12">
-            No {activeTab} events found
-          </div>
-        ) : (
-          <div className="space-y-4">
+        </div>
+
+        {/* Upcoming/Past Events Tabs */}
+        {activeTab !== 'models' && activeTab !== 'bets' && (
+          <>
+            {currentEvents.length === 0 ? (
+              <div className="text-center text-slate-400 py-12">
+                No {activeTab} events found
+              </div>
+            ) : (
+              <div className="space-y-4">
             {currentEvents.map((event) => (
               <div
                 key={event.event_id}
@@ -656,6 +603,37 @@ export default function UFCPage() {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Pagination controls for past events */}
+        {activeTab === 'past' && pastPagination && pastPagination.total_pages > 1 && (
+          <div className="flex items-center justify-center gap-2 sm:gap-4 mt-8">
+            <button
+              onClick={() => setPendingPastPage(p => Math.max(1, p - 1))}
+              disabled={pastPage === 1 || pastLoading}
+              className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Previous
+            </button>
+            <span className="text-xs sm:text-base text-slate-300 flex items-center gap-2">
+              Page {pastPage} of {pastPagination.total_pages}
+              {pastLoading && (
+                <svg className="w-4 h-4 animate-spin text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              )}
+            </span>
+            <button
+              onClick={() => setPendingPastPage(p => Math.min(pastPagination.total_pages, p + 1))}
+              disabled={pastPage === pastPagination.total_pages || pastLoading}
+              className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
+            )}
+          </>
         )}
       </div>
     </div>

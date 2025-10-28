@@ -7,13 +7,13 @@ if __name__ == "__main__":
     start_time = time.time()
     conn = create_connection()
     print('Beginning UFC Cron processes')
-    
+
     ### CRON SCRAPE PROCESSES ###
     get_new_upcoming_events(conn=conn)
     update_scrapes_for_upcoming_events(conn=conn)
     update_last2_events_outcomes(conn=conn)
     #############################
-    
+
     ### ML MODEL PROCESSES ###
     update_predictions_winners(conn=conn)
     update_prediction_simplified(conn=conn)
@@ -23,10 +23,10 @@ if __name__ == "__main__":
     update_bookmakers()
     make_bets_upcoming_events(conn=conn)
     ##########################
-    
+
     end_time = time.time()
     elapsed_time = end_time - start_time
-    
+
     minutes = int(elapsed_time // 60)
     seconds = elapsed_time % 60
 

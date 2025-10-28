@@ -31,10 +31,31 @@ def get_model_accuracies():
     """
     return execute_query(query)
 
-def get_all_bets():
-    """Get all user bets"""
-    query = """
-        SELECT 
+def get_all_bets(offset=0, limit=10):
+    """Get all user bets paginated by event (not individual bets)"""
+    # First, get distinct events with their earliest fight_date for ordering
+    events_query = """
+        SELECT DISTINCT event_name, fight_date
+        FROM ufc.bets
+        ORDER BY fight_date DESC
+        LIMIT %s OFFSET %s
+    """
+    events = execute_query(events_query, (limit, offset))
+
+    if not events:
+        return []
+
+    # Build list of event identifiers
+    event_list = [(event['event_name'], event['fight_date']) for event in events]
+
+    # Now fetch all bets for these events
+    placeholders = ','.join(['(%s, %s)'] * len(event_list))
+    params = []
+    for event_name, fight_date in event_list:
+        params.extend([event_name, fight_date])
+
+    bets_query = f"""
+        SELECT
             bet_date,
             bet_outcome,
             bet_type,
@@ -54,42 +75,46 @@ def get_all_bets():
             potential_profit,
             potential_loss
         FROM ufc.bets
+        WHERE (event_name, fight_date) IN ({placeholders})
         ORDER BY fight_date DESC, bet_date DESC
     """
-    return execute_query(query)
+    return execute_query(bets_query, tuple(params))
 
-def get_pending_bets():
-    """Get pending bets"""
+def get_all_bets_total_count():
+    """Get total count of distinct events for pagination"""
     query = """
-        SELECT 
-            bet_date,
-            bet_outcome,
-            bet_type,
-            event_name,
-            fight_date,
-            fighter1_name,
-            fighter2_name,
-            fighter1_odds,
-            fighter2_odds,
-            fighter1_ev,
-            fighter2_ev,
-            fighter1_pred,
-            fighter2_pred,
-            fighter_bet_on,
-            sportsbook,
-            stake,
-            potential_profit,
-            potential_loss
+        SELECT COUNT(DISTINCT event_name, fight_date) as total
+        FROM ufc.bets
+    """
+    result = execute_query(query, fetch_one=True)
+    return result['total'] if result else 0
+
+def get_pending_bets(offset=0, limit=10):
+    """Get pending bets paginated by event (not individual bets)"""
+    # First, get distinct events with pending bets
+    events_query = """
+        SELECT DISTINCT event_name, fight_date
         FROM ufc.bets
         WHERE bet_outcome = 'pending'
         ORDER BY fight_date ASC
+        LIMIT %s OFFSET %s
     """
-    return execute_query(query)
+    events = execute_query(events_query, (limit, offset))
 
-def get_settled_bets():
-    """Get settled bets (won/lost)"""
-    query = """
-        SELECT 
+    if not events:
+        return []
+
+    # Build list of event identifiers
+    event_list = [(event['event_name'], event['fight_date']) for event in events]
+
+    # Now fetch all pending bets for these events
+    placeholders = ','.join(['(%s, %s)'] * len(event_list))
+    params = []
+    for event_name, fight_date in event_list:
+        params.extend([event_name, fight_date])
+
+    bets_query = f"""
+        SELECT
             bet_date,
             bet_outcome,
             bet_type,
@@ -109,10 +134,80 @@ def get_settled_bets():
             potential_profit,
             potential_loss
         FROM ufc.bets
+        WHERE bet_outcome = 'pending' AND (event_name, fight_date) IN ({placeholders})
+        ORDER BY fight_date ASC, bet_date DESC
+    """
+    return execute_query(bets_query, tuple(params))
+
+def get_pending_bets_total_count():
+    """Get total count of distinct events with pending bets for pagination"""
+    query = """
+        SELECT COUNT(DISTINCT event_name, fight_date) as total
+        FROM ufc.bets
+        WHERE bet_outcome = 'pending'
+    """
+    result = execute_query(query, fetch_one=True)
+    return result['total'] if result else 0
+
+def get_settled_bets(offset=0, limit=10):
+    """Get settled bets (won/lost) paginated by event (not individual bets)"""
+    # First, get distinct events with settled bets
+    events_query = """
+        SELECT DISTINCT event_name, fight_date
+        FROM ufc.bets
         WHERE bet_outcome IN ('won', 'lost', 'push')
         ORDER BY fight_date DESC
+        LIMIT %s OFFSET %s
     """
-    return execute_query(query)
+    events = execute_query(events_query, (limit, offset))
+
+    if not events:
+        return []
+
+    # Build list of event identifiers
+    event_list = [(event['event_name'], event['fight_date']) for event in events]
+
+    # Now fetch all settled bets for these events
+    placeholders = ','.join(['(%s, %s)'] * len(event_list))
+    params = []
+    for event_name, fight_date in event_list:
+        params.extend([event_name, fight_date])
+
+    bets_query = f"""
+        SELECT
+            bet_date,
+            bet_outcome,
+            bet_type,
+            event_name,
+            fight_date,
+            fighter1_name,
+            fighter2_name,
+            fighter1_odds,
+            fighter2_odds,
+            fighter1_ev,
+            fighter2_ev,
+            fighter1_pred,
+            fighter2_pred,
+            fighter_bet_on,
+            sportsbook,
+            stake,
+            potential_profit,
+            potential_loss
+        FROM ufc.bets
+        WHERE bet_outcome IN ('won', 'lost', 'push') AND (event_name, fight_date) IN ({placeholders})
+        ORDER BY fight_date DESC, bet_date DESC
+    """
+    return execute_query(bets_query, tuple(params))
+
+def get_settled_bets_total_count():
+    """Get total count of distinct events with settled bets for pagination"""
+    query = """
+        SELECT COUNT(DISTINCT event_name, fight_date) as total
+        FROM ufc.bets
+        WHERE bet_outcome IN ('won', 'lost', 'push')
+    """
+    result = execute_query(query, fetch_one=True)
+    return result['total'] if result else 0
 
 def get_betting_stats():
     """Get overall betting statistics"""
@@ -156,10 +251,10 @@ def get_upcoming_events():
     """
     return execute_query(query)
 
-def get_past_events():
-    """Get past UFC events (only events after 2025-10-03)"""
+def get_past_events(offset=0, limit=10):
+    """Get past UFC events with pagination (only events after 2025-10-03)"""
     query = """
-        SELECT 
+        SELECT
             event_id,
             event_url,
             title,
@@ -170,8 +265,20 @@ def get_past_events():
         WHERE date < CURDATE()
           AND date > '2025-10-03'
         ORDER BY date DESC
+        LIMIT %s OFFSET %s
     """
-    return execute_query(query)
+    return execute_query(query, (limit, offset))
+
+def get_past_events_total_count():
+    """Get total count of past UFC events for pagination"""
+    query = """
+        SELECT COUNT(*) as total
+        FROM ufc.events
+        WHERE date < CURDATE()
+          AND date > '2025-10-03'
+    """
+    result = execute_query(query, fetch_one=True)
+    return result['total'] if result else 0
 
 def get_event_by_id(event_id):
     """Get a specific event by ID"""

@@ -3,6 +3,7 @@ from models.ufc_models import (
     get_all_events,
     get_upcoming_events,
     get_past_events,
+    get_past_events_total_count,
     get_event_by_id,
     get_fights_by_event,
     get_fight_odds,
@@ -12,8 +13,11 @@ from models.ufc_models import (
     get_fighter_stats,
     get_model_accuracies,
     get_all_bets,
+    get_all_bets_total_count,
     get_pending_bets,
+    get_pending_bets_total_count,
     get_settled_bets,
+    get_settled_bets_total_count,
     get_betting_stats
 )
 
@@ -38,27 +42,102 @@ def get_upcoming():
 
 @ufc_bp.route('/bets', methods=['GET'])
 def get_bets():
-    """Get all user bets"""
-    bets = get_all_bets()
+    """Get all user bets with server-side pagination (paginated by events, not bets)"""
+    page = request.args.get('page', default=1, type=int)
+    limit = request.args.get('limit', default=10, type=int)
+
+    # Validate pagination parameters
+    if page < 1:
+        page = 1
+    if limit < 1 or limit > 100:  # Cap at 100 to prevent abuse
+        limit = 10
+
+    # Calculate offset from page number
+    offset = (page - 1) * limit
+
+    # Fetch paginated bets from database (grouped by event)
+    bets = get_all_bets(offset=offset, limit=limit)
     if bets is None:
         return jsonify({'error': 'Database error'}), 500
-    return jsonify(bets)
+
+    # Get total count of distinct events for pagination metadata
+    total = get_all_bets_total_count()
+
+    return jsonify({
+        'bets': bets,
+        'pagination': {
+            'page': page,
+            'limit': limit,
+            'total': total,
+            'total_pages': (total + limit - 1) // limit  # Ceiling division
+        }
+    })
 
 @ufc_bp.route('/bets/pending', methods=['GET'])
 def get_pending():
-    """Get pending bets"""
-    bets = get_pending_bets()
+    """Get pending bets with server-side pagination (paginated by events, not bets)"""
+    page = request.args.get('page', default=1, type=int)
+    limit = request.args.get('limit', default=10, type=int)
+
+    # Validate pagination parameters
+    if page < 1:
+        page = 1
+    if limit < 1 or limit > 100:  # Cap at 100 to prevent abuse
+        limit = 10
+
+    # Calculate offset from page number
+    offset = (page - 1) * limit
+
+    # Fetch paginated bets from database (grouped by event)
+    bets = get_pending_bets(offset=offset, limit=limit)
     if bets is None:
         return jsonify({'error': 'Database error'}), 500
-    return jsonify(bets)
+
+    # Get total count of distinct events for pagination metadata
+    total = get_pending_bets_total_count()
+
+    return jsonify({
+        'bets': bets,
+        'pagination': {
+            'page': page,
+            'limit': limit,
+            'total': total,
+            'total_pages': (total + limit - 1) // limit  # Ceiling division
+        }
+    })
 
 @ufc_bp.route('/bets/settled', methods=['GET'])
 def get_settled():
-    """Get settled bets"""
-    bets = get_settled_bets()
+    """Get settled bets with server-side pagination (paginated by events, not bets)"""
+    page = request.args.get('page', default=1, type=int)
+    limit = request.args.get('limit', default=10, type=int)
+
+    # Validate pagination parameters
+    if page < 1:
+        page = 1
+    if limit < 1 or limit > 100:  # Cap at 100 to prevent abuse
+        limit = 10
+
+    # Calculate offset from page number
+    offset = (page - 1) * limit
+
+    # Fetch paginated bets from database (grouped by event)
+    bets = get_settled_bets(offset=offset, limit=limit)
     if bets is None:
         return jsonify({'error': 'Database error'}), 500
-    return jsonify(bets)
+
+    # Get total count of distinct events for pagination metadata
+    total = get_settled_bets_total_count()
+
+    return jsonify({
+        'bets': bets,
+        'pagination': {
+            'page': page,
+            'limit': limit,
+            'total': total,
+            'total_pages': (total + limit - 1) // limit  # Ceiling division
+        }
+    })
 
 @ufc_bp.route('/bets/stats', methods=['GET'])
 def get_bet_stats():
@@ -78,11 +157,36 @@ def get_accuracies():
 
 @ufc_bp.route('/events/past', methods=['GET'])
 def get_past():
-    """Get past UFC events"""
-    events = get_past_events()
+    """Get past UFC events with server-side pagination"""
+    page = request.args.get('page', default=1, type=int)
+    limit = request.args.get('limit', default=10, type=int)
+
+    # Validate pagination parameters
+    if page < 1:
+        page = 1
+    if limit < 1 or limit > 100:  # Cap at 100 to prevent abuse
+        limit = 10
+
+    # Calculate offset from page number
+    offset = (page - 1) * limit
+
+    # Fetch paginated events from database
+    events = get_past_events(offset=offset, limit=limit)
     if events is None:
         return jsonify({'error': 'Database error'}), 500
-    return jsonify(events)
+
+    # Get total count for pagination metadata
+    total = get_past_events_total_count()
+
+    return jsonify({
+        'events': events,
+        'pagination': {
+            'page': page,
+            'limit': limit,
+            'total': total,
+            'total_pages': (total + limit - 1) // limit  # Ceiling division
+        }
+    })
 
 @ufc_bp.route('/events/<event_id>', methods=['GET'])
 def get_event(event_id):

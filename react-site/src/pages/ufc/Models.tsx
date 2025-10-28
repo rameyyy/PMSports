@@ -1,13 +1,6 @@
 import { useState, useEffect } from 'react';
-
-interface ModelAccuracy {
-  model_name: string;
-  total_predictions: number;
-  correct_predictions: number;
-  accuracy: number;
-  avg_confidence: number;
-  avg_sample_size: number;
-}
+import type { ModelAccuracy } from './types';
+import { fetchModelAccuracies } from './api';
 
 export default function ModelsPage() {
   const [expandedModel, setExpandedModel] = useState<string | null>(null);
@@ -15,13 +8,10 @@ export default function ModelsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchModelAccuracies = async () => {
+    const loadModelAccuracies = async () => {
       try {
-        const res = await fetch('/api/ufc/model-accuracies');
-        const data = await res.json();
-        // Filter out AlgoPicks model
-        const filteredData = data.filter((model: ModelAccuracy) => model.model_name !== 'AlgoPicks');
-        setModels(filteredData);
+        const data = await fetchModelAccuracies();
+        setModels(data);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching model accuracies:', error);
@@ -29,7 +19,7 @@ export default function ModelsPage() {
       }
     };
 
-    fetchModelAccuracies();
+    loadModelAccuracies();
   }, []);
 
   if (loading) {

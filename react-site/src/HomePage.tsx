@@ -32,7 +32,10 @@ export default function HomePage() {
               </span>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="text-slate-300 hover:text-white transition-colors">
+              <button
+                onClick={() => navigate('/about')}
+                className="text-slate-300 hover:text-white transition-colors"
+              >
                 About
               </button>
             </div>

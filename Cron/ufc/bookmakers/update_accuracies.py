@@ -47,7 +47,7 @@ def calculate_model_accuracies():
             WHERE legacy = 0 AND {model_name}_correct IS NOT NULL;
             """
             stats = fetch_query(conn, stats_query, None)[0]
-            
+
             # Get all probabilities and convert to predicted winner's confidence (>0.5)
             probs_query = f"""
             SELECT {model_name}_f1_prob
@@ -55,11 +55,11 @@ def calculate_model_accuracies():
             WHERE legacy = 0 AND {model_name}_correct IS NOT NULL AND {model_name}_f1_prob IS NOT NULL;
             """
             probs_result = fetch_query(conn, probs_query, None)
-            
+
             # Convert all probs to be > 0.5 (predicted winner's confidence)
             probs = []
             for row in probs_result:
-                prob = float(row[f'{model_name}_f1_prob'])
+                prob = float(row[f'{model_name}_f1_prob'])  # Dictionary access with column name
                 # If prob < 0.5, it's predicting fighter 2, so convert to fighter 2's confidence
                 if prob < 0.5:
                     prob = 1.0 - prob
@@ -68,31 +68,31 @@ def calculate_model_accuracies():
             # Get unique probability values for batched accuracy calculation
             # Round to 2 decimals and get unique values
             unique_probs = list(set([round(p, 2) for p in probs]))
-            
+
             if unique_probs:
                 # Use batched function to get accuracy at each confidence level
                 accuracy_by_prob = get_model_accuracies_batched(model_name, unique_probs, window=0.01)
-                
+
                 # Calculate weighted average confidence
                 # Weight by how many predictions fall in each band
                 total_weighted_accuracy = 0
                 total_weight = 0
-                
+
                 for prob, data in accuracy_by_prob.items():
                     correct = data['correct']
                     prob_range = data['prob_range']
-                    
+
                     if prob_range > 0:
                         # Accuracy at this confidence level
                         band_accuracy = (correct / prob_range) * 100
                         # Weight by number of predictions in this band
                         total_weighted_accuracy += band_accuracy * prob_range
                         total_weight += prob_range
-                
+
                 avg_confidence = total_weighted_accuracy / total_weight if total_weight > 0 else 0.0
             else:
                 avg_confidence = 0.0
-            
+
             models_data.append({
                 **stats,
                 'avg_confidence': avg_confidence
@@ -111,7 +111,6 @@ def calculate_model_accuracies():
         algopicks_stats = fetch_query(conn, algopicks_query, None)[0]
 
         # For AlgoPicks, average the algopick_probability where correct IS NOT NULL
-        # Convert to percentage by multiplying by 100
         algopicks_conf_query = """
         SELECT AVG(algopick_probability) AS avg_conf
         FROM ufc.prediction_simplified

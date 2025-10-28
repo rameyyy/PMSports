@@ -1,37 +1,14 @@
 import { useState, useEffect } from 'react';
-
-interface Bet {
-  bet_date: string;
-  bet_outcome: 'pending' | 'won' | 'lost' | 'push' | 'void';
-  bet_type: string;
-  event_name: string;
-  fight_date: string;
-  fighter1_name: string;
-  fighter2_name: string;
-  fighter1_odds: string;
-  fighter2_odds: string;
-  fighter1_ev: number | null;
-  fighter2_ev: number | null;
-  fighter1_pred: number | null;
-  fighter2_pred: number | null;
-  fighter_bet_on: string;
-  sportsbook: string;
-  stake: number | null;
-  potential_profit: number | null;
-  potential_loss: number | null;
-}
-
-interface BettingStats {
-  total_bets: number;
-  total_staked: number | null;
-  total_profit: number | null;
-  total_loss: number | null;
-  bets_won: number;
-  bets_lost: number;
-  bets_pending: number;
-  win_rate: number | null;
-  roi: number | null;
-}
+import type { Bet, BettingStats } from './types';
+import {
+  formatDateShort,
+  formatDateLong,
+  getBookmakerDisplayName,
+  calculateROI,
+  formatNetProfit
+} from './utils';
+import { fetchBetsAndStats } from './api';
+import type { PaginationInfo } from './api';
 
 interface EventGroup {
   event_name: string;
@@ -45,52 +22,6 @@ interface EventGroup {
   bets_lost: number;
   bets_void: number;
   has_settled_bets: boolean;
-}
-
-function calculateROI(net_profit: number, total_staked: number): number {
-  if (total_staked === null || total_staked === 0 || net_profit === null) {
-    return 0;
-  }
-  return (net_profit / total_staked) * 100;
-}
-
-function getBookmakerDisplayName(key: string): string {
-  const names: { [key: string]: string } = {
-    'bovada': 'Bovada',
-    'fanduel': 'FanDuel',
-    'draftkings': 'DraftKings',
-    'betmgm': 'BetMGM',
-    'betonlineag': 'BetOnline',
-    'betus': 'BetUS',
-    'betrivers': 'BetRivers'
-  };
-  return names[key] || key;
-}
-
-function formatDate(dateString: string): string {
-  const match = dateString.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
-  if (!match) return dateString;
-  
-  const [, day, monthStr, year] = match;
-  const months: { [key: string]: string } = {
-    'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
-    'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
-    'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
-  };
-  
-  const month = months[monthStr];
-  return `${month}-${day.padStart(2, '0')}-${year}`;
-}
-
-function formatDateLong(dateString: string): string {
-  const date = new Date(dateString);
-  const options: Intl.DateTimeFormatOptions = { 
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric',
-    timeZone: 'UTC'
-  };
-  return date.toLocaleDateString('en-US', options);
 }
 
 function groupBetsByEvent(bets: Bet[]): EventGroup[] {
@@ -138,47 +69,67 @@ function groupBetsByEvent(bets: Bet[]): EventGroup[] {
   );
 }
 
-function formatNetProfit(amount: number): string {
-  if (amount >= 0) {
-    return `+$${amount.toFixed(2)}`;
-  } else {
-    return `-$${Math.abs(amount).toFixed(2)}`;
-  }
-}
-
 export default function Bets() {
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
   const [expandedBet, setExpandedBet] = useState<string | null>(null);
   const [bets, setBets] = useState<Bet[]>([]);
   const [stats, setStats] = useState<BettingStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [statsLoaded, setStatsLoaded] = useState(false);
+  const [betsLoaded, setBetsLoaded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const eventsPerPage = 8;
+  const [pendingPage, setPendingPage] = useState(1);
+  const [betsLoading, setBetsLoading] = useState(false);
+  const eventsPerPage = 10;
 
+  // Fetch betting stats once on mount
   useEffect(() => {
-    const fetchBetsAndStats = async () => {
+    const loadStats = async () => {
       try {
-        const [betsRes, statsRes] = await Promise.all([
-          fetch('/api/ufc/bets'),
-          fetch('/api/ufc/bets/stats')
-        ]);
-        
-        const betsData = await betsRes.json();
-        const statsData = await statsRes.json();
-        
-        setBets(betsData);
+        const res = await fetch('/api/ufc/bets/stats');
+        if (!res.ok) throw new Error('Failed to fetch betting stats');
+        const statsData = await res.json();
         setStats(statsData);
-        setLoading(false);
       } catch (error) {
-        console.error('Error fetching bets:', error);
-        setLoading(false);
+        console.error('Error fetching betting stats:', error);
+      } finally {
+        setStatsLoaded(true);
       }
     };
 
-    fetchBetsAndStats();
+    loadStats();
   }, []);
 
-  if (loading) {
+  // Fetch paginated bets when pending page changes
+  useEffect(() => {
+    const loadBets = async () => {
+      setBetsLoading(true);
+      try {
+        const { bets: betsData, pagination: paginationData } = await fetchBetsAndStats(pendingPage, eventsPerPage);
+        setBets(betsData);
+        setPagination(paginationData);
+        // Only update the displayed page number AFTER data loads
+        setCurrentPage(pendingPage);
+      } catch (error) {
+        console.error('Error fetching bets:', error);
+      } finally {
+        setBetsLoading(false);
+        setBetsLoaded(true);
+      }
+    };
+
+    loadBets();
+  }, [pendingPage]);
+
+  // Set initial loading to false once both stats and bets are loaded
+  useEffect(() => {
+    if (statsLoaded && betsLoaded) {
+      setInitialLoading(false);
+    }
+  }, [statsLoaded, betsLoaded]);
+
+  if (initialLoading) {
     return (
       <div className="w-full p-8 flex items-center justify-center">
         <p className="text-white text-lg">Loading bets...</p>
@@ -187,12 +138,9 @@ export default function Bets() {
   }
 
   const eventGroups = groupBetsByEvent(bets);
-  
-  // Pagination
-  const totalPages = Math.ceil(eventGroups.length / eventsPerPage);
-  const startIndex = (currentPage - 1) * eventsPerPage;
-  const endIndex = startIndex + eventsPerPage;
-  const currentEvents = eventGroups.slice(startIndex, endIndex);
+
+  // Use backend pagination data (pagination is already by events)
+  const totalPages = pagination?.total_pages || 1;
 
   const toggleEvent = (eventKey: string) => {
     setExpandedEvent(expandedEvent === eventKey ? null : eventKey);
@@ -241,7 +189,7 @@ export default function Bets() {
 
       {/* Events List */}
       <div className="space-y-6">
-        {currentEvents.map((eventGroup) => {
+        {eventGroups.map((eventGroup) => {
           const eventKey = `${eventGroup.event_name}-${eventGroup.fight_date}`;
           const isEventExpanded = expandedEvent === eventKey;
           
@@ -402,7 +350,7 @@ export default function Bets() {
                               </div>
                               <div>
                                 <p className="text-slate-400 text-xs mb-1">Bet Date</p>
-                                <p className="text-white text-sm sm:text-lg font-semibold">{formatDate(bet.bet_date)}</p>
+                                <p className="text-white text-sm sm:text-lg font-semibold">{formatDateShort(bet.bet_date)}</p>
                               </div>
                               <div>
                                 <p className="text-slate-400 text-xs mb-1">Amount Staked</p>
@@ -452,18 +400,24 @@ export default function Bets() {
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 sm:gap-4 mt-8">
           <button
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
+            onClick={() => setPendingPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1 || betsLoading}
             className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Previous
           </button>
-          <span className="text-xs sm:text-base text-slate-300">
+          <span className="text-xs sm:text-base text-slate-300 flex items-center gap-2">
             Page {currentPage} of {totalPages}
+            {betsLoading && (
+              <svg className="w-4 h-4 animate-spin text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            )}
           </span>
           <button
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
+            onClick={() => setPendingPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages || betsLoading}
             className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Next
