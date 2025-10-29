@@ -76,7 +76,7 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
     }
     options.add_experimental_option("prefs", prefs)
 
-    driver = uc.Chrome(options=options, version_main=None)
+    driver = uc.Chrome(options=options, version_main=141)
 
     try:
         # Visit main page first
@@ -162,48 +162,6 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
             col_order = ['date', 'rank', 'team', 'conf', 'g', 'barthag', 'wins', 'losses'] + stat_cols
             df = df[[col for col in col_order if col in df.columns]]
 
-            # Check if data is the same as previous day
-            try:
-                conn = sqlconn.create_connection()
-                if conn:
-                    # Get the most recent date in the database
-                    query = "SELECT MAX(date) as max_date FROM leaderboard"
-                    result = sqlconn.fetch(conn, query)
-
-                    if result and result[0]['max_date']:
-                        prev_date = result[0]['max_date']
-
-                        # Fetch previous day's data
-                        prev_query = "SELECT * FROM leaderboard WHERE date = %s ORDER BY team"
-                        prev_data = sqlconn.fetch(conn, prev_query, (prev_date,))
-
-                        if prev_data:
-                            # Convert to DataFrame for comparison
-                            prev_df = pd.DataFrame(prev_data)
-
-                            # Sort both dataframes by team for comparison
-                            current_compare = df.drop(columns=['date']).sort_values('team').reset_index(drop=True)
-                            prev_compare = prev_df.drop(columns=['date']).sort_values('team').reset_index(drop=True)
-
-                            # Check if dataframes are equal (excluding date)
-                            if current_compare.equals(prev_compare):
-                                print(f"⏭️  Skipping push - data unchanged from {prev_date}")
-                                conn.close()
-
-                                # Clean up CSV files
-                                csv_files = [f for f in os.listdir(download_dir) if f.endswith('.csv')]
-                                for csv_file in csv_files:
-                                    csv_path = os.path.join(download_dir, csv_file)
-                                    try:
-                                        os.remove(csv_path)
-                                    except Exception as e:
-                                        print(f"⚠️  Warning: Could not remove {csv_file}: {e}")
-
-                                return df
-
-                    conn.close()
-            except Exception as e:
-                print(f"⚠️  Warning: Could not check for duplicates: {e}")
 
             # Push to database
             success = sqlconn.execute_query(df=df, table_name='leaderboard', if_exists='append')
