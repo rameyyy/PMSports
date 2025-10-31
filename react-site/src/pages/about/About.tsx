@@ -56,54 +56,44 @@ export default function About() {
       </nav>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-        {/* About Me Section */}
+        {/* About Section */}
         <div className="mb-16 sm:mb-20">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8 sm:gap-12">
-            {/* Profile Section */}
-            <div className="flex flex-col items-center sm:items-start flex-shrink-0 w-full sm:w-auto">
-              <img
-                src="/about/me.jpg"
-                alt="Clay Ramey"
-                className="w-28 h-28 sm:w-32 sm:h-32 rounded-full mb-6 shadow-lg flex-shrink-0 object-cover"
-              />
-              <div className="text-center sm:text-left">
-                <h1 className="text-3xl sm:text-4xl font-bold text-white">Clay Ramey</h1>
-                <p className="text-slate-300 mt-1 text-sm sm:text-base">Software Engineering Student</p>
-                <p className="text-slate-300 mt-1 text-sm sm:text-base">Auburn University</p>
-                <a
-                  href="https://www.linkedin.com/in/clay-ramey/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-6 inline-flex items-center px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm sm:text-base"
-                >
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
-                  </svg>
-                  LinkedIn
-                </a>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-6">About</h2>
+          <p className="text-slate-300 text-base sm:text-lg mb-6 leading-relaxed">
+            AlgoPicks uses machine learning models trained on historical sports data to predict game outcomes. Multiple models work together to generate probability-based predictions that help identify valuable betting opportunities.
+          </p>
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-white font-semibold mb-3 text-base sm:text-lg">What Sports Are Covered?</h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <img src="/logo/ufc-logo.png" alt="UFC" className="h-6 sm:h-8 object-contain flex-shrink-0" />
+                  <p className="text-slate-300 text-sm sm:text-base">Mixed Martial Arts predictions</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <img src="/logo/ncaa-logo.png" alt="NCAA" className="h-6 sm:h-8 object-contain flex-shrink-0" />
+                  <p className="text-slate-300 text-sm sm:text-base">Men's Basketball predictions</p>
+                </div>
+                <p className="text-slate-400 text-sm mt-3">More sports coming soon...</p>
               </div>
             </div>
 
-            {/* Bio Section */}
-            <div className="flex-1 w-full">
-              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-6">About</h2>
-              <p className="text-slate-300 text-base sm:text-lg mb-6 leading-relaxed">
-                AlgoPicks uses machine learning models trained on historical sports data to predict game outcomes. Multiple models work together to generate probability-based predictions that help identify valuable betting opportunities.
-              </p>
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-white font-semibold mb-3 text-base sm:text-lg">What Sports Are Covered?</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <img src="/logo/ufc-logo.png" alt="UFC" className="h-6 sm:h-8 object-contain flex-shrink-0" />
-                      <p className="text-slate-300 text-sm sm:text-base">Mixed Martial Arts predictions</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <img src="/logo/ncaa-logo.png" alt="NCAA" className="h-6 sm:h-8 object-contain flex-shrink-0" />
-                      <p className="text-slate-300 text-sm sm:text-base">Men's Basketball predictions</p>
-                    </div>
-                    <p className="text-slate-400 text-sm mt-3">More sports coming soon...</p>
+            <div>
+              <h3 className="text-white font-semibold mb-3 text-base sm:text-lg">Model Analytics</h3>
+              <div className="space-y-4">
+                <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-700">
+                  <div className="flex items-center gap-3 mb-2">
+                    <img src="/logo/ufc-logo.png" alt="UFC" className="h-5 sm:h-6 object-contain flex-shrink-0" />
+                    <h4 className="text-white font-semibold text-sm sm:text-base">UFC Model</h4>
                   </div>
+                  <p className="text-slate-300 text-sm">Trained on <span className="font-semibold text-orange-400">2,193 fights</span> with a test accuracy of <span className="font-semibold text-orange-400">74.7%</span></p>
+                </div>
+                <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-700">
+                  <div className="flex items-center gap-3 mb-2">
+                    <img src="/logo/ncaa-logo.png" alt="NCAA" className="h-5 sm:h-6 object-contain flex-shrink-0" />
+                    <h4 className="text-white font-semibold text-sm sm:text-base">NCAAB Model</h4>
+                  </div>
+                  <p className="text-slate-300 text-sm">Advanced model using historic betting data and trained on <span className="font-semibold text-orange-400">45,000+ games</span>. Currently under development.</p>
                 </div>
               </div>
             </div>

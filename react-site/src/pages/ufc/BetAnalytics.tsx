@@ -15,7 +15,7 @@ const formatStrategyName = (strategy: string): string => {
 
 export default function BetAnalyticsPage() {
   const [riskMetrics, setRiskMetrics] = useState<RiskMetrics[]>([]);
-  const [selectedStrategy, setSelectedStrategy] = useState<string>('Kelly_4pct');
+  const [selectedStrategy, setSelectedStrategy] = useState<string>('Kelly_5pct');
   const [betAnalytics, setBetAnalytics] = useState<BetAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -23,14 +23,12 @@ export default function BetAnalyticsPage() {
   // Available strategies based on your kelly.py
   const strategies = [
     'Flat_50',
-    'Kelly_4pct',
     'Kelly_5pct',
     'Kelly_6pct',
     'Kelly_7pct',
     'Kelly_8pct',
     'Kelly_9pct',
-    'Kelly_10pct',
-    'Kelly_11pct'
+    'Kelly_10pct'
   ];
 
   // Load risk metrics on mount
@@ -143,7 +141,7 @@ export default function BetAnalyticsPage() {
       {/* Page Header */}
       <div className="text-center">
         <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Betting Analytics Dashboard</h1>
-        <p className="text-sm md:text-base text-slate-400">Kelly Criterion vs Flat Betting Performance Analysis</p>
+        <p className="text-sm md:text-base text-slate-400">Kelly Criterion and Flat Betting Performance Analysis</p>
       </div>
 
       {/* Risk Metrics Table */}
@@ -160,13 +158,13 @@ export default function BetAnalyticsPage() {
                 <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold whitespace-nowrap">Win Rate</th>
                 <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold whitespace-nowrap">Profit</th>
                 <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold">ROI</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold hidden md:table-cell">Max DD</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold hidden lg:table-cell">Sharpe</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold hidden lg:table-cell">Avg Kelly</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold">Max DD</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold">Sharpe</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold">Avg Kelly</th>
               </tr>
             </thead>
             <tbody>
-              {riskMetrics.map((metric) => (
+              {riskMetrics.filter(metric => metric.strategy_name !== 'Kelly_4pct' && metric.strategy_name !== 'Kelly_11pct').map((metric) => (
                 <tr
                   key={metric.strategy_name}
                   className={`border-t border-slate-700 hover:bg-slate-700/30 cursor-pointer transition-colors ${
@@ -193,15 +191,15 @@ export default function BetAnalyticsPage() {
                       {formatPercent(metric.roi)}
                     </span>
                   </td>
-                  <td className="px-2 md:px-4 py-2 md:py-3 text-right text-red-400 hidden md:table-cell">
+                  <td className="px-2 md:px-4 py-2 md:py-3 text-right text-red-400">
                     ${metric.max_drawdown.toFixed(0)}
                   </td>
-                  <td className="px-2 md:px-4 py-2 md:py-3 text-right hidden lg:table-cell">
+                  <td className="px-2 md:px-4 py-2 md:py-3 text-right">
                     <span className={metric.sharpe_ratio >= 0 ? 'text-green-400' : 'text-red-400'}>
                       {metric.sharpe_ratio.toFixed(2)}
                     </span>
                   </td>
-                  <td className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 hidden lg:table-cell">
+                  <td className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300">
                     {formatPercent(metric.avg_kelly_fraction)}
                   </td>
                 </tr>
