@@ -499,7 +499,7 @@ def get_predictions_by_confidence(min_confidence=60.0, limit=20):
 def get_fighter_stats(fighter_id):
     """Get fighter statistics"""
     query = """
-        SELECT 
+        SELECT
             fighter_id,
             name,
             nickname,
@@ -524,3 +524,56 @@ def get_fighter_stats(fighter_id):
         WHERE fighter_id = %s
     """
     return execute_query(query, (fighter_id,), fetch_one=True)
+
+def get_risk_metrics():
+    """Get all risk metrics from the risk_metrics table"""
+    query = """
+        SELECT
+            id,
+            strategy_name,
+            calculation_date,
+            total_bets,
+            win_rate,
+            total_profit,
+            roi,
+            max_drawdown,
+            current_drawdown,
+            sharpe_ratio,
+            volatility,
+            avg_kelly_fraction,
+            kelly_utilization,
+            created_at
+        FROM ufc.risk_metrics
+        ORDER BY strategy_name
+    """
+    return execute_query(query)
+
+def get_bet_analytics_by_strategy(strategy_name):
+    """Get bet analytics for a specific strategy from bet_analytics table"""
+    query = """
+        SELECT
+            id,
+            fight_id,
+            bet_sequence,
+            strategy_name,
+            bet_size,
+            win_probability,
+            decimal_odds,
+            kelly_fraction,
+            expected_value,
+            bankroll_before,
+            bankroll_after,
+            cumulative_profit,
+            bet_outcome,
+            actual_profit,
+            running_roi,
+            max_drawdown,
+            current_win_streak,
+            current_loss_streak,
+            bet_date,
+            created_at
+        FROM ufc.bet_analytics
+        WHERE strategy_name = %s
+        ORDER BY bet_sequence ASC
+    """
+    return execute_query(query, (strategy_name,))

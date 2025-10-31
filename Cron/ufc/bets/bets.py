@@ -88,14 +88,16 @@ def update_bet_outcomes(connection, event_id: str):
         'void': void_count
     }
 
-def insert_bets_for_event(event_id: str, stake: float = 50.0):
+def insert_bets_for_event(event_id: str, starting_bankroll: float = 1000.0, kelly_multiplier: float = 0.05, max_bet_pct: float = 0.10):
     """
-    Insert bets for all fights in an event based on AlgoPicks predictions.
+    Insert bets for all fights in an event based on AlgoPicks predictions using Kelly 5% sizing.
     Only overwrites if potential_profit is better than existing bet.
     
     Args:
         event_id: The event_id to process
-        stake: Amount to bet on each fight (default 50)
+        starting_bankroll: Starting bankroll amount (default 1000)
+        kelly_multiplier: Kelly fraction multiplier (default 0.05 for 5% Kelly)
+        max_bet_pct: Maximum bet as percentage of bankroll (default 0.10 for 10% cap)
     """
     conn = create_connection()
     cursor = conn.cursor(dictionary=True)
@@ -115,6 +117,19 @@ def insert_bets_for_event(event_id: str, stake: float = 50.0):
         
         event_name = event_info['event_name']
         event_date = event_info['event_date']
+        
+        # Get current bankroll from latest bet_analytics record (if available)
+        cursor.execute("""
+            SELECT bankroll_after
+            FROM ufc.bet_analytics
+            ORDER BY bet_sequence DESC
+            LIMIT 1
+        """)
+        
+        current_bankroll_result = cursor.fetchone()
+        current_bankroll = float(current_bankroll_result['bankroll_after']) if current_bankroll_result else starting_bankroll
+        
+        print(f"Using current bankroll: ${current_bankroll:.2f}")
         
         # Get all fights for this event from prediction_simplified
         cursor.execute("""
@@ -164,6 +179,9 @@ def insert_bets_for_event(event_id: str, stake: float = 50.0):
                 fighter1_pred = 100 - algopick_prob
                 fighter2_pred = algopick_prob
             
+            # Win probability for Kelly calculation
+            win_prob = algopick_prob / 100.0
+            
             # Get odds for BOTH fighters from bookmaker_odds
             cursor.execute("""
                 SELECT 
@@ -186,9 +204,9 @@ def insert_bets_for_event(event_id: str, stake: float = 50.0):
                 print(f"No bookmaker odds found for fight_id {fight_id}, skipping...")
                 continue
             
-            # Find best odds for my pick across all bookmakers
+            # Find best Kelly bet across all bookmakers
             best_bet = None
-            best_odds = -999999
+            best_kelly_bet_size = 0
             
             for book in bookmaker_data:
                 # We need to map fighter IDs correctly
@@ -222,30 +240,54 @@ def insert_bets_for_event(event_id: str, stake: float = 50.0):
                 
                 # Only consider if EV > 5
                 if my_fighter_ev is not None and my_fighter_ev > 5:
-                    if my_fighter_odds > best_odds:
-                        best_odds = my_fighter_odds
+                    # Convert American odds to decimal odds
+                    if my_fighter_odds > 0:
+                        decimal_odds = (my_fighter_odds / 100.0) + 1
+                    else:
+                        decimal_odds = (100.0 / abs(my_fighter_odds)) + 1
+                    
+                    # Calculate Kelly fraction: f = (bp - q) / b
+                    # where b = decimal_odds - 1, p = win_prob, q = 1 - win_prob
+                    b = decimal_odds - 1
+                    p = win_prob
+                    q = 1 - win_prob
+                    
+                    kelly_fraction = max(0, (b * p - q) / b) if b > 0 else 0
+                    
+                    # Apply Kelly multiplier and cap
+                    adjusted_kelly = kelly_fraction * kelly_multiplier
+                    bet_fraction = min(adjusted_kelly, max_bet_pct)
+                    kelly_bet_size = current_bankroll * bet_fraction
+                    
+                    # Only consider if Kelly suggests betting at least $1
+                    if kelly_bet_size >= 1 and kelly_bet_size > best_kelly_bet_size:
+                        best_kelly_bet_size = kelly_bet_size
                         best_bet = {
                             'bookmaker': book['bookmaker'],
                             'fighter1_odds': book_fighter1_odds,
                             'fighter1_ev': book_fighter1_ev,
                             'fighter2_odds': book_fighter2_odds,
                             'fighter2_ev': book_fighter2_ev,
-                            'my_fighter_odds': my_fighter_odds
+                            'my_fighter_odds': my_fighter_odds,
+                            'kelly_bet_size': kelly_bet_size,
+                            'kelly_fraction': kelly_fraction
                         }
             
-            # Insert bet if we found one with EV > 5
+            # Insert bet if we found one with positive Kelly sizing
             if best_bet:
+                stake = best_bet['kelly_bet_size']
+                
                 # Calculate potential profit
                 if best_bet['my_fighter_odds'] > 0:
                     potential_profit = stake * (best_bet['my_fighter_odds'] / 100)
                 else:
                     potential_profit = stake * (100 / abs(best_bet['my_fighter_odds']))
                 
-                potential_loss = stake  # Just 50, not negative
+                potential_loss = stake
                 
                 # Check if bet already exists for this fight_id
                 cursor.execute("""
-                    SELECT potential_profit
+                    SELECT potential_profit, stake
                     FROM ufc.bets
                     WHERE fight_id = %s
                 """, (fight_id,))
@@ -311,16 +353,16 @@ def insert_bets_for_event(event_id: str, stake: float = 50.0):
                     ))
                     
                     if existing_bet:
-                        print(f"⟳ Updated bet for {fighter1_name} vs {fighter2_name}: {my_pick_name} at {best_bet['my_fighter_odds']} ({best_bet['bookmaker']}) - Better profit: ${existing_bet['potential_profit']:.2f} → ${potential_profit:.2f}")
+                        print(f"⟳ Updated bet for {fighter1_name} vs {fighter2_name}: {my_pick_name} at {best_bet['my_fighter_odds']} ({best_bet['bookmaker']}) - Kelly: ${stake:.2f} (was ${existing_bet['stake']:.2f})")
                     else:
-                        print(f"✓ Inserted bet for {fighter1_name} vs {fighter2_name}: {my_pick_name} at {best_bet['my_fighter_odds']} ({best_bet['bookmaker']}) - EV: {best_bet['fighter1_ev'] if algopick_pred == 0 else best_bet['fighter2_ev']}%")
+                        print(f"✓ Inserted Kelly bet for {fighter1_name} vs {fighter2_name}: {my_pick_name} at {best_bet['my_fighter_odds']} ({best_bet['bookmaker']}) - Bet: ${stake:.2f} (Kelly: {best_bet['kelly_fraction']:.3f})")
                 else:
                     print(f"⊘ Skipped {fighter1_name} vs {fighter2_name}: Existing bet has better profit (${existing_bet['potential_profit']:.2f} vs ${potential_profit:.2f})")
             else:
-                print(f"✗ No qualifying bets (EV > 5) found for fight {fight_id}")
+                print(f"✗ No qualifying Kelly bets found for fight {fight_id} (need EV > 5% and Kelly > $1)")
         
         conn.commit()
-        print(f"\n✓ Successfully processed event {event_id}")
+        print(f"\n✓ Successfully processed event {event_id} with Kelly 5% sizing")
         
     except Exception as e:
         conn.rollback()

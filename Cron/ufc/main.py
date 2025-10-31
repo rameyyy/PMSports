@@ -22,6 +22,7 @@ if __name__ == "__main__":
     make_predictions(conn=conn)
     update_bookmakers()
     make_bets_upcoming_events(conn=conn)
+    update_bet_analytics(conn=conn)
     ##########################
 
     end_time = time.time()

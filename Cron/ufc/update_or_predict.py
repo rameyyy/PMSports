@@ -4,6 +4,7 @@ import bets.bets as bets
 import bookmakers.update_accuracies as accuracy_update
 import bookmakers.bookmaker_push as bookie_handle
 import bookmakers.sportsbook_api as bookie_get
+import bets.kelly as kellypred
 from scrapes import *
 
 def update_predictions_winners(conn):
@@ -48,3 +49,11 @@ def make_bets_upcoming_events(conn):
         return
     for event in event_ids_arr:
         bets.insert_bets_for_event(event_id=event)
+
+def update_bet_analytics(conn):
+    last_two_event_urls = get_last_two_past_events(conn)
+    event_ids_arr = [event_url.rstrip("/").split("/")[-1] for event_url in last_two_event_urls]
+    if not event_ids_arr:
+        return
+    for event in event_ids_arr:
+        kellypred.run(event_id=event, clear_existing=False)

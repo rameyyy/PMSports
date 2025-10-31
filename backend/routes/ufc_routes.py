@@ -18,7 +18,9 @@ from models.ufc_models import (
     get_pending_bets_total_count,
     get_settled_bets,
     get_settled_bets_total_count,
-    get_betting_stats
+    get_betting_stats,
+    get_risk_metrics,
+    get_bet_analytics_by_strategy
 )
 
 # CREATE THE BLUEPRINT FIRST
@@ -245,7 +247,7 @@ def get_odds(fight_id):
     odds = get_fight_odds(fight_id)
     if odds is None:
         return jsonify({'error': 'Database error'}), 500
-    
+
     # Transform the data to include EV and format properly
     formatted_odds = []
     for odd in odds:
@@ -264,5 +266,23 @@ def get_odds(fight_id):
             'algopick_prediction': odd['algopick_prediction'],
             'algopick_probability': round(float(odd['algopick_probability']), 2) if odd.get('algopick_probability') is not None else None
         })
-    
+
     return jsonify(formatted_odds)
+
+@ufc_bp.route('/risk-metrics', methods=['GET'])
+def get_risk_metrics_route():
+    """Get all risk metrics from Kelly analytics"""
+    risk_metrics = get_risk_metrics()
+    if risk_metrics is None:
+        return jsonify({'error': 'Database error'}), 500
+    return jsonify(risk_metrics)
+
+@ufc_bp.route('/bet-analytics/<strategy_name>', methods=['GET'])
+def get_bet_analytics_route(strategy_name):
+    """Get bet analytics for a specific strategy (e.g., Kelly_4pct, Flat_50, Kelly_5pct)"""
+    bet_analytics = get_bet_analytics_by_strategy(strategy_name)
+    if bet_analytics is None:
+        return jsonify({'error': 'Database error'}), 500
+    if len(bet_analytics) == 0:
+        return jsonify({'error': f'No data found for strategy: {strategy_name}'}), 404
+    return jsonify(bet_analytics)

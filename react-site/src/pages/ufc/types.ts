@@ -87,3 +87,43 @@ export interface ModelAccuracy {
   avg_confidence: number;
   avg_sample_size: number;
 }
+
+export interface RiskMetrics {
+  id: number;
+  strategy_name: string;
+  calculation_date: string;
+  total_bets: number;
+  win_rate: number;
+  total_profit: number;
+  roi: number;
+  max_drawdown: number;
+  current_drawdown: number;
+  sharpe_ratio: number;
+  volatility: number;
+  avg_kelly_fraction: number;
+  kelly_utilization: number;
+  created_at: string;
+}
+
+export interface BetAnalytics {
+  id: number;
+  fight_id: string;
+  bet_sequence: number;
+  strategy_name: string;
+  bet_size: number;
+  win_probability: number;
+  decimal_odds: number;
+  kelly_fraction: number;
+  expected_value: number;
+  bankroll_before: number;
+  bankroll_after: number;
+  cumulative_profit: number;
+  bet_outcome: 'won' | 'lost' | 'pending' | 'void';
+  actual_profit: number;
+  running_roi: number;
+  max_drawdown: number;
+  current_win_streak: number;
+  current_loss_streak: number;
+  bet_date: string;
+  created_at: string;
+}

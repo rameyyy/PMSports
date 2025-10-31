@@ -14,6 +14,7 @@ import {
 
 const Models = lazy(() => import('./Models'));
 const Bets = lazy(() => import('./Bets'));
+const BetAnalytics = lazy(() => import('./BetAnalytics'));
 
 export default function UFCPage() {
   const [activeTab, setActiveTab] = useState('upcoming');
@@ -211,6 +212,16 @@ export default function UFCPage() {
           >
             Bets
           </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`py-4 px-2 sm:px-3 text-sm sm:text-base font-semibold transition-colors border-b-2 whitespace-nowrap ${
+              activeTab === 'analytics'
+                ? 'text-orange-500 border-orange-500 bg-slate-700/20'
+                : 'text-slate-400 border-transparent hover:text-slate-300'
+            }`}
+          >
+            Bet Analytics
+          </button>
         </div>
       </div>
 
@@ -237,8 +248,19 @@ export default function UFCPage() {
           </Suspense>
         </div>
 
+        {/* Bet Analytics Tab - Keep mounted but hidden for caching */}
+        <div className={activeTab === 'analytics' ? '' : 'hidden'}>
+          <Suspense fallback={
+            <div className="text-center text-white py-12">
+              Loading Bet Analytics...
+            </div>
+          }>
+            <BetAnalytics />
+          </Suspense>
+        </div>
+
         {/* Upcoming/Past Events Tabs */}
-        {activeTab !== 'models' && activeTab !== 'bets' && (
+        {activeTab !== 'models' && activeTab !== 'bets' && activeTab !== 'analytics' && (
           <>
             {currentEvents.length === 0 ? (
               <div className="text-center text-slate-400 py-12">

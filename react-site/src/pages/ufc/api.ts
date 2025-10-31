@@ -1,4 +1,4 @@
-import type { Fight, BookmakerOdds, Event, Bet, BettingStats, ModelAccuracy } from './types';
+import type { Fight, BookmakerOdds, Event, Bet, BettingStats, ModelAccuracy, RiskMetrics, BetAnalytics } from './types';
 
 // ===== EVENT APIs =====
 export async function fetchUpcomingEvents(): Promise<Event[]> {
@@ -105,4 +105,17 @@ export async function fetchModelAccuracies(): Promise<ModelAccuracy[]> {
   const data = await res.json();
   // Filter out AlgoPicks model
   return data.filter((model: ModelAccuracy) => model.model_name !== 'AlgoPicks');
+}
+
+// ===== BET ANALYTICS APIs =====
+export async function fetchRiskMetrics(): Promise<RiskMetrics[]> {
+  const res = await fetch('/api/ufc/risk-metrics');
+  if (!res.ok) throw new Error('Failed to fetch risk metrics');
+  return res.json();
+}
+
+export async function fetchBetAnalytics(strategyName: string): Promise<BetAnalytics[]> {
+  const res = await fetch(`/api/ufc/bet-analytics/${strategyName}`);
+  if (!res.ok) throw new Error(`Failed to fetch bet analytics for ${strategyName}`);
+  return res.json();
 }
