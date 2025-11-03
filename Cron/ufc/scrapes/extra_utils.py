@@ -45,8 +45,8 @@ def get_last_two_past_events(conn) -> list[str]:
     Get the event URLs for the last 2 events that have already occurred.
     """
     query = """
-        SELECT event_url 
-        FROM ufc.events 
+        SELECT event_url
+        FROM ufc.events
         WHERE date < CURDATE()
         ORDER BY date DESC
         LIMIT 2

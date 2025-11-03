@@ -53,6 +53,7 @@ def make_bets_upcoming_events(conn):
 def update_bet_analytics(conn):
     last_two_event_urls = get_last_two_past_events(conn)
     event_ids_arr = [event_url.rstrip("/").split("/")[-1] for event_url in last_two_event_urls]
+    print(event_ids_arr)
     if not event_ids_arr:
         return
     for event in event_ids_arr:

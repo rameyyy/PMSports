@@ -3,34 +3,6 @@ import { useNavigate } from 'react-router-dom';
 export default function About() {
   const navigate = useNavigate();
 
-  const models = [
-    {
-      name: 'Logistic Regression',
-      description: 'A linear classifier that estimates outcome probabilities using a sigmoid function. Simple, interpretable, and fast.',
-      icon: '📉'
-    },
-    {
-      name: 'XGBoost',
-      description: 'Gradient boosting with optimized regularization. Builds an ensemble of decision trees sequentially, with each correcting errors from previous ones.',
-      icon: '🌲'
-    },
-    {
-      name: 'Gradient Boosting',
-      description: 'Iterative ensemble method that combines weak learners to create a strong predictor. Effective at capturing non-linear relationships.',
-      icon: '📈'
-    },
-    {
-      name: 'Ensemble Average',
-      description: 'Combines predictions from all models by taking the arithmetic mean. Reduces variance and individual model bias.',
-      icon: '🔗'
-    },
-    {
-      name: 'Weighted Ensemble',
-      description: 'Blends model predictions using learned weights based on historical performance. Better performing models have greater influence on final predictions.',
-      icon: '⚖️'
-    }
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Navbar */}
@@ -95,94 +67,6 @@ export default function About() {
                   </div>
                   <p className="text-slate-300 text-sm">Advanced model using historic betting data and trained on <span className="font-semibold text-orange-400">45,000+ games</span>. Currently under development.</p>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Models Section */}
-        <div className="mb-16 sm:mb-20">
-          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3">Machine Learning Models</h2>
-          <p className="text-slate-400 text-base sm:text-lg mb-12">
-            Different models, each with unique strengths, work together for better predictions:
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {models.map((model, idx) => (
-              <div
-                key={idx}
-                className="p-6 sm:p-7 rounded-lg border border-slate-700 hover:border-orange-500 transition-colors bg-slate-800/30"
-              >
-                <div className="flex items-start gap-4">
-                  <span className="text-3xl sm:text-4xl flex-shrink-0">{model.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">
-                      {model.name}
-                    </h3>
-                    <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-                      {model.description}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* How It Works */}
-        <div className="mb-12 sm:mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-12">How It Works</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="flex gap-6">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-orange-500 text-white font-bold text-lg">
-                  1
-                </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Gather Data</h3>
-                <p className="text-slate-300 text-sm sm:text-base">
-                  Collect historical game data, fighter stats, team performance, and other relevant information.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-6">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-orange-500 text-white font-bold text-lg">
-                  2
-                </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Train Models</h3>
-                <p className="text-slate-300 text-sm sm:text-base">
-                  Use machine learning algorithms to learn patterns from the data. The models learn what factors predict wins and losses.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-6">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-orange-500 text-white font-bold text-lg">
-                  3
-                </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Make Predictions</h3>
-                <p className="text-slate-300 text-sm sm:text-base">
-                  When a new game is coming up, feed current data into the models. They output probability predictions for each outcome.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-6">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-orange-500 text-white font-bold text-lg">
-                  4
-                </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Analyze & Evaluate</h3>
-                <p className="text-slate-300 text-sm sm:text-base">
-                  Track how accurate predictions are over time. Use this to improve the models and features.
-                </p>
               </div>
             </div>
           </div>

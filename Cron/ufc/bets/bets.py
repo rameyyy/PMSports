@@ -118,14 +118,15 @@ def insert_bets_for_event(event_id: str, starting_bankroll: float = 1000.0, kell
         event_name = event_info['event_name']
         event_date = event_info['event_date']
         
-        # Get current bankroll from latest bet_analytics record (if available)
+        # Get current bankroll from latest Kelly_5pct bet (if available)
         cursor.execute("""
             SELECT bankroll_after
             FROM ufc.bet_analytics
+            WHERE strategy_name = 'Kelly_5pct'
             ORDER BY bet_sequence DESC
             LIMIT 1
         """)
-        
+
         current_bankroll_result = cursor.fetchone()
         current_bankroll = float(current_bankroll_result['bankroll_after']) if current_bankroll_result else starting_bankroll
         

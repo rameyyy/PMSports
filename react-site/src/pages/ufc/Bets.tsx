@@ -4,7 +4,6 @@ import {
   formatDateShort,
   formatDateLong,
   getBookmakerDisplayName,
-  calculateROI,
   formatNetProfit
 } from './utils';
 import { fetchBetsAndStats } from './api';
@@ -151,7 +150,7 @@ export default function Bets() {
   };
 
   const netProfit = Number(stats?.total_profit ?? 0) - Number(stats?.total_loss ?? 0);
-  const totalStaked = (Number(stats?.bets_won ?? 0) + Number(stats?.bets_lost ?? 0)) * 50;
+  const totalStaked = Number(stats?.total_staked ?? 0);
 
   return (
     <div className="w-full p-4 sm:p-8">     
@@ -181,8 +180,8 @@ export default function Bets() {
         </div>
         <div className="bg-slate-800/50 rounded-lg p-3 sm:p-4 border border-slate-700">
           <p className="text-slate-400 text-xs sm:text-sm mb-1">ROI</p>
-          <p className={`text-lg sm:text-2xl font-bold ${calculateROI(netProfit, totalStaked) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {calculateROI(netProfit, totalStaked) >= 0 ? '+' : ''}{calculateROI(netProfit, totalStaked).toFixed(1)}%
+          <p className={`text-lg sm:text-2xl font-bold ${Number(stats?.roi ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {Number(stats?.roi ?? 0) >= 0 ? '+' : ''}{Number(stats?.roi ?? 0).toFixed(1)}%
           </p>
         </div>
       </div>

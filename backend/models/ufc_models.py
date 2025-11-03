@@ -212,22 +212,21 @@ def get_settled_bets_total_count():
 def get_betting_stats():
     """Get overall betting statistics"""
     query = """
-        SELECT 
-            COUNT(*) as total_bets,
-            SUM(stake) as total_staked,
+        SELECT
+            COUNT(CASE WHEN bet_outcome IN ('won', 'lost') THEN 1 END) as total_bets,
+            SUM(CASE WHEN bet_outcome IN ('won', 'lost') THEN stake ELSE 0 END) as total_staked,
             SUM(CASE WHEN bet_outcome = 'won' THEN potential_profit ELSE 0 END) as total_profit,
             SUM(CASE WHEN bet_outcome = 'lost' THEN potential_loss ELSE 0 END) as total_loss,
             COUNT(CASE WHEN bet_outcome = 'won' THEN 1 END) as bets_won,
             COUNT(CASE WHEN bet_outcome = 'lost' THEN 1 END) as bets_lost,
-            COUNT(CASE WHEN bet_outcome = 'pending' THEN 1 END) as bets_pending,
             ROUND(
-                (COUNT(CASE WHEN bet_outcome = 'won' THEN 1 END) * 100.0 / 
-                NULLIF(COUNT(CASE WHEN bet_outcome IN ('won', 'lost') THEN 1 END), 0)), 
+                (COUNT(CASE WHEN bet_outcome = 'won' THEN 1 END) * 100.0 /
+                NULLIF(COUNT(CASE WHEN bet_outcome IN ('won', 'lost') THEN 1 END), 0)),
                 2
             ) as win_rate,
             ROUND(
-                ((SUM(CASE WHEN bet_outcome = 'won' THEN potential_profit ELSE 0 END) - 
-                  SUM(CASE WHEN bet_outcome = 'lost' THEN potential_loss ELSE 0 END)) * 100.0 / 
+                ((SUM(CASE WHEN bet_outcome = 'won' THEN potential_profit ELSE 0 END) -
+                  SUM(CASE WHEN bet_outcome = 'lost' THEN potential_loss ELSE 0 END)) * 100.0 /
                 NULLIF(SUM(CASE WHEN bet_outcome IN ('won', 'lost') THEN stake END), 0)),
                 2
             ) as roi
@@ -566,7 +565,7 @@ def get_bet_analytics_by_strategy(strategy_name):
             cumulative_profit,
             bet_outcome,
             actual_profit,
-            running_roi,
+            running_roi * 100 as running_roi,
             max_drawdown,
             current_win_streak,
             current_loss_streak,

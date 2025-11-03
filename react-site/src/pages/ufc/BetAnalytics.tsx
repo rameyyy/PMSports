@@ -19,6 +19,19 @@ export default function BetAnalyticsPage() {
   const [betAnalytics, setBetAnalytics] = useState<BetAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [selectedTooltip, setSelectedTooltip] = useState<string | null>(null);
+
+  const tooltips: { [key: string]: string } = {
+    strategy: 'Strategy name & Kelly %',
+    bets: 'Total bets placed',
+    winrate: '% of bets won',
+    profit: 'Net profit/loss',
+    roi: 'Return on investment %',
+    maxdd: 'Maximum Drawdown - The largest peak-to-trough decline experienced. How much your bankroll dropped at worst.',
+    volatility: 'Volatility - Measures how much your returns swing up and down. Higher = more unpredictable, Lower = more stable.',
+    sharpe: 'Sharpe Ratio - Risk-adjusted returns. Measures how much profit you make per unit of risk. Higher = better risk-adjusted performance.',
+    kelly: 'Average Kelly Fraction - The average percentage of your bankroll bet per play. Shows how aggressively the strategy sizes bets.'
+  };
 
   // Available strategies based on your kelly.py
   const strategies = [
@@ -101,7 +114,10 @@ export default function BetAnalyticsPage() {
   };
 
   // Format percentage
-  const formatPercent = (value: number) => {
+  const formatPercent = (value: number, isAlreadyPercent: boolean = false) => {
+    if (isAlreadyPercent) {
+      return `${value.toFixed(2)}%`;
+    }
     return `${(value * 100).toFixed(2)}%`;
   };
 
@@ -110,13 +126,13 @@ export default function BetAnalyticsPage() {
     bet: index + 1,
     bankroll: bet.bankroll_after,
     profit: bet.cumulative_profit,
-    roi: bet.running_roi * 100
+    roi: bet.running_roi
   }));
 
   // Prepare ROI chart data
   const roiChartData = betAnalytics.map((bet, index) => ({
     bet: index + 1,
-    roi: bet.running_roi * 100
+    roi: bet.running_roi
   }));
 
   // Prepare drawdown chart data
@@ -154,13 +170,14 @@ export default function BetAnalyticsPage() {
             <thead className="bg-slate-900/50">
               <tr>
                 <th className="px-2 md:px-4 py-2 md:py-3 text-left text-slate-300 font-semibold sticky left-0 bg-slate-900/50">Strategy</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold whitespace-nowrap">Bets</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold whitespace-nowrap">Win Rate</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold whitespace-nowrap">Profit</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold">ROI</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold">Max DD</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold">Sharpe</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold">Avg Kelly</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold whitespace-nowrap cursor-pointer" onClick={() => setSelectedTooltip(selectedTooltip === 'bets' ? null : 'bets')}>Bets</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold whitespace-nowrap cursor-pointer" onClick={() => setSelectedTooltip(selectedTooltip === 'winrate' ? null : 'winrate')}>Win Rate</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold whitespace-nowrap cursor-pointer" onClick={() => setSelectedTooltip(selectedTooltip === 'profit' ? null : 'profit')}>Profit</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold cursor-pointer" onClick={() => setSelectedTooltip(selectedTooltip === 'roi' ? null : 'roi')}>ROI</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold cursor-pointer" onClick={() => setSelectedTooltip(selectedTooltip === 'maxdd' ? null : 'maxdd')}>Max DD</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold cursor-pointer" onClick={() => setSelectedTooltip(selectedTooltip === 'volatility' ? null : 'volatility')}>Volatility</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold cursor-pointer" onClick={() => setSelectedTooltip(selectedTooltip === 'sharpe' ? null : 'sharpe')}>Sharpe</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300 font-semibold cursor-pointer" onClick={() => setSelectedTooltip(selectedTooltip === 'kelly' ? null : 'kelly')}>Avg Kelly</th>
               </tr>
             </thead>
             <tbody>
@@ -178,7 +195,7 @@ export default function BetAnalyticsPage() {
                   <td className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300">{metric.total_bets}</td>
                   <td className="px-2 md:px-4 py-2 md:py-3 text-right">
                     <span className={metric.win_rate >= 0.5 ? 'text-green-400' : 'text-red-400'}>
-                      {formatPercent(metric.win_rate)}
+                      {formatPercent(metric.win_rate, false)}
                     </span>
                   </td>
                   <td className="px-2 md:px-4 py-2 md:py-3 text-right">
@@ -188,11 +205,14 @@ export default function BetAnalyticsPage() {
                   </td>
                   <td className="px-2 md:px-4 py-2 md:py-3 text-right">
                     <span className={metric.roi >= 0 ? 'text-green-400' : 'text-red-400'}>
-                      {formatPercent(metric.roi)}
+                      {metric.roi.toFixed(2)}%
                     </span>
                   </td>
                   <td className="px-2 md:px-4 py-2 md:py-3 text-right text-red-400">
                     ${metric.max_drawdown.toFixed(0)}
+                  </td>
+                  <td className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300">
+                    {metric.volatility.toFixed(4)}
                   </td>
                   <td className="px-2 md:px-4 py-2 md:py-3 text-right">
                     <span className={metric.sharpe_ratio >= 0 ? 'text-green-400' : 'text-red-400'}>
@@ -200,13 +220,19 @@ export default function BetAnalyticsPage() {
                     </span>
                   </td>
                   <td className="px-2 md:px-4 py-2 md:py-3 text-right text-slate-300">
-                    {formatPercent(metric.avg_kelly_fraction)}
+                    {formatPercent(metric.avg_kelly_fraction, false)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        {selectedTooltip && (
+          <div className="mt-4 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg flex items-start gap-3">
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-orange-400 text-orange-400 text-xs font-bold flex-shrink-0 mt-0.5">i</span>
+            <p className="text-orange-400 font-semibold text-sm">{tooltips[selectedTooltip]}</p>
+          </div>
+        )}
       </div>
 
       {/* Strategy Selector */}
@@ -257,7 +283,7 @@ export default function BetAnalyticsPage() {
               <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-3 md:p-4">
                 <div className="text-slate-400 text-xs md:text-sm mb-1">ROI</div>
                 <div className={`text-lg md:text-2xl font-bold ${currentMetrics.roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {formatPercent(currentMetrics.roi)}
+                  {currentMetrics.roi.toFixed(2)}%
                 </div>
               </div>
               <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-3 md:p-4">

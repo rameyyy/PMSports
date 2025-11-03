@@ -94,54 +94,59 @@ class KellyAnalyticsBuilder:
     def get_base_bet_data(self, event_id=None):
         """Fetch and prepare base betting data"""
         query = """
-        SELECT 
+        SELECT
             fight_id,
             event_id,
             fighter1_name,
             fighter2_name,
-            fighter1_odds,
-            fighter2_odds,
+            CAST(fighter1_odds AS FLOAT) as fighter1_odds,
+            CAST(fighter2_odds AS FLOAT) as fighter2_odds,
             fighter1_pred,
             fighter2_pred,
-            fighter_bet_on,
+            CAST(fighter_bet_on AS UNSIGNED) as fighter_bet_on,
             bet_outcome,
             potential_profit,
             stake,
             bet_date
-        FROM bets 
+        FROM bets
         WHERE bet_outcome NOT IN ('pending', 'void')
         """
-        
+
         if event_id:
             query += f" AND event_id = '{event_id}'"
-            
+
         query += " ORDER BY bet_date, fight_id"
-        
+
         return fetch_query(self.conn, query)
     
     def calculate_kelly_metrics(self, row):
         """Calculate Kelly fraction and related metrics for a single bet"""
-        
+
         # Determine which fighter we bet on and get win probability
         if row['fighter_bet_on'] == 0:
             win_prob = float(row['fighter1_pred']) / 100.0
             american_odds = float(row['fighter1_odds'])
+            fighter_name = row['fighter1_name']
         else:
             win_prob = float(row['fighter2_pred']) / 100.0
             american_odds = float(row['fighter2_odds'])
-        
+            fighter_name = row['fighter2_name']
+
         # Convert American odds to decimal odds
         if american_odds > 0:
             decimal_odds = (american_odds / 100.0) + 1
         else:
             decimal_odds = (100.0 / abs(american_odds)) + 1
-        
+
         # Calculate Kelly fraction: f = (bp - q) / b
         # where b = decimal_odds - 1, p = win_prob, q = 1 - win_prob
         b = decimal_odds - 1
         p = win_prob
         q = 1 - win_prob
-        
+
+        # Debug log (uncomment if needed)
+        # print(f"        DEBUG: {fighter_name} | American Odds: {american_odds} | Decimal: {decimal_odds:.3f} | Win Prob: {p:.4f} | b={b:.3f} | bp-q={(b*p-q):.4f}")
+
         kelly_fraction = max(0, (b * p - q) / b) if b > 0 else 0
         
         # Expected value = (win_prob * payout) - (loss_prob * bet_amount)
@@ -156,7 +161,7 @@ class KellyAnalyticsBuilder:
     
     def simulate_strategy(self, df, strategy_name, kelly_multiplier, max_bet_pct=0.10, starting_bankroll=1000):
         """Simulate a betting strategy with sequential bankroll tracking"""
-        
+
         results = []
         current_bankroll = starting_bankroll
         bet_sequence = 0
@@ -165,22 +170,40 @@ class KellyAnalyticsBuilder:
         max_drawdown = 0
         win_streak = 0
         loss_streak = 0
-        
+
+        print(f"\n  Simulating {strategy_name} (Kelly: {kelly_multiplier*100:.0f}%, Max Bet: {max_bet_pct*100:.0f}%)")
+        print(f"  Starting bankroll: ${starting_bankroll:.2f}\n")
+
         for idx, row in df.iterrows():
             bet_sequence += 1
-            
+
             # Calculate Kelly metrics
             kelly_metrics = self.calculate_kelly_metrics(row)
-            
+
             # Determine bet size
             full_kelly = kelly_metrics['kelly_fraction']
             adjusted_kelly = full_kelly * kelly_multiplier
             bet_fraction = min(adjusted_kelly, max_bet_pct)
             bet_size = current_bankroll * bet_fraction
-            
+
+            # Determine which fighter was bet on
+            if row['fighter_bet_on'] == 0:
+                bet_fighter = row['fighter1_name']
+            else:
+                bet_fighter = row['fighter2_name']
+
+            # Log bet processing
+            print(f"    Bet #{bet_sequence}: {row['fighter1_name']} vs {row['fighter2_name']} (Fight: {row['fight_id']})")
+            print(f"      Betting on: {bet_fighter}")
+            print(f"      Win Prob: {kelly_metrics['win_probability']:.4f} | Decimal Odds: {kelly_metrics['decimal_odds']:.3f}")
+            print(f"      Kelly Fraction: {full_kelly:.4f} | Adjusted: {adjusted_kelly:.4f} | Bet Size: ${bet_size:.2f}")
+
             # Skip if bet size too small or no edge
             if bet_size < 1:
+                print(f"      ❌ SKIPPED: Bet size ${bet_size:.2f} < $1 minimum")
                 continue
+
+            print(f"      ✓ INCLUDED")
             
             bankroll_before = current_bankroll
             
@@ -214,7 +237,6 @@ class KellyAnalyticsBuilder:
             # Store result
             result = {
                 'fight_id': row['fight_id'],
-                'event_id': row['event_id'],
                 'bet_sequence': bet_sequence,
                 'strategy_name': strategy_name,
                 'bet_size': round(bet_size, 2),
@@ -240,7 +262,7 @@ class KellyAnalyticsBuilder:
     
     def simulate_flat_betting(self, df, bet_amount=50, starting_bankroll=1000):
         """Simulate flat betting strategy"""
-        
+
         results = []
         current_bankroll = starting_bankroll
         bet_sequence = 0
@@ -249,10 +271,17 @@ class KellyAnalyticsBuilder:
         max_drawdown = 0
         win_streak = 0
         loss_streak = 0
-        
+
+        print(f"\n  Simulating Flat_50 (Flat Bet: ${bet_amount})")
+        print(f"  Starting bankroll: ${starting_bankroll:.2f}\n")
+
         for idx, row in df.iterrows():
             bet_sequence += 1
             bankroll_before = current_bankroll
+
+            print(f"    Bet #{bet_sequence}: {row['fighter1_name']} vs {row['fighter2_name']} (Fight: {row['fight_id']})")
+            print(f"      Bet Size: ${bet_amount:.2f}")
+            print(f"      ✓ INCLUDED")
             
             # Flat bet amount
             bet_size = bet_amount
@@ -289,7 +318,6 @@ class KellyAnalyticsBuilder:
             
             result = {
                 'fight_id': row['fight_id'],
-                'event_id': row['event_id'],
                 'bet_sequence': bet_sequence,
                 'strategy_name': 'Flat_50',
                 'bet_size': bet_size,
@@ -315,23 +343,37 @@ class KellyAnalyticsBuilder:
     
     def populate_bet_analytics(self, event_id=None, clear_existing=True):
         """Populate the bet_analytics table with all strategies
-        
+
         Args:
-            event_id (str, optional): Only process bets from this specific event
+            event_id (str, optional): Ignored - always processes ALL bets for continuous sequences
             clear_existing (bool): Whether to clear existing data before inserting
         """
-        
+
         print("Fetching base bet data...")
-        if event_id:
-            print(f"Filtering for event: {event_id}")
-            
-        df = pd.DataFrame(self.get_base_bet_data(event_id))
-        
+        print("Processing ALL bets in chronological order for continuous bet sequences and bankroll tracking...")
+
+        # Always fetch ALL bets (not just one event) so sequences are continuous across all events
+        df = pd.DataFrame(self.get_base_bet_data(event_id=None))
+
         if df.empty:
             print("No bet data found!")
             return
-        
-        print(f"Processing {len(df)} bets...")
+
+        # Ensure dataframe is sorted by bet_date to maintain proper sequence
+        df['bet_date'] = pd.to_datetime(df['bet_date'])
+        df = df.sort_values('bet_date').reset_index(drop=True)
+
+        print(f"\n{'='*80}")
+        print(f"Processing {len(df)} bets for event {event_id}...")
+        print(f"{'='*80}\n")
+
+        # Log all bets being processed
+        for idx, row in df.iterrows():
+            print(f"Bet #{idx+1}: {row['fighter1_name']} vs {row['fighter2_name']}")
+            print(f"  - Fight ID: {row['fight_id']}")
+            print(f"  - Bet Outcome: {row['bet_outcome']}")
+            print(f"  - Stake: ${row['stake']:.2f}")
+            print(f"  - Potential Profit: ${row['potential_profit']:.2f}")
         
         # Clear existing data only if requested
         if clear_existing:
@@ -344,7 +386,10 @@ class KellyAnalyticsBuilder:
                 cursor.execute("DELETE FROM bet_analytics")
             self.conn.commit()
             cursor.close()
-        
+
+        # Create cursor for inserting data
+        cursor = self.conn.cursor()
+
         # Define strategies to simulate
         strategies = [
             ('Flat_50', 0, 0.10),  # (name, kelly_multiplier, max_bet_pct)
@@ -359,28 +404,45 @@ class KellyAnalyticsBuilder:
         ]
         
         all_results = []
-        
+
         for strategy_name, kelly_mult, max_bet in strategies:
             print(f"Simulating {strategy_name}...")
-            
+
             if strategy_name == 'Flat_50':
                 results = self.simulate_flat_betting(df)
             else:
                 results = self.simulate_strategy(df, strategy_name, kelly_mult, max_bet)
-            
+
             all_results.extend(results)
-        
+
+        # Delete existing records for these fight_ids and strategies to avoid duplicates
+        if all_results:
+            fight_ids = list(set([r['fight_id'] for r in all_results]))
+            strategy_names = list(set([r['strategy_name'] for r in all_results]))
+
+            placeholders_fights = ','.join(['%s'] * len(fight_ids))
+            placeholders_strategies = ','.join(['%s'] * len(strategy_names))
+
+            delete_sql = f"""
+            DELETE FROM bet_analytics
+            WHERE fight_id IN ({placeholders_fights})
+            AND strategy_name IN ({placeholders_strategies})
+            """
+            cursor.execute(delete_sql, fight_ids + strategy_names)
+            self.conn.commit()
+            print(f"Cleared {cursor.rowcount} existing records for duplicate prevention")
+
         # Insert all results
         print("Inserting results into database...")
         insert_sql = """
         INSERT INTO bet_analytics (
-            fight_id, event_id, bet_sequence, strategy_name, bet_size, win_probability,
+            fight_id, bet_sequence, strategy_name, bet_size, win_probability,
             decimal_odds, kelly_fraction, expected_value, bankroll_before,
             bankroll_after, cumulative_profit, bet_outcome, actual_profit,
             running_roi, max_drawdown, current_win_streak, current_loss_streak,
             bet_date
         ) VALUES (
-            %(fight_id)s, %(event_id)s, %(bet_sequence)s, %(strategy_name)s, %(bet_size)s,
+            %(fight_id)s, %(bet_sequence)s, %(strategy_name)s, %(bet_size)s,
             %(win_probability)s, %(decimal_odds)s, %(kelly_fraction)s,
             %(expected_value)s, %(bankroll_before)s, %(bankroll_after)s,
             %(cumulative_profit)s, %(bet_outcome)s, %(actual_profit)s,
@@ -392,8 +454,22 @@ class KellyAnalyticsBuilder:
         cursor.executemany(insert_sql, all_results)
         self.conn.commit()
         cursor.close()
-        
-        print(f"Inserted {len(all_results)} analytics records!")
+
+        print(f"\n{'='*80}")
+        print(f"✅ Inserted {len(all_results)} total analytics records!")
+        print(f"{'='*80}\n")
+
+        # Summary by strategy
+        if all_results:
+            strategy_counts = {}
+            for result in all_results:
+                strategy = result['strategy_name']
+                strategy_counts[strategy] = strategy_counts.get(strategy, 0) + 1
+
+            print("Summary by Strategy:")
+            for strategy, count in sorted(strategy_counts.items()):
+                print(f"  - {strategy}: {count} bets")
+            print()
     
     def calculate_risk_metrics(self):
         """Calculate and populate risk metrics summary table"""
@@ -406,11 +482,13 @@ class KellyAnalyticsBuilder:
         
         # Get strategy performance data
         query = """
-        SELECT 
+        SELECT
             strategy_name,
             COUNT(*) as total_bets,
             AVG(CASE WHEN bet_outcome = 'won' THEN 1.0 ELSE 0.0 END) as win_rate,
-            SUM(actual_profit) as total_profit,
+            (SELECT cumulative_profit FROM bet_analytics ba2
+             WHERE ba2.strategy_name = bet_analytics.strategy_name
+             ORDER BY bet_sequence DESC LIMIT 1) as total_profit,
             SUM(bet_size) as total_staked,
             MAX(max_drawdown) as max_drawdown
         FROM bet_analytics
@@ -426,7 +504,7 @@ class KellyAnalyticsBuilder:
             strategy_name = strategy['strategy_name']
             
             # Calculate additional metrics
-            roi = float(strategy['total_profit']) / float(strategy['total_staked']) if strategy['total_staked'] > 0 else 0
+            roi = (float(strategy['total_profit']) / float(strategy['total_staked']) * 100) if strategy['total_staked'] > 0 else 0
             
             # Get return series for Sharpe ratio calculation
             returns_query = f"""
