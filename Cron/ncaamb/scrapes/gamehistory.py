@@ -3,6 +3,7 @@ import pandas as pd
 from . import sqlconn
 import json
 from datetime import datetime
+from urllib.parse import quote
 
 def scrape_game_history(year='2025', team=None):
     """
@@ -19,7 +20,9 @@ def scrape_game_history(year='2025', team=None):
         print("Error: team parameter is required")
         return None
 
-    url = f"https://barttorvik.com/getgamestats.php?year={year}&tvalue={team}"
+    # URL-encode team name to handle special characters like &
+    encoded_team = quote(team, safe='')
+    url = f"https://barttorvik.com/getgamestats.php?year={year}&tvalue={encoded_team}"
 
     try:
         print(f"Fetching game history for {team} ({year})...")
@@ -82,8 +85,16 @@ def transform_game_history(df, year):
     # Column 4: Opponent team name
     df['opponent'] = df[4]
 
-    # Column 5: H/A/N (Home/Away/Neutral)
-    df['location'] = df[5]
+    # Column 5: H/A/N (Home/Away/Neutral) - convert to team names or N
+    def convert_location(row_location, team_name, opponent_name):
+        if row_location == 'H':
+            return team_name
+        elif row_location == 'A':
+            return opponent_name
+        else:  # 'N' for neutral
+            return 'N'
+
+    df['location'] = df.apply(lambda row: convert_location(row[5], row[2], row[4]), axis=1)
 
     # Column 6: Parse Win/Loss and scores
     def parse_result(result_str):
@@ -153,43 +164,43 @@ def transform_game_history(df, year):
     # Opponent stats start at nested_4 (after date, 200/OT, opp_name, team_name)
     # Team stats start at nested_19 (15 stats per team)
 
-    # Opponent shooting stats from nested data
+    # Team shooting stats from nested data (indices 4-18)
     # Order: FGM, FGA, 3PM, 3PA, FTM, FTA, OREB, DREB, TREB, AST, STL, BLK, TO, PF, PTS
-    df['opp_fgm'] = df['nested_4'].astype(int)
-    df['opp_fga'] = df['nested_5'].astype(int)
-    df['opp_3pm'] = df['nested_6'].astype(int)
-    df['opp_3pa'] = df['nested_7'].astype(int)
-    df['opp_2pm'] = (df['nested_4'] - df['nested_6']).astype(int)  # FGM - 3PM
-    df['opp_2pa'] = (df['nested_5'] - df['nested_7']).astype(int)  # FGA - 3PA
-    df['opp_ftm'] = df['nested_8'].astype(int)
-    df['opp_fta'] = df['nested_9'].astype(int)
-    df['opp_oreb'] = df['nested_10'].astype(int)
-    df['opp_dreb'] = df['nested_11'].astype(int)
-    df['opp_treb'] = df['nested_12'].astype(int)
-    df['opp_ast'] = df['nested_13'].astype(int)
-    df['opp_stl'] = df['nested_14'].astype(int)
-    df['opp_blk'] = df['nested_15'].astype(int)
-    df['opp_to'] = df['nested_16'].astype(int)
-    df['opp_pf'] = df['nested_17'].astype(int)
+    df['team_fgm'] = df['nested_4'].astype(int)
+    df['team_fga'] = df['nested_5'].astype(int)
+    df['team_3pm'] = df['nested_6'].astype(int)
+    df['team_3pa'] = df['nested_7'].astype(int)
+    df['team_2pm'] = (df['nested_4'] - df['nested_6']).astype(int)  # FGM - 3PM
+    df['team_2pa'] = (df['nested_5'] - df['nested_7']).astype(int)  # FGA - 3PA
+    df['team_ftm'] = df['nested_8'].astype(int)
+    df['team_fta'] = df['nested_9'].astype(int)
+    df['team_oreb'] = df['nested_10'].astype(int)
+    df['team_dreb'] = df['nested_11'].astype(int)
+    df['team_treb'] = df['nested_12'].astype(int)
+    df['team_ast'] = df['nested_13'].astype(int)
+    df['team_stl'] = df['nested_14'].astype(int)
+    df['team_blk'] = df['nested_15'].astype(int)
+    df['team_to'] = df['nested_16'].astype(int)
+    df['team_pf'] = df['nested_17'].astype(int)
 
-    # Team shooting stats from nested data
+    # Opponent shooting stats from nested data (indices 19-33)
     # Order: FGM, FGA, 3PM, 3PA, FTM, FTA, OREB, DREB, TREB, AST, STL, BLK, TO, PF, PTS
-    df['team_fgm'] = df['nested_19'].astype(int)
-    df['team_fga'] = df['nested_20'].astype(int)
-    df['team_3pm'] = df['nested_21'].astype(int)
-    df['team_3pa'] = df['nested_22'].astype(int)
-    df['team_2pm'] = (df['nested_19'] - df['nested_21']).astype(int)  # FGM - 3PM
-    df['team_2pa'] = (df['nested_20'] - df['nested_22']).astype(int)  # FGA - 3PA
-    df['team_ftm'] = df['nested_23'].astype(int)
-    df['team_fta'] = df['nested_24'].astype(int)
-    df['team_oreb'] = df['nested_25'].astype(int)
-    df['team_dreb'] = df['nested_26'].astype(int)
-    df['team_treb'] = df['nested_27'].astype(int)
-    df['team_ast'] = df['nested_28'].astype(int)
-    df['team_stl'] = df['nested_29'].astype(int)
-    df['team_blk'] = df['nested_30'].astype(int)
-    df['team_to'] = df['nested_31'].astype(int)
-    df['team_pf'] = df['nested_32'].astype(int)
+    df['opp_fgm'] = df['nested_19'].astype(int)
+    df['opp_fga'] = df['nested_20'].astype(int)
+    df['opp_3pm'] = df['nested_21'].astype(int)
+    df['opp_3pa'] = df['nested_22'].astype(int)
+    df['opp_2pm'] = (df['nested_19'] - df['nested_21']).astype(int)  # FGM - 3PM
+    df['opp_2pa'] = (df['nested_20'] - df['nested_22']).astype(int)  # FGA - 3PA
+    df['opp_ftm'] = df['nested_23'].astype(int)
+    df['opp_fta'] = df['nested_24'].astype(int)
+    df['opp_oreb'] = df['nested_25'].astype(int)
+    df['opp_dreb'] = df['nested_26'].astype(int)
+    df['opp_treb'] = df['nested_27'].astype(int)
+    df['opp_ast'] = df['nested_28'].astype(int)
+    df['opp_stl'] = df['nested_29'].astype(int)
+    df['opp_blk'] = df['nested_30'].astype(int)
+    df['opp_to'] = df['nested_31'].astype(int)
+    df['opp_pf'] = df['nested_32'].astype(int)
 
     # Select and rename final columns
     final_columns = [
@@ -212,12 +223,13 @@ def transform_game_history(df, year):
     return df
 
 
-def scrape_all_teams(year='2025'):
+def scrape_all_teams(year='2025', season=2025):
     """
-    Scrape game history for all teams in the database
+    Scrape game history for all teams in the database and insert into MySQL
 
     Args:
-        year: Season year (e.g., '2025')
+        year: Season year for scraping (e.g., '2025')
+        season: Season year for database insertion (e.g., 2025)
     """
     # Get all distinct teams from leaderboard
     conn = sqlconn.create_connection()
@@ -237,7 +249,7 @@ def scrape_all_teams(year='2025'):
     total_teams = len(teams)
 
     print(f"Starting game history scrape for {total_teams} teams")
-    print(f"Year: {year}")
+    print(f"Year: {year}, Season: {season}")
     print("-" * 60)
 
     successful = 0
@@ -251,6 +263,13 @@ def scrape_all_teams(year='2025'):
             df = scrape_game_history(year=year, team=team)
             if df is not None and len(df) > 0:
                 print(f"Success - {len(df)} games retrieved")
+
+                # Insert team into teams table (only this team, not opponents)
+                sqlconn.push_to_teams(df, season)
+
+                # Insert games into games table
+                sqlconn.push_to_games(df, season, year)
+
                 successful += 1
             else:
                 print(f"No games found")

@@ -3,22 +3,9 @@
 Main entry point for NCAAMB data scraping and processing
 """
 
-from scrapes.gamehistory import scrape_game_history
+from scrapes.gamehistory import scrape_game_history, scrape_all_teams
 
 if __name__ == "__main__":
-    year = '2025'
-    team = 'Auburn'
-
-    print(f"Fetching game history for {team} {year}\n")
-    df = scrape_game_history(year=year, team=team)
-
-    if df is not None:
-        # Save to CSV in parent directory
-        output_file = '../game_history_sample.csv'
-        df.to_csv(output_file, index=False)
-        print(f"\nData saved to {output_file}")
-        print(f"Shape: {df.shape}")
-        print(f"\nFirst few rows:")
-        print(df)
-    else:
-        print("Failed to retrieve data")
+    # Scrape all teams from leaderboard and insert into MySQL
+    print("Starting full scrape of all teams...\n")
+    scrape_all_teams(year='2023', season=2023)

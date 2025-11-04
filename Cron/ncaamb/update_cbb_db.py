@@ -11,10 +11,20 @@ if sys.platform == 'win32':
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
 
-def get_missing_dates():
-    """Get all dates between 11/03/2023 and 04/07/2024 that are NOT in the database"""
-    season_start = datetime(2023, 11, 3)
-    season_end = datetime(2024, 4, 7)
+def get_missing_dates_for_season(year):
+    """
+    Get all dates for a season that are NOT in the database.
+
+    Args:
+        year: Season year (e.g., 2025 for 2024-2025 season)
+
+    Returns:
+        List of missing dates in YYYY-MM-DD format
+    """
+    # Seasons run from November 1 to April 15
+    # 2024 season = Nov 1, 2023 - Apr 15, 2024
+    season_start = datetime(year - 1, 11, 1)
+    season_end = datetime(year, 5, 5)
     today = datetime.now()
 
     # Only check up to today
@@ -26,23 +36,33 @@ def get_missing_dates():
         print("❌ Could not connect to database")
         return []
 
+    # Get all dates from leaderboard and infer season from the date
     query = "SELECT DISTINCT DATE(date) as scrape_date FROM leaderboard"
     results = sqlconn.fetch(conn, query)
     conn.close()
 
-    # Convert to set of date strings (YYYY-MM-DD format)
+    # Convert to set of date strings (YYYY-MM-DD format) that belong to this season
     existing_dates = set()
     for row in results:
         if row['scrape_date']:
             date_obj = row['scrape_date']
             if hasattr(date_obj, 'strftime'):
-                existing_dates.add(date_obj.strftime('%Y-%m-%d'))
+                date_str = date_obj.strftime('%Y-%m-%d')
             else:
-                existing_dates.add(str(date_obj))
+                date_str = str(date_obj)
 
-    print(f"📊 Found {len(existing_dates)} dates already in database")
+            # Parse the date to check if it belongs to this season
+            try:
+                date_parsed = datetime.strptime(date_str, '%Y-%m-%d')
+                # Check if date is in season range (Nov of previous year to Apr of current year)
+                if season_start <= date_parsed <= season_end:
+                    existing_dates.add(date_str)
+            except ValueError:
+                pass
 
-    # Generate ALL dates from 11/04/2024 to 04/07/2025 and remove those in database
+    print(f"  📊 Found {len(existing_dates)} dates already in database for season {year}")
+
+    # Generate ALL dates for the season and remove those in database
     all_dates = []
     current = season_start
 
@@ -54,59 +74,75 @@ def get_missing_dates():
     # Remove existing dates from all dates
     missing_dates = [d for d in all_dates if d not in existing_dates]
 
-    print(f"Total days in range (11/03/2023-04/07/2024): {len(all_dates)}")
-    print(f"Missing dates to scrape: {len(missing_dates)}")
+    print(f"  📅 Total days in season ({season_start.strftime('%m/%d/%Y')}-{end_date.strftime('%m/%d/%Y')}): {len(all_dates)}")
+    print(f"  ⏳ Missing dates to scrape: {len(missing_dates)}")
 
     return missing_dates
 
 def run_season_scrapes():
-    """Run the leaderboard scraper for missing dates in the season"""
-    # Get only dates missing from database
-    scrape_dates = get_missing_dates()
-    total_scrapes = len(scrape_dates)
+    """Run the leaderboard scraper for multiple seasons (2024, 2023, 2022)"""
+    seasons_to_scrape = [2021, 2020]
 
-    if total_scrapes == 0:
-        print("✅ Database is up to date - no missing dates found")
-        return
+    print("🏀 Starting NCAAMB multi-season scrape")
+    print(f"📊 Seasons to scrape: {', '.join(map(str, seasons_to_scrape))}")
+    print("=" * 60)
 
-    print(f"🏀 Starting NCAAMB season scrape")
-    print(f"📊 Total missing dates to scrape: {total_scrapes}")
-    if scrape_dates:
-        print(f"📅 Date range: {scrape_dates[0]} to {scrape_dates[-1]}")
-    print("-" * 60)
+    total_successful = 0
+    total_failed = 0
 
-    successful = 0
-    failed = 0
+    for season_year in seasons_to_scrape:
+        print(f"\n🔄 Processing season {season_year}...")
+        print("-" * 60)
 
-    for idx, date_str in enumerate(scrape_dates, 1):
-        # Parse the date string to extract year, month, day
-        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-        year = str(date_obj.year)
-        end_date = date_obj.strftime('%m%d')
-        percentage = (idx / total_scrapes) * 100
+        # Get only dates missing from database for this season
+        scrape_dates = get_missing_dates_for_season(season_year)
+        total_scrapes = len(scrape_dates)
 
-        print(f"\n[{idx}/{total_scrapes}] ({percentage:.1f}%) Scraping date: {date_str}")
+        if total_scrapes == 0:
+            print(f"✅ Season {season_year} is up to date - no missing dates found")
+            continue
 
-        try:
-            df = scrape_barttorvik_csv(year, end_date=end_date)
-            if df is not None:
-                print(f"  ✅ Success - {len(df)} teams processed")
-                successful += 1
-            else:
-                print(f"  ❌ Failed - check logs above")
+        print(f"  Starting scrape for {total_scrapes} missing dates")
+        print()
+
+        successful = 0
+        failed = 0
+
+        for idx, date_str in enumerate(scrape_dates, 1):
+            # Parse the date string to extract year, month, day
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            year = str(date_obj.year)
+            end_date = date_obj.strftime('%m%d')
+            percentage = (idx / total_scrapes) * 100
+
+            print(f"  [{idx}/{total_scrapes}] ({percentage:.1f}%) Scraping {date_str}...", end=" ")
+
+            try:
+                df = scrape_barttorvik_csv(year, end_date=end_date)
+                if df is not None:
+                    print(f"✅ ({len(df)} teams)")
+                    successful += 1
+                    total_successful += 1
+                else:
+                    print(f"❌ Failed")
+                    failed += 1
+                    total_failed += 1
+            except Exception as e:
+                print(f"❌ Error: {e}")
                 failed += 1
-        except Exception as e:
-            print(f"  ❌ Error: {e}")
-            failed += 1
+                total_failed += 1
 
-        # Add a small delay between scrapes to be respectful to the server
-        if idx < total_scrapes:
-            time.sleep(2)
+            # Add a small delay between scrapes to be respectful to the server
+            if idx < total_scrapes:
+                time.sleep(2)
+
+        print()
+        print(f"  Season {season_year} complete: {successful} successful, {failed} failed")
 
     print("\n" + "=" * 60)
-    print(f"🏁 Season scrape complete!")
-    print(f"  ✅ Successful: {successful}/{total_scrapes}")
-    print(f"  ❌ Failed: {failed}/{total_scrapes}")
+    print(f"🏁 Multi-season scrape complete!")
+    print(f"  ✅ Total successful: {total_successful}")
+    print(f"  ❌ Total failed: {total_failed}")
     print("=" * 60)
 
 if __name__ == "__main__":

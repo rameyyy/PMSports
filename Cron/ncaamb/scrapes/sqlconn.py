@@ -295,7 +295,7 @@ def push_to_games(df, season, year):
                         game_id
                     )
                 else:
-                    # Update team_2 columns
+                    # Update both team_1 and team_2 columns (scraped team is team_2)
                     update_query = """
                         UPDATE games SET
                             season = %s,
@@ -314,6 +314,22 @@ def push_to_games(df, season, year):
                             team_2_def_or_pct = %s,
                             team_2_def_ftr = %s,
                             team_2_g_sc = %s,
+                            team_1_fgm = %s,
+                            team_1_fga = %s,
+                            team_1_2pm = %s,
+                            team_1_2pa = %s,
+                            team_1_3pm = %s,
+                            team_1_3pa = %s,
+                            team_1_ftm = %s,
+                            team_1_fta = %s,
+                            team_1_oreb = %s,
+                            team_1_dreb = %s,
+                            team_1_treb = %s,
+                            team_1_ast = %s,
+                            team_1_to = %s,
+                            team_1_stl = %s,
+                            team_1_blk = %s,
+                            team_1_pf = %s,
                             team_2_fgm = %s,
                             team_2_fga = %s,
                             team_2_2pm = %s,
@@ -334,21 +350,21 @@ def push_to_games(df, season, year):
                     """
                     params = (
                         season,
-                        row['opponent'],
-                        row['opp_score'],
-                        row['opp_adjoe'] if 'opp_adjoe' in df.columns else None,
-                        row['opp_adjde'] if 'opp_adjde' in df.columns else None,
-                        row['opp_eff'] if 'opp_eff' in df.columns else None,
-                        row['opp_efg_pct'] if 'opp_efg_pct' in df.columns else None,
-                        row['opp_to_pct'] if 'opp_to_pct' in df.columns else None,
-                        row['opp_or_pct'] if 'opp_or_pct' in df.columns else None,
-                        row['opp_ftr'] if 'opp_ftr' in df.columns else None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
+                        row['team'],
+                        row['team_score'],
+                        row['team_adjoe'],
+                        row['team_adjde'],
+                        row['team_eff'],
+                        row['team_efg_pct'],
+                        row['team_to_pct'],
+                        row['team_or_pct'],
+                        row['team_ftr'],
+                        row['team_def_eff'],
+                        row['team_def_efg_pct'],
+                        row['team_def_to_pct'],
+                        row['team_def_or_pct'],
+                        row['team_def_ftr'],
+                        row['team_g_sc'],
                         row['opp_fgm'],
                         row['opp_fga'],
                         row['opp_2pm'],
@@ -365,6 +381,22 @@ def push_to_games(df, season, year):
                         row['opp_stl'],
                         row['opp_blk'],
                         row['opp_pf'],
+                        row['team_fgm'],
+                        row['team_fga'],
+                        row['team_2pm'],
+                        row['team_2pa'],
+                        row['team_3pm'],
+                        row['team_3pa'],
+                        row['team_ftm'],
+                        row['team_fta'],
+                        row['team_oreb'],
+                        row['team_dreb'],
+                        row['team_treb'],
+                        row['team_ast'],
+                        row['team_to'],
+                        row['team_stl'],
+                        row['team_blk'],
+                        row['team_pf'],
                         game_id
                     )
 
@@ -382,7 +414,13 @@ def push_to_games(df, season, year):
                         team_1_fgm, team_1_fga, team_1_2pm, team_1_2pa, team_1_3pm, team_1_3pa,
                         team_1_ftm, team_1_fta, team_1_oreb, team_1_dreb, team_1_treb,
                         team_1_ast, team_1_to, team_1_stl, team_1_blk, team_1_pf,
-                        team_2, team_2_score
+                        team_2, team_2_score,
+                        team_2_adjoe, team_2_adjde, team_2_eff,
+                        team_2_efg_pct, team_2_to_pct, team_2_or_pct, team_2_ftr,
+                        team_2_def_eff, team_2_def_efg_pct, team_2_def_to_pct, team_2_def_or_pct, team_2_def_ftr, team_2_g_sc,
+                        team_2_fgm, team_2_fga, team_2_2pm, team_2_2pa, team_2_3pm, team_2_3pa,
+                        team_2_ftm, team_2_fta, team_2_oreb, team_2_dreb, team_2_treb,
+                        team_2_ast, team_2_to, team_2_stl, team_2_blk, team_2_pf
                     ) VALUES (
                         %s, %s, %s, %s, %s, %s, %s,
                         %s, %s,
@@ -392,20 +430,59 @@ def push_to_games(df, season, year):
                         %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s,
-                        %s, %s
+                        %s, %s,
+                        %s, %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s
                     )
                 """
-                params = (
-                    game_id, season, row['date'], row['game_type'], row['location'], row['plus_minus'], row['ot'],
-                    row['team'], row['team_score'],
-                    row['team_adjoe'], row['team_adjde'], row['team_eff'],
-                    row['team_efg_pct'], row['team_to_pct'], row['team_or_pct'], row['team_ftr'],
-                    row['team_def_eff'], row['team_def_efg_pct'], row['team_def_to_pct'], row['team_def_or_pct'], row['team_def_ftr'], row['team_g_sc'],
-                    row['team_fgm'], row['team_fga'], row['team_2pm'], row['team_2pa'], row['team_3pm'], row['team_3pa'],
-                    row['team_ftm'], row['team_fta'], row['team_oreb'], row['team_dreb'], row['team_treb'],
-                    row['team_ast'], row['team_to'], row['team_stl'], row['team_blk'], row['team_pf'],
-                    row['opponent'], row['opp_score']
-                )
+
+                if team_1_is_scraped:
+                    # Scraped team is team_1 - push team_1 and team_2 box score data, leave team_2 advanced stats null
+                    params = (
+                        game_id, season, row['date'], row['game_type'], row['location'], row['plus_minus'], row['ot'],
+                        row['team'], row['team_score'],
+                        row['team_adjoe'], row['team_adjde'], row['team_eff'],
+                        row['team_efg_pct'], row['team_to_pct'], row['team_or_pct'], row['team_ftr'],
+                        row['team_def_eff'], row['team_def_efg_pct'], row['team_def_to_pct'], row['team_def_or_pct'], row['team_def_ftr'], row['team_g_sc'],
+                        row['team_fgm'], row['team_fga'], row['team_2pm'], row['team_2pa'], row['team_3pm'], row['team_3pa'],
+                        row['team_ftm'], row['team_fta'], row['team_oreb'], row['team_dreb'], row['team_treb'],
+                        row['team_ast'], row['team_to'], row['team_stl'], row['team_blk'], row['team_pf'],
+                        row['opponent'], row['opp_score'],
+                        None, None, None,
+                        None, None, None, None,
+                        None, None, None, None, None, None,
+                        row['opp_fgm'], row['opp_fga'], row['opp_2pm'], row['opp_2pa'], row['opp_3pm'], row['opp_3pa'],
+                        row['opp_ftm'], row['opp_fta'], row['opp_oreb'], row['opp_dreb'], row['opp_treb'],
+                        row['opp_ast'], row['opp_to'], row['opp_stl'], row['opp_blk'], row['opp_pf']
+                    )
+                else:
+                    # Scraped team is team_2 (opponent is team_1)
+                    params = (
+                        game_id, season, row['date'], row['game_type'], row['location'], row['plus_minus'], row['ot'],
+                        row['opponent'], row['opp_score'],
+                        row['opp_adjoe'] if 'opp_adjoe' in df.columns else None,
+                        row['opp_adjde'] if 'opp_adjde' in df.columns else None,
+                        row['opp_eff'] if 'opp_eff' in df.columns else None,
+                        row['opp_efg_pct'] if 'opp_efg_pct' in df.columns else None,
+                        row['opp_to_pct'] if 'opp_to_pct' in df.columns else None,
+                        row['opp_or_pct'] if 'opp_or_pct' in df.columns else None,
+                        row['opp_ftr'] if 'opp_ftr' in df.columns else None,
+                        None, None, None, None, None, None,
+                        row['opp_fgm'], row['opp_fga'], row['opp_2pm'], row['opp_2pa'], row['opp_3pm'], row['opp_3pa'],
+                        row['opp_ftm'], row['opp_fta'], row['opp_oreb'], row['opp_dreb'], row['opp_treb'],
+                        row['opp_ast'], row['opp_to'], row['opp_stl'], row['opp_blk'], row['opp_pf'],
+                        row['team'], row['team_score'],
+                        row['team_adjoe'], row['team_adjde'], row['team_eff'],
+                        row['team_efg_pct'], row['team_to_pct'], row['team_or_pct'], row['team_ftr'],
+                        row['team_def_eff'], row['team_def_efg_pct'], row['team_def_to_pct'], row['team_def_or_pct'], row['team_def_ftr'], row['team_g_sc'],
+                        None, None, None, None, None, None,
+                        None, None, None, None, None,
+                        None, None, None, None, None
+                    )
 
                 cursor.execute(insert_query, params)
                 games_inserted += 1
