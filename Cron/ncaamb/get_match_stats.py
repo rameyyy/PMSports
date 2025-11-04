@@ -8,4 +8,4 @@ from scrapes.gamehistory import scrape_game_history, scrape_all_teams
 if __name__ == "__main__":
     # Scrape all teams from leaderboard and insert into MySQL
     print("Starting full scrape of all teams...\n")
-    scrape_all_teams(year='2023', season=2023)
+    scrape_all_teams(year='2020', season=2020)

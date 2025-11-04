@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from urllib.parse import quote
 
-def scrape_game_history(year='2025', team=None):
+def scrape_game_history(year, team=None):
     """
     Scrape game history for a specific team from Bart Torvik's API
 
@@ -223,7 +223,7 @@ def transform_game_history(df, year):
     return df
 
 
-def scrape_all_teams(year='2025', season=2025):
+def scrape_all_teams(year, season):
     """
     Scrape game history for all teams in the database and insert into MySQL
 

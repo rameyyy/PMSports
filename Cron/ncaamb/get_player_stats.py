@@ -58,13 +58,14 @@ def construct_game_id(date_str, team, opponent, year=2025):
     return game_id
 
 
-def load_player_stats_to_db(year='2025', season=2025):
+def load_player_stats_to_db(year='2025', season=2025, skip_missing_games=True):
     """
     Load player stats from Bart Torvik API into player_stats table.
 
     Args:
         year: Season year (e.g., '2025')
         season: Season number for database (e.g., 2025)
+        skip_missing_games: If True, skip player stats for games not in DB (default: True)
     """
     try:
         # Scrape player stats
@@ -107,6 +108,12 @@ def load_player_stats_to_db(year='2025', season=2025):
             exists = "EXISTS" if count > 0 else "MISSING"
             print(f"  {gid}: {exists}")
 
+        # Pre-load all existing game_ids into a set for fast lookup
+        print("\nLoading existing game_ids from database...")
+        cursor.execute(f"SELECT game_id FROM games WHERE season = {season}")
+        existing_games = set(row[0] for row in cursor.fetchall())
+        print(f"Found {len(existing_games)} games in database for season {season}")
+
         print("\n" + "="*100)
 
         # Prepare insert statement
@@ -148,8 +155,10 @@ def load_player_stats_to_db(year='2025', season=2025):
 
         successful = 0
         failed = 0
+        skipped_missing_games = 0
         batch_size = 10000
         batch_values = []
+        missing_games = set()
 
         start_time = pd.Timestamp.now()
 
@@ -161,6 +170,18 @@ def load_player_stats_to_db(year='2025', season=2025):
                 if not game_id:
                     failed += 1
                     continue
+
+                # Check if game exists in database
+                if game_id not in existing_games:
+                    if skip_missing_games:
+                        skipped_missing_games += 1
+                        missing_games.add(game_id)
+                        continue
+                    else:
+                        failed += 1
+                        if failed <= 10:
+                            print(f"Error: Game not found in database: {game_id}")
+                        continue
 
                 # Prepare values - convert NaN to None for SQL NULL
                 # Note: DataFrame has 'Usage' but table has 'useage' (reserved keyword)
@@ -212,7 +233,24 @@ def load_player_stats_to_db(year='2025', season=2025):
         conn.close()
 
         print(f"\n{'='*100}")
-        print(f"Load complete: {successful} successful, {failed} failed out of {len(df)} records")
+        print(f"Load complete:")
+        print(f"  - Successful: {successful}")
+        print(f"  - Failed: {failed}")
+        print(f"  - Skipped (missing games): {skipped_missing_games}")
+        print(f"  - Total processed: {len(df)}")
+
+        if missing_games:
+            print(f"\n⚠️  WARNING: {len(missing_games)} unique games not found in database!")
+            print(f"This means you need to load game data for season {season} first.")
+            print(f"\nSample of missing game_ids (first 10):")
+            for game_id in sorted(list(missing_games))[:10]:
+                print(f"  - {game_id}")
+            if len(missing_games) > 10:
+                print(f"  ... and {len(missing_games) - 10} more")
+            print(f"\nTo fix this:")
+            print(f"  1. Run: python main.py  (with year='{year}' and season={season})")
+            print(f"  2. Then re-run this script")
+
         print(f"{'='*100}")
 
     except Exception as e:
@@ -222,4 +260,4 @@ def load_player_stats_to_db(year='2025', season=2025):
 
 
 if __name__ == "__main__":
-    load_player_stats_to_db(year='2024', season=2024)
+    load_player_stats_to_db(year='2020', season=2020)

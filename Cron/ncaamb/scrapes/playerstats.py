@@ -14,7 +14,7 @@ PLAYER_STATS_COLUMNS = [
     'loc', 'tt', 'pp', 'inches', 'cls', 'pid', 'year'
 ]
 
-def scrape_player_stats(year='2024'):
+def scrape_player_stats(year):
     """
     Scrape player stats for all games from Bart Torvik's advanced games JSON
 

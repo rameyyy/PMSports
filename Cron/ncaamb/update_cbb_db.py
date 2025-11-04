@@ -81,7 +81,7 @@ def get_missing_dates_for_season(year):
 
 def run_season_scrapes():
     """Run the leaderboard scraper for multiple seasons (2024, 2023, 2022)"""
-    seasons_to_scrape = [2021, 2020]
+    seasons_to_scrape = [2020]
 
     print("🏀 Starting NCAAMB multi-season scrape")
     print(f"📊 Seasons to scrape: {', '.join(map(str, seasons_to_scrape))}")
