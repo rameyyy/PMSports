@@ -227,7 +227,39 @@ def build_flat_df(season: Optional[int] = None, limit: Optional[int] = None, tar
         flat_rows.append(flat_row)
 
     print(f"\nFlat dataset built with {len(flat_rows)} games")
-    return flat_rows
+
+    # Convert to polars DataFrame for efficient processing
+    # Flatten nested structures for DataFrame conversion
+    flattened_rows = []
+    for row in flat_rows:
+        flat_row = {
+            'game_id': row.get('game_id'),
+            'date': row.get('date'),
+            'season': row.get('season'),
+            'team_1': row.get('team_1'),
+            'team_2': row.get('team_2'),
+            'team_1_conference': row.get('team_1_conference'),
+            'team_2_conference': row.get('team_2_conference'),
+            'team_1_score': row.get('team_1_score'),
+            'team_2_score': row.get('team_2_score'),
+            'total_score_outcome': row.get('total_score_outcome'),
+            'team_1_winloss': row.get('team_1_winloss'),
+            'team_1_rank': (row.get('team_1_leaderboard') or {}).get('rank'),
+            'team_1_wins': (row.get('team_1_leaderboard') or {}).get('wins'),
+            'team_1_losses': (row.get('team_1_leaderboard') or {}).get('losses'),
+            'team_1_barthag': (row.get('team_1_leaderboard') or {}).get('barthag'),
+            'team_2_rank': (row.get('team_2_leaderboard') or {}).get('rank'),
+            'team_2_wins': (row.get('team_2_leaderboard') or {}).get('wins'),
+            'team_2_losses': (row.get('team_2_leaderboard') or {}).get('losses'),
+            'team_2_barthag': (row.get('team_2_leaderboard') or {}).get('barthag'),
+            'team_1_hist_count': row.get('team_1_hist_count', 0),
+            'team_2_hist_count': row.get('team_2_hist_count', 0),
+        }
+        flattened_rows.append(flat_row)
+
+    # Convert to Polars DataFrame
+    df = pl.DataFrame(flattened_rows)
+    return df
 
 
 if __name__ == "__main__":
