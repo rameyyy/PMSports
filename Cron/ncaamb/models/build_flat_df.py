@@ -14,7 +14,7 @@ from .utils import (
 )
 
 
-def build_flat_row_for_game(game_row: dict, games_df: pl.DataFrame, leaderboard_df: pl.DataFrame, player_stats_df: pl.DataFrame) -> dict:
+def build_flat_row_for_game(game_row: dict, games_df: pl.DataFrame, leaderboard_df: pl.DataFrame, player_stats_df: pl.DataFrame, odds_dict: dict = None) -> dict:
     """
     Build a flat row for a single game with raw historical match data
 
@@ -23,6 +23,7 @@ def build_flat_row_for_game(game_row: dict, games_df: pl.DataFrame, leaderboard_
         games_df: DataFrame with all games
         leaderboard_df: DataFrame with leaderboard data
         player_stats_df: DataFrame with player stats data
+        odds_dict: Dictionary mapping game_id to odds data (optional)
 
     Returns:
         Dictionary with game info, outcome data, and historical matches for both teams
@@ -56,14 +57,44 @@ def build_flat_row_for_game(game_row: dict, games_df: pl.DataFrame, leaderboard_
     team_1_leaderboard = team_1_leaderboard_data.to_dicts()[0] if len(team_1_leaderboard_data) > 0 else None
     team_2_leaderboard = team_2_leaderboard_data.to_dicts()[0] if len(team_2_leaderboard_data) > 0 else None
 
+    # Determine home/away status
+    # location is a team name (meaning that team is at home) or 'N' (neutral site)
+    location = game_row.get("location")
+
+    if location == 'N':
+        team_1_is_home = None  # Neutral site
+        team_2_is_home = None
+    elif location == team_1:
+        team_1_is_home = True
+        team_2_is_home = False
+    elif location == team_2:
+        team_1_is_home = False
+        team_2_is_home = True
+    else:
+        # Default: unknown location
+        team_1_is_home = None
+        team_2_is_home = None
+
+    # Extract start_time from odds data if available
+    start_time = None
+    if odds_dict and game_id in odds_dict:
+        odds_data = odds_dict[game_id]
+        if isinstance(odds_data, list) and len(odds_data) > 0:
+            # Get start_time from first sportsbook (should be same for all)
+            start_time = odds_data[0].get("start_time")
+
     flat_row = {
         "game_id": game_id,
         "season": season,
         "date": date,
+        "start_time": start_time,
         "team_1": team_1,
         "team_2": team_2,
         "team_1_conference": game_row.get("team_1_conference"),
         "team_2_conference": game_row.get("team_2_conference"),
+        "team_1_is_home": team_1_is_home,
+        "team_2_is_home": team_2_is_home,
+        "location": location,
         "team_1_score": team_1_score,
         "team_2_score": team_2_score,
         "total_score_outcome": total_score_outcome,
@@ -173,7 +204,11 @@ def build_flat_row_for_game(game_row: dict, games_df: pl.DataFrame, leaderboard_
     return flat_row
 
 
-def build_flat_df(season: Optional[int] = None, limit: Optional[int] = None, target_date: Optional[str] = None) -> List[dict]:
+def build_flat_df(season: Optional[int] = None, limit: Optional[int] = None, target_date: Optional[str] = None,
+                  target_date_start: Optional[str] = None, target_date_end: Optional[str] = None,
+                  games_df: Optional[pl.DataFrame] = None, teams_df: Optional[pl.DataFrame] = None,
+                  leaderboard_df: Optional[pl.DataFrame] = None, player_stats_df: Optional[pl.DataFrame] = None,
+                  odds_dict: Optional[dict] = None) -> List[dict]:
     """
     Build flat dataset with raw historical match data for all games
 
@@ -181,25 +216,34 @@ def build_flat_df(season: Optional[int] = None, limit: Optional[int] = None, tar
         season: Optional season filter
         limit: Optional limit on number of games to process (for testing)
         target_date: Optional specific date to process (format: YYYY-MM-DD)
+        games_df: Optional pre-loaded games DataFrame (skips fetch if provided)
+        teams_df: Optional pre-loaded teams DataFrame (skips fetch if provided)
+        leaderboard_df: Optional pre-loaded leaderboard DataFrame (skips fetch if provided)
+        player_stats_df: Optional pre-loaded player stats DataFrame (skips fetch if provided)
+        odds_dict: Optional dictionary mapping game_id to odds data (skips fetch if provided)
 
     Returns:
         List of dictionaries, each containing game info and historical matches
     """
-    print(f"Loading games data{f' for season {season}' if season else ''}...")
-    games_df = fetch_games(season=season)
-    print(f"Loaded {len(games_df)} games")
+    if games_df is None:
+        print(f"Loading games data{f' for season {season}' if season else ''}...")
+        games_df = fetch_games(season=season)
+        print(f"Loaded {len(games_df)} games")
 
-    print("Loading teams data...")
-    teams_df = fetch_teams(season=season)
-    print(f"Loaded {len(teams_df)} teams")
+    if teams_df is None:
+        print("Loading teams data...")
+        teams_df = fetch_teams(season=season)
+        print(f"Loaded {len(teams_df)} teams")
 
-    print("Loading leaderboard data...")
-    leaderboard_df = fetch_leaderboard()
-    print(f"Loaded {len(leaderboard_df)} leaderboard records")
+    if leaderboard_df is None:
+        print("Loading leaderboard data...")
+        leaderboard_df = fetch_leaderboard()
+        print(f"Loaded {len(leaderboard_df)} leaderboard records")
 
-    print("Loading player stats data...")
-    player_stats_df = fetch_player_stats(season=season)
-    print(f"Loaded {len(player_stats_df)} player stats records")
+    if player_stats_df is None:
+        print("Loading player stats data...")
+        player_stats_df = fetch_player_stats(season=season)
+        print(f"Loaded {len(player_stats_df)} player stats records")
 
     print("Adding conference information...")
     games_df = add_team_conferences(games_df, teams_df)
@@ -214,6 +258,15 @@ def build_flat_df(season: Optional[int] = None, limit: Optional[int] = None, tar
         target_date_obj = datetime.strptime(target_date, "%Y-%m-%d").date()
         games_to_process = games_df.filter(pl.col("date") == target_date_obj)
         print(f"Filtered to {len(games_to_process)} games on {target_date}")
+    elif target_date_start and target_date_end:
+        # Convert string dates to polars dates
+        from datetime import datetime
+        start_date_obj = datetime.strptime(target_date_start, "%Y-%m-%d").date()
+        end_date_obj = datetime.strptime(target_date_end, "%Y-%m-%d").date()
+        games_to_process = games_df.filter(
+            (pl.col("date") >= start_date_obj) & (pl.col("date") <= end_date_obj)
+        )
+        print(f"Filtered to {len(games_to_process)} games between {target_date_start} and {target_date_end}")
     elif limit:
         games_to_process = games_df.head(limit)
     else:
@@ -223,35 +276,35 @@ def build_flat_df(season: Optional[int] = None, limit: Optional[int] = None, tar
         if i % 100 == 0:
             print(f"Processing game {i+1}/{len(games_to_process)}...")
 
-        flat_row = build_flat_row_for_game(row, games_df, leaderboard_df, player_stats_df)
+        flat_row = build_flat_row_for_game(row, games_df, leaderboard_df, player_stats_df, odds_dict)
         flat_rows.append(flat_row)
 
     print(f"\nFlat dataset built with {len(flat_rows)} games")
 
     # Convert to polars DataFrame for efficient processing
-    # Flatten nested structures for DataFrame conversion
+    # Keep all nested structures (match history with player stats, leaderboard dicts)
     flattened_rows = []
     for row in flat_rows:
         flat_row = {
             'game_id': row.get('game_id'),
             'date': row.get('date'),
+            'start_time': row.get('start_time'),
             'season': row.get('season'),
             'team_1': row.get('team_1'),
             'team_2': row.get('team_2'),
             'team_1_conference': row.get('team_1_conference'),
             'team_2_conference': row.get('team_2_conference'),
+            'team_1_is_home': row.get('team_1_is_home'),
+            'team_2_is_home': row.get('team_2_is_home'),
+            'location': row.get('location'),
             'team_1_score': row.get('team_1_score'),
             'team_2_score': row.get('team_2_score'),
             'total_score_outcome': row.get('total_score_outcome'),
             'team_1_winloss': row.get('team_1_winloss'),
-            'team_1_rank': (row.get('team_1_leaderboard') or {}).get('rank'),
-            'team_1_wins': (row.get('team_1_leaderboard') or {}).get('wins'),
-            'team_1_losses': (row.get('team_1_leaderboard') or {}).get('losses'),
-            'team_1_barthag': (row.get('team_1_leaderboard') or {}).get('barthag'),
-            'team_2_rank': (row.get('team_2_leaderboard') or {}).get('rank'),
-            'team_2_wins': (row.get('team_2_leaderboard') or {}).get('wins'),
-            'team_2_losses': (row.get('team_2_leaderboard') or {}).get('losses'),
-            'team_2_barthag': (row.get('team_2_leaderboard') or {}).get('barthag'),
+            'team_1_leaderboard': row.get('team_1_leaderboard'),
+            'team_2_leaderboard': row.get('team_2_leaderboard'),
+            'team_1_match_hist': row.get('team_1_match_hist', []),
+            'team_2_match_hist': row.get('team_2_match_hist', []),
             'team_1_hist_count': row.get('team_1_hist_count', 0),
             'team_2_hist_count': row.get('team_2_hist_count', 0),
         }
