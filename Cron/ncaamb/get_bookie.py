@@ -37,6 +37,18 @@ SKIP_DATES = {
         (datetime(2022, 12, 25), datetime(2022, 12, 26)),
         (datetime(2023, 1, 1), datetime(2023, 1, 1)),
     ],
+    2022: [
+        (datetime(2021, 12, 25), datetime(2021, 12, 26)),
+        (datetime(2022, 1, 1), datetime(2022, 1, 1)),
+    ],
+    2021: [
+        (datetime(2020, 12, 25), datetime(2020, 12, 26)),
+        (datetime(2021, 1, 1), datetime(2021, 1, 1)),
+    ],
+    2020: [
+        (datetime(2019, 12, 25), datetime(2019, 12, 26)),
+        (datetime(2020, 1, 1), datetime(2020, 1, 1)),
+    ],
 }
 
 
