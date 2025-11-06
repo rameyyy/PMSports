@@ -59,9 +59,9 @@ if __name__ == "__main__":
 
     try:
         # Configuration
-        season = 2025
-        start_date = "2024-11-29"
-        end_date = "2025-03-15"  # Change to desired end date
+        season = 2021
+        start_date = "2020-11-29"
+        end_date = "2021-03-15"  # Change to desired end date
 
         # Load data once
         print("Loading data...")

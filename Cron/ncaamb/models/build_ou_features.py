@@ -190,8 +190,7 @@ def build_rolling_window_features(team_hist: List[dict], team_prefix: str, stat_
                                   windows: List[int]) -> Dict[str, Optional[float]]:
     """
     Build rolling window features for a given stat across multiple window sizes
-    For larger windows (>= 5), if not enough history, falls back to using all available games
-    For smaller windows (2-4), always uses the requested window or available games
+    Uses fallback: if not enough data for larger window, uses smaller window values
 
     Args:
         team_hist: List of historical games
@@ -201,57 +200,67 @@ def build_rolling_window_features(team_hist: List[dict], team_prefix: str, stat_
 
     Returns:
         Dictionary with keys like 'stat_last3', 'stat_last5', etc.
-        For large windows without enough data, returns None
+        Falls back to smaller windows if not enough data
     """
     features = {}
     full_key = f'{team_prefix}_{stat_key}'
+    computed_values = {}
 
     for window in windows:
         if window == 0:
-            # 0 means use all available
             actual_window = len(team_hist)
-        elif window <= 4:
-            # Small windows: use requested window or available, whichever is smaller
-            actual_window = min(window, len(team_hist))
         else:
-            # Large windows (5+): need enough history to create the window
-            # If not enough games, use the largest available <= 4, otherwise None
-            if len(team_hist) >= window:
-                actual_window = window
-            else:
-                # Fall back to last3 if available
-                actual_window = min(3, len(team_hist))
-                if actual_window < 2:
-                    # Not enough data even for fallback
-                    features[f'{team_prefix}_{stat_key}_last{window}'] = None
-                    if stat_key in ['score', 'total', 'efg_pct', 'pace']:
-                        features[f'{team_prefix}_{stat_key}_variance_last{window}'] = None
-                        features[f'{team_prefix}_{stat_key}_trend_last{window}'] = None
-                    continue
+            actual_window = min(window, len(team_hist))
 
         # Get games to use
         games_to_use = team_hist[:actual_window]
 
-        # Calculate average
-        avg_val = calculate_simple_average(games_to_use, full_key)
+        # Calculate if we have enough data (at least 2 games)
+        if len(games_to_use) >= 2:
+            avg_val = calculate_simple_average(games_to_use, full_key)
+            var_val = None
+            trend_val = None
 
-        # Store with requested window name (not actual window used)
-        feature_key = f'{team_prefix}_{stat_key}_last{window}'
-        features[feature_key] = avg_val
+            if stat_key in ['score', 'total', 'efg_pct', 'pace']:
+                var_val = calculate_variance(games_to_use, full_key)
+                trend_val = calculate_trend(games_to_use, full_key)
 
-        # Also add variance and trend for key stats
-        if stat_key in ['score', 'total', 'efg_pct', 'pace']:
-            var_val = calculate_variance(games_to_use, full_key)
-            features[f'{team_prefix}_{stat_key}_variance_last{window}'] = var_val
+            computed_values[window] = {
+                'avg': avg_val,
+                'variance': var_val,
+                'trend': trend_val
+            }
+        else:
+            # Not enough data - use fallback from smaller window
+            fallback_window = None
+            for prev_window in sorted([w for w in windows if w < window], reverse=True):
+                if prev_window in computed_values:
+                    fallback_window = prev_window
+                    break
 
-            trend_val = calculate_trend(games_to_use, full_key)
-            features[f'{team_prefix}_{stat_key}_trend_last{window}'] = trend_val
+            if fallback_window:
+                computed_values[window] = computed_values[fallback_window]
+            else:
+                computed_values[window] = None
+
+    # Assign features from computed values
+    for window in windows:
+        if computed_values[window]:
+            features[f'{team_prefix}_{stat_key}_last{window}'] = computed_values[window]['avg']
+            if stat_key in ['score', 'total', 'efg_pct', 'pace']:
+                features[f'{team_prefix}_{stat_key}_variance_last{window}'] = computed_values[window]['variance']
+                features[f'{team_prefix}_{stat_key}_trend_last{window}'] = computed_values[window]['trend']
+        else:
+            features[f'{team_prefix}_{stat_key}_last{window}'] = None
+            if stat_key in ['score', 'total', 'efg_pct', 'pace']:
+                features[f'{team_prefix}_{stat_key}_variance_last{window}'] = None
+                features[f'{team_prefix}_{stat_key}_trend_last{window}'] = None
 
     return features
 
 
 def build_closest_rank_features(team_hist: List[dict], opp_rank: Optional[int],
-                               team_prefix: str) -> Dict[str, Optional[float]]:
+                               team_prefix: str, team_name: str, windows: List[int] = [3, 5, 7]) -> Dict[str, Optional[float]]:
     """
     Build features based on closest rank historical games
 
@@ -259,34 +268,40 @@ def build_closest_rank_features(team_hist: List[dict], opp_rank: Optional[int],
         team_hist: Match history for a team
         opp_rank: Opponent's rank in current game
         team_prefix: 'team_1' or 'team_2'
+        team_name: Name of the team (to find correct leaderboard in historical games)
+        windows: List of window sizes (default: [3, 5, 7] for top 3, 5, 7 closest rank games)
 
     Returns:
-        Dictionary with closest rank features
+        Dictionary with closest rank features for each window size
     """
     features = {}
+    base_features = ['score', 'score_allowed', 'total', 'margin', 'adjoe', 'adjde']
 
     if not opp_rank or not team_hist:
         # Return None values if we can't calculate
-        base_features = ['score', 'score_allowed', 'total', 'margin']
-        for feat in base_features:
-            features[f'{team_prefix}_{feat}_closest3rank'] = None
+        for window in windows:
+            for feat in base_features:
+                features[f'{team_prefix}_{feat}_closest{window}rank'] = None
         return features
 
-    # Find closest rank games
-    closest_games, weights = find_closest_rank_games(team_hist, opp_rank, top_n=3, rank_window=50)
+    # Find closest rank games (use max window size)
+    max_window = max(windows)
+    closest_games, weights = find_closest_rank_games(team_hist, opp_rank, top_n=max_window, rank_window=50, team_name=team_name)
 
     if not closest_games:
         # Return None values if no close rank games found
-        base_features = ['score', 'score_allowed', 'total', 'margin']
-        for feat in base_features:
-            features[f'{team_prefix}_{feat}_closest3rank'] = None
+        for window in windows:
+            for feat in base_features:
+                features[f'{team_prefix}_{feat}_closest{window}rank'] = None
         return features
 
-    # Calculate weighted averages from closest games
-    scores = []
-    scores_allowed = []
-    totals = []
-    margins = []
+    # Extract all stats from closest games
+    all_scores = []
+    all_scores_allowed = []
+    all_totals = []
+    all_margins = []
+    all_adjoe_values = []
+    all_adjde_values = []
 
     for game in closest_games:
         if not isinstance(game, dict):
@@ -296,20 +311,102 @@ def build_closest_rank_features(team_hist: List[dict], opp_rank: Optional[int],
         opp_score = game.get(f'{"team_2" if team_prefix == "team_1" else "team_1"}_score')
 
         if t_score is not None:
-            scores.append(float(t_score))
+            all_scores.append(float(t_score))
+        else:
+            all_scores.append(None)
 
         if opp_score is not None:
-            scores_allowed.append(float(opp_score))
+            all_scores_allowed.append(float(opp_score))
+        else:
+            all_scores_allowed.append(None)
 
         if t_score is not None and opp_score is not None:
-            totals.append(float(t_score) + float(opp_score))
-            margins.append(float(t_score) - float(opp_score))
+            all_totals.append(float(t_score) + float(opp_score))
+            all_margins.append(float(t_score) - float(opp_score))
+        else:
+            all_totals.append(None)
+            all_margins.append(None)
 
-    # Calculate weighted averages
-    features[f'{team_prefix}_score_closest3rank'] = calculate_weighted_average(scores, weights[:len(scores)])
-    features[f'{team_prefix}_score_allowed_closest3rank'] = calculate_weighted_average(scores_allowed, weights[:len(scores_allowed)])
-    features[f'{team_prefix}_total_closest3rank'] = calculate_weighted_average(totals, weights[:len(totals)])
-    features[f'{team_prefix}_margin_closest3rank'] = calculate_weighted_average(margins, weights[:len(margins)])
+        # Extract adjoe and adjde from leaderboard snapshot
+        # Determine which team this is in the historical game
+        if game.get('team_1') == team_name:
+            lb = game.get('team_1_leaderboard')
+        elif game.get('team_2') == team_name:
+            lb = game.get('team_2_leaderboard')
+        else:
+            lb = None
+
+        if lb and isinstance(lb, dict):
+            adjoe = lb.get('adjoe')
+            adjde = lb.get('adjde')
+
+            if adjoe is not None:
+                try:
+                    all_adjoe_values.append(float(adjoe))
+                except (ValueError, TypeError):
+                    all_adjoe_values.append(None)
+            else:
+                all_adjoe_values.append(None)
+
+            if adjde is not None:
+                try:
+                    all_adjde_values.append(float(adjde))
+                except (ValueError, TypeError):
+                    all_adjde_values.append(None)
+            else:
+                all_adjde_values.append(None)
+        else:
+            all_adjoe_values.append(None)
+            all_adjde_values.append(None)
+
+    # Calculate weighted averages for each window size
+    # Store computed values for fallback (use smaller window if larger not available)
+    computed_values = {}
+
+    for window in windows:
+        # Get subset for this window
+        window_size = min(window, len(closest_games))
+
+        # Filter out None values and get corresponding weights
+        scores = [v for v in all_scores[:window_size] if v is not None]
+        scores_allowed = [v for v in all_scores_allowed[:window_size] if v is not None]
+        totals = [v for v in all_totals[:window_size] if v is not None]
+        margins = [v for v in all_margins[:window_size] if v is not None]
+        adjoe_values = [v for v in all_adjoe_values[:window_size] if v is not None]
+        adjde_values = [v for v in all_adjde_values[:window_size] if v is not None]
+
+        # If we have data for this window, compute features
+        if len(scores) >= min(window, 2):  # Need at least 2 games or whatever we can get
+            computed_values[window] = {
+                'score': calculate_weighted_average(scores, weights[:len(scores)]),
+                'score_allowed': calculate_weighted_average(scores_allowed, weights[:len(scores_allowed)]),
+                'total': calculate_weighted_average(totals, weights[:len(totals)]),
+                'margin': calculate_weighted_average(margins, weights[:len(margins)]),
+                'adjoe': calculate_weighted_average(adjoe_values, weights[:len(adjoe_values)]),
+                'adjde': calculate_weighted_average(adjde_values, weights[:len(adjde_values)])
+            }
+        else:
+            # Not enough data for this window - use fallback from smaller window
+            # Find the largest window smaller than this one that has data
+            fallback_window = None
+            for prev_window in sorted([w for w in windows if w < window], reverse=True):
+                if prev_window in computed_values:
+                    fallback_window = prev_window
+                    break
+
+            if fallback_window:
+                computed_values[window] = computed_values[fallback_window]
+            else:
+                computed_values[window] = None
+
+    # Assign features from computed values
+    for window in windows:
+        if computed_values[window]:
+            for feat in base_features:
+                features[f'{team_prefix}_{feat}_closest{window}rank'] = computed_values[window].get(feat)
+        else:
+            for feat in base_features:
+                features[f'{team_prefix}_{feat}_closest{window}rank'] = None
 
     return features
 
@@ -332,8 +429,8 @@ def build_leaderboard_differentials(team1_lb: Optional[dict], team2_lb: Optional
             'rank_differential': None,
             'barthag_differential': None,
             'adj_tempo_differential': None,
-            'adj_oe_differential': None,
-            'adj_de_differential': None,
+            'adjoe_differential': None,
+            'adjde_differential': None,
             'efg_off_differential': None,
             'efg_def_differential': None,
             'orb_rate_differential': None,
@@ -372,6 +469,22 @@ def build_leaderboard_differentials(team1_lb: Optional[dict], team2_lb: Optional
         features['adj_tempo_differential'] = t1_tempo - t2_tempo
     else:
         features['adj_tempo_differential'] = None
+
+    # Adjusted Offensive Efficiency differential
+    t1_adjoe = safe_float(team1_lb.get('adjoe'))
+    t2_adjoe = safe_float(team2_lb.get('adjoe'))
+    if t1_adjoe is not None and t2_adjoe is not None:
+        features['adjoe_differential'] = t1_adjoe - t2_adjoe
+    else:
+        features['adjoe_differential'] = None
+
+    # Adjusted Defensive Efficiency differential
+    t1_adjde = safe_float(team1_lb.get('adjde'))
+    t2_adjde = safe_float(team2_lb.get('adjde'))
+    if t1_adjde is not None and t2_adjde is not None:
+        features['adjde_differential'] = t1_adjde - t2_adjde
+    else:
+        features['adjde_differential'] = None
 
     # Four factors differentials
     t1_efg_off = safe_float(team1_lb.get('efg_off_prcnt'))
@@ -419,6 +532,95 @@ def build_leaderboard_differentials(team1_lb: Optional[dict], team2_lb: Optional
     return features
 
 
+def build_leaderboard_rolling_features(team_hist: List[dict], team_prefix: str, stat_key: str,
+                                       windows: List[int], team_name: str) -> Dict[str, Optional[float]]:
+    """
+    Build rolling window features for leaderboard-based stats (adjoe, adjde, adj_t)
+    Extracts stats from historical game leaderboard snapshots
+
+    Args:
+        team_hist: List of historical games
+        team_prefix: 'team_1' or 'team_2'
+        stat_key: Leaderboard stat key (e.g., 'adjoe', 'adjde', 'adj_t')
+        windows: List of window sizes to calculate
+        team_name: Name of the team (to find correct leaderboard in historical games)
+
+    Returns:
+        Dictionary with keys like 'team_1_adjoe_last3', 'team_1_adjoe_last5', etc.
+    """
+    features = {}
+
+    # Extract the stat values from historical game leaderboards
+    stat_values = []
+    for game in team_hist:
+        if not isinstance(game, dict):
+            continue
+
+        # Determine which team this is in the historical game
+        # and get the corresponding leaderboard
+        if game.get('team_1') == team_name:
+            lb = game.get('team_1_leaderboard')
+        elif game.get('team_2') == team_name:
+            lb = game.get('team_2_leaderboard')
+        else:
+            continue
+
+        if lb and isinstance(lb, dict):
+            val = lb.get(stat_key)
+            if val is not None:
+                try:
+                    stat_values.append(float(val))
+                except (ValueError, TypeError):
+                    pass
+
+    # Calculate rolling averages for each window with fallback
+    computed_values = {}
+
+    for window in windows:
+        if window == 0:
+            actual_window = len(stat_values)
+        else:
+            actual_window = min(window, len(stat_values))
+
+        # Get values for this window
+        window_values = stat_values[:actual_window]
+
+        # Calculate average if we have enough data
+        if len(window_values) >= 2:
+            avg_val = sum(window_values) / len(window_values)
+            mean = avg_val
+            variance = sum((x - mean) ** 2 for x in window_values) / len(window_values)
+            variance_val = variance ** 0.5 if len(window_values) > 1 else None
+
+            computed_values[window] = {
+                'avg': avg_val,
+                'variance': variance_val
+            }
+        else:
+            # Not enough data - use fallback from smaller window
+            fallback_window = None
+            for prev_window in sorted([w for w in windows if w < window], reverse=True):
+                if prev_window in computed_values:
+                    fallback_window = prev_window
+                    break
+
+            if fallback_window:
+                computed_values[window] = computed_values[fallback_window]
+            else:
+                computed_values[window] = None
+
+    # Assign features from computed values
+    for window in windows:
+        if computed_values[window]:
+            features[f'{team_prefix}_{stat_key}_last{window}'] = computed_values[window]['avg']
+            features[f'{team_prefix}_{stat_key}_variance_last{window}'] = computed_values[window]['variance']
+        else:
+            features[f'{team_prefix}_{stat_key}_last{window}'] = None
+            features[f'{team_prefix}_{stat_key}_variance_last{window}'] = None
+
+    return features
+
+
 def build_ou_features(df: pl.DataFrame) -> pl.DataFrame:
     """
     Build comprehensive Over/Under features from flat dataset
@@ -462,11 +664,31 @@ def build_ou_features(df: pl.DataFrame) -> pl.DataFrame:
             except (ValueError, TypeError):
                 pass
 
+        # Extract current adjoe/adjde values for both teams
+        def safe_float(val):
+            try:
+                return float(val) if val is not None else None
+            except (ValueError, TypeError):
+                return None
+
+        if t1_lb and isinstance(t1_lb, dict):
+            features['team_1_adjoe'] = safe_float(t1_lb.get('adjoe'))
+            features['team_1_adjde'] = safe_float(t1_lb.get('adjde'))
+        else:
+            features['team_1_adjoe'] = None
+            features['team_1_adjde'] = None
+
+        if t2_lb and isinstance(t2_lb, dict):
+            features['team_2_adjoe'] = safe_float(t2_lb.get('adjoe'))
+            features['team_2_adjde'] = safe_float(t2_lb.get('adjde'))
+        else:
+            features['team_2_adjoe'] = None
+            features['team_2_adjde'] = None
+
         # ============================================
         # TEAM-LEVEL ROLLING WINDOW FEATURES
         # ============================================
-        # Note: pace only exists in leaderboard snapshot (adj_t), not in match_hist
-        # So we cannot build rolling windows for pace
+        # Game-level stats (from match history)
         team_stats_to_roll = ['score', 'efg_pct']
 
         for stat in team_stats_to_roll:
@@ -475,27 +697,75 @@ def build_ou_features(df: pl.DataFrame) -> pl.DataFrame:
             features.update(t1_features)
             features.update(t2_features)
 
+        # Leaderboard-based stats (from historical leaderboard snapshots)
+        leaderboard_stats_to_roll = ['adjoe', 'adjde', 'adj_t']
+
+        for stat in leaderboard_stats_to_roll:
+            t1_lb_features = build_leaderboard_rolling_features(t1_hist, 'team_1', stat, rolling_windows, row['team_1'])
+            t2_lb_features = build_leaderboard_rolling_features(t2_hist, 'team_2', stat, rolling_windows, row['team_2'])
+            features.update(t1_lb_features)
+            features.update(t2_lb_features)
+
         # ============================================
         # RANK-BASED CLOSEST MATCH FEATURES
         # ============================================
-        t1_closest = build_closest_rank_features(t1_hist, t2_rank, 'team_1')
-        t2_closest = build_closest_rank_features(t2_hist, t1_rank, 'team_2')
+        t1_closest = build_closest_rank_features(t1_hist, t2_rank, 'team_1', row['team_1'])
+        t2_closest = build_closest_rank_features(t2_hist, t1_rank, 'team_2', row['team_2'])
         features.update(t1_closest)
         features.update(t2_closest)
 
-        # Derived: Combined expected total from closest rank games
-        t1_score_closest = t1_closest.get('team_1_score_closest3rank')
-        t2_score_closest = t2_closest.get('team_2_score_closest3rank')
-        if t1_score_closest and t2_score_closest:
-            features['combined_expected_total_closest_rank'] = t1_score_closest + t2_score_closest
-        else:
-            features['combined_expected_total_closest_rank'] = None
+        # Derived: Combined features from closest rank games (for each window)
+        rank_windows = [3, 5, 7]
+        for window in rank_windows:
+            # Combined expected total
+            t1_score_closest = t1_closest.get(f'team_1_score_closest{window}rank')
+            t2_score_closest = t2_closest.get(f'team_2_score_closest{window}rank')
+            if t1_score_closest and t2_score_closest:
+                features[f'combined_expected_total_closest{window}rank'] = t1_score_closest + t2_score_closest
+            else:
+                features[f'combined_expected_total_closest{window}rank'] = None
+
+            # Combined adjoe/adjde from closest rank games
+            t1_adjoe_closest = t1_closest.get(f'team_1_adjoe_closest{window}rank')
+            t2_adjoe_closest = t2_closest.get(f'team_2_adjoe_closest{window}rank')
+            if t1_adjoe_closest is not None and t2_adjoe_closest is not None:
+                features[f'combined_adjoe_closest{window}rank'] = (t1_adjoe_closest + t2_adjoe_closest) / 2
+                features[f'adjoe_differential_closest{window}rank'] = t1_adjoe_closest - t2_adjoe_closest
+            else:
+                features[f'combined_adjoe_closest{window}rank'] = None
+                features[f'adjoe_differential_closest{window}rank'] = None
+
+            t1_adjde_closest = t1_closest.get(f'team_1_adjde_closest{window}rank')
+            t2_adjde_closest = t2_closest.get(f'team_2_adjde_closest{window}rank')
+            if t1_adjde_closest is not None and t2_adjde_closest is not None:
+                features[f'combined_adjde_closest{window}rank'] = (t1_adjde_closest + t2_adjde_closest) / 2
+                features[f'adjde_differential_closest{window}rank'] = t1_adjde_closest - t2_adjde_closest
+            else:
+                features[f'combined_adjde_closest{window}rank'] = None
+                features[f'adjde_differential_closest{window}rank'] = None
 
         # ============================================
         # LEADERBOARD DIFFERENTIALS
         # ============================================
         lb_diffs = build_leaderboard_differentials(t1_lb, t2_lb)
         features.update(lb_diffs)
+
+        # Derived adjoe/adjde features
+        # Combined offensive/defensive efficiency (for total scoring prediction)
+        t1_adjoe = features.get('team_1_adjoe')
+        t2_adjoe = features.get('team_2_adjoe')
+        t1_adjde = features.get('team_1_adjde')
+        t2_adjde = features.get('team_2_adjde')
+
+        if t1_adjoe is not None and t2_adjoe is not None:
+            features['combined_adjoe'] = (t1_adjoe + t2_adjoe) / 2
+        else:
+            features['combined_adjoe'] = None
+
+        if t1_adjde is not None and t2_adjde is not None:
+            features['combined_adjde'] = (t1_adjde + t2_adjde) / 2
+        else:
+            features['combined_adjde'] = None
 
         # ============================================
         # ODDS DATA FEATURES
@@ -608,6 +878,67 @@ def build_ou_features(df: pl.DataFrame) -> pl.DataFrame:
 
         time_features = calculate_game_time_features(game_time)
         features.update(time_features)
+
+        # ============================================
+        # ODDS AVAILABILITY TO GAME START TIME DIFFERENCE
+        # ============================================
+        # Odds available at 9AM EST on game date
+        # Calculate hours from odds availability to game start
+        features['hours_until_game_from_odds'] = None
+
+        game_date = row.get('date')
+        start_time_val = row.get('start_time')
+
+        if game_date and start_time_val:
+            try:
+                from datetime import datetime, timezone
+                import pytz
+
+                # Parse game date (format: YYYY-MM-DD or date object)
+                if isinstance(game_date, str):
+                    date_obj = datetime.strptime(game_date, '%Y-%m-%d')
+                elif hasattr(game_date, 'year'):
+                    date_obj = datetime(game_date.year, game_date.month, game_date.day)
+                else:
+                    date_obj = None
+
+                if date_obj:
+                    # Create odds timestamp: 9AM EST on game date
+                    est = pytz.timezone('US/Eastern')
+                    odds_time_est = est.localize(date_obj.replace(hour=9, minute=0, second=0))
+                    odds_time_utc = odds_time_est.astimezone(timezone.utc)
+
+                    # Parse start_time (assumed to be UTC)
+                    if isinstance(start_time_val, str):
+                        # Try parsing as datetime string
+                        try:
+                            start_dt = datetime.strptime(start_time_val, '%Y-%m-%d %H:%M:%S')
+                        except ValueError:
+                            try:
+                                start_dt = datetime.strptime(start_time_val, '%Y-%m-%d %H:%M')
+                            except ValueError:
+                                start_dt = None
+
+                        if start_dt:
+                            # Assume it's UTC
+                            start_dt_utc = start_dt.replace(tzinfo=timezone.utc)
+                    elif hasattr(start_time_val, 'hour'):
+                        # It's already a datetime object
+                        if start_time_val.tzinfo is None:
+                            start_dt_utc = start_time_val.replace(tzinfo=timezone.utc)
+                        else:
+                            start_dt_utc = start_time_val.astimezone(timezone.utc)
+                    else:
+                        start_dt_utc = None
+
+                    # Calculate difference in hours
+                    if start_dt_utc:
+                        time_diff = start_dt_utc - odds_time_utc
+                        hours_diff = time_diff.total_seconds() / 3600
+                        features['hours_until_game_from_odds'] = float(hours_diff)
+            except Exception:
+                # If any error occurs, leave as None
+                features['hours_until_game_from_odds'] = None
 
         features_list.append(features)
 

@@ -116,14 +116,21 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
             # Sort by barthag (largest to smallest) to get proper ranking
             df = df.sort_values('barthag', ascending=False).reset_index(drop=True)
 
-            # Format date from year and end_date (e.g., '2025' + '0214' -> '2025-02-14')
+            # Format date from year and end_date
+            # Need to determine the actual calendar year (not season year)
             if end_date:
                 # end_date is in format MMDD
                 month = end_date[:2]
                 day = end_date[2:4]
-                date_str = f"{year}-{month}-{day}"
+                # If Nov/Dec, the calendar year is season_year - 1
+                # Otherwise it's the season year
+                if int(month) >= 11:  # November or December
+                    calendar_year = str(int(year) - 1)
+                else:  # January through October
+                    calendar_year = year
+                date_str = f"{calendar_year}-{month}-{day}"
             else:
-                # Default to June 30th
+                # Default to June 30th of season year
                 date_str = f"{year}-06-30"
 
             # Add date column as first column
@@ -137,11 +144,7 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
             df['rec'] = df['rec'].astype(str).str.replace('–', '-')
             df[['wins', 'losses']] = df['rec'].str.split('-', expand=True).astype(int)
 
-            # Rename columns
-            df = df.rename(columns={
-                'adjoe': 'conf',
-                'adjde': 'g',
-            })
+            # No renaming needed - keep adjoe and adjde as-is
 
             # Drop unnecessary columns
             cols_to_drop = [
@@ -153,13 +156,13 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
             ]
             df = df.drop(columns=[col for col in cols_to_drop if col in df.columns])
 
-            # Reorder columns: date, rank, team, conf, g, barthag, wins, losses, then all stat columns
+            # Reorder columns: date, rank, team, barthag, wins, losses, then all stat columns
             stat_cols = [
-                'efg_off_prcnt', 'efg_def_prcnt', 'ftr', 'ftrd', 'tor', 'tord',
+                'adjoe', 'adjde', 'efg_off_prcnt', 'efg_def_prcnt', 'ftr', 'ftrd', 'tor', 'tord',
                 'orb', 'drb', 'adj_t', '2p_prcnt_off', '2p_prcnt_def', '3p_prcnt_off',
                 '3p_prcnt_def', '3pr', '3prd', 'wab'
             ]
-            col_order = ['date', 'rank', 'team', 'conf', 'g', 'barthag', 'wins', 'losses'] + stat_cols
+            col_order = ['date', 'rank', 'team', 'barthag', 'wins', 'losses'] + stat_cols
             df = df[[col for col in col_order if col in df.columns]]
 
 

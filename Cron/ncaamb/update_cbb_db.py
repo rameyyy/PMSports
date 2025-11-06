@@ -21,10 +21,10 @@ def get_missing_dates_for_season(year):
     Returns:
         List of missing dates in YYYY-MM-DD format
     """
-    # Seasons run from November 1 to April 15
-    # 2024 season = Nov 1, 2023 - Apr 15, 2024
+    # Seasons run from November 1 to April 5
+    # 2024 season = Nov 1, 2023 - Apr 5, 2024
     season_start = datetime(year - 1, 11, 1)
-    season_end = datetime(year, 5, 5)
+    season_end = datetime(year, 4, 5)
     today = datetime.now()
 
     # Only check up to today
@@ -80,8 +80,8 @@ def get_missing_dates_for_season(year):
     return missing_dates
 
 def run_season_scrapes():
-    """Run the leaderboard scraper for multiple seasons (2024, 2023, 2022)"""
-    seasons_to_scrape = [2020]
+    """Run the leaderboard scraper for multiple seasons (2020-2025)"""
+    seasons_to_scrape = [2021, 2022, 2023, 2024, 2025]
 
     print("🏀 Starting NCAAMB multi-season scrape")
     print(f"📊 Seasons to scrape: {', '.join(map(str, seasons_to_scrape))}")
@@ -111,7 +111,14 @@ def run_season_scrapes():
         for idx, date_str in enumerate(scrape_dates, 1):
             # Parse the date string to extract year, month, day
             date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-            year = str(date_obj.year)
+
+            # Determine season year (Nov-Dec dates belong to next year's season)
+            # e.g., 2024-11-15 is part of the 2024-2025 season (year=2025)
+            if date_obj.month >= 11:  # November or December
+                year = str(date_obj.year + 1)
+            else:  # January through October
+                year = str(date_obj.year)
+
             end_date = date_obj.strftime('%m%d')
             percentage = (idx / total_scrapes) * 100
 

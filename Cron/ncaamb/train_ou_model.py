@@ -19,30 +19,84 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'models'))
 from models.ou_model import OUModel
 
 
-def apply_data_quality_filters(df):
+def apply_data_quality_filters(df, min_bookmakers=2):
     """
     Apply data quality filters to remove low-quality rows
 
-    Filters (per user requirement):
-    1. Remove rows where avg_ou_line is null (no odds data)
-    2. Remove rows where num_books_with_ou < 2 (need at least 2 bookmakers)
+    Filters:
+    1. Remove rows where either team is missing leaderboard data
+    2. Remove rows where avg_ou_line is null (no odds data)
+    3. Remove rows where num_books_with_ou < min_bookmakers (insufficient bookmaker coverage)
 
     Args:
         df: Polars DataFrame with features
+        min_bookmakers: Minimum number of bookmakers required (default: 2)
 
     Returns:
         Filtered DataFrame and filter statistics
     """
     initial_count = len(df)
-    stats = {'initial': initial_count}
+    stats = {
+        'initial': initial_count,
+        'min_bookmakers': min_bookmakers
+    }
 
-    # Filter 1: Remove null avg_ou_line (no odds data)
+    # Show distribution before filtering
+    if 'num_books_with_ou' in df.columns:
+        print(f"\n   Bookmaker distribution BEFORE filtering:")
+        for i in range(0, 10):
+            count = len(df.filter(pl.col('num_books_with_ou') == i))
+            if count > 0:
+                pct = (count / initial_count * 100)
+                print(f"     {i} bookmakers: {count:>5} games ({pct:>5.1f}%)")
+
+    # Filter 1: Remove rows where either team is missing leaderboard data
+    # Check key leaderboard features (adjoe, adjde, barthag) for both teams
+    print(f"\n   Checking leaderboard data availability...")
+
+    team1_missing = len(df.filter(
+        pl.col('team_1_adjoe').is_null() |
+        pl.col('team_1_adjde').is_null()
+    ))
+    team2_missing = len(df.filter(
+        pl.col('team_2_adjoe').is_null() |
+        pl.col('team_2_adjde').is_null()
+    ))
+    either_missing = len(df.filter(
+        pl.col('team_1_adjoe').is_null() |
+        pl.col('team_1_adjde').is_null() |
+        pl.col('team_2_adjoe').is_null() |
+        pl.col('team_2_adjde').is_null()
+    ))
+
+    print(f"     Team 1 missing leaderboard: {team1_missing} games ({team1_missing/initial_count*100:.1f}%)")
+    print(f"     Team 2 missing leaderboard: {team2_missing} games ({team2_missing/initial_count*100:.1f}%)")
+    print(f"     Either team missing: {either_missing} games ({either_missing/initial_count*100:.1f}%)")
+
+    df = df.filter(
+        pl.col('team_1_adjoe').is_not_null() &
+        pl.col('team_1_adjde').is_not_null() &
+        pl.col('team_2_adjoe').is_not_null() &
+        pl.col('team_2_adjde').is_not_null()
+    )
+    stats['after_leaderboard_check'] = len(df)
+
+    # Filter 2: Remove null avg_ou_line (no odds data)
     df = df.filter(pl.col('avg_ou_line').is_not_null())
     stats['after_avg_ou_line'] = len(df)
 
-    # Filter 2: Remove rows with < 2 bookmakers for O/U
-    df = df.filter(pl.col('num_books_with_ou') >= 2)
+    # Filter 3: Remove rows with insufficient bookmakers
+    df = df.filter(pl.col('num_books_with_ou') >= min_bookmakers)
     stats['after_num_books'] = len(df)
+
+    # Show distribution after filtering
+    if 'num_books_with_ou' in df.columns and len(df) > 0:
+        print(f"\n   Bookmaker distribution AFTER filtering (>= {min_bookmakers}):")
+        for i in range(min_bookmakers, 10):
+            count = len(df.filter(pl.col('num_books_with_ou') == i))
+            if count > 0:
+                pct = (count / len(df) * 100)
+                print(f"     {i} bookmakers: {count:>5} games ({pct:>5.1f}%)")
 
     # Calculate filtered out
     stats['filtered_out'] = initial_count - len(df)
@@ -63,10 +117,13 @@ def main():
 
     # Apply data quality filters
     print("\n2. Applying data quality filters...")
-    features_df, filter_stats = apply_data_quality_filters(features_df)
+    MIN_BOOKMAKERS = 2  # Require at least 2 bookmakers with O/U data
+    features_df, filter_stats = apply_data_quality_filters(features_df, min_bookmakers=MIN_BOOKMAKERS)
+    print(f"\n   Filter Summary:")
     print(f"   Initial games: {filter_stats['initial']}")
+    print(f"   After removing games with missing leaderboard data: {filter_stats['after_leaderboard_check']}")
     print(f"   After removing null avg_ou_line: {filter_stats['after_avg_ou_line']}")
-    print(f"   After requiring >=2 bookmakers: {filter_stats['after_num_books']}")
+    print(f"   After requiring >={MIN_BOOKMAKERS} bookmakers: {filter_stats['after_num_books']}")
     print(f"   Final games: {len(features_df)}")
     print(f"   Filtered out: {filter_stats['filtered_out']} ({100-filter_stats['percent_retained']:.1f}%)")
     print(f"   Retained: {filter_stats['percent_retained']:.1f}%")
@@ -121,8 +178,8 @@ def main():
 
     for i in range(min(10, len(predictions['game_id']))):
         game_id = predictions['game_id'][i]
-        t1 = predictions['team_1'][i][:12]
-        t2 = predictions['team_2'][i][:12]
+        t1 = predictions['team_1'][i][:12] if predictions['team_1'][i] else 'N/A'
+        t2 = predictions['team_2'][i][:12] if predictions['team_2'][i] else 'N/A'
         actual = predictions['actual_total'][i]
         pred = predictions['predicted_total'][i]
         error = predictions['prediction_error'][i]

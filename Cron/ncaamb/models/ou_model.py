@@ -43,7 +43,10 @@ class OUModel:
 
         numeric_types = (pl.Float64, pl.Float32, pl.Int64, pl.Int32, pl.Int16, pl.Int8)
         numeric_cols = [c for c, dt in zip(df.columns, df.dtypes) if dt in numeric_types]
-        feature_cols = [c for c in numeric_cols if c != target_col]
+
+        # Exclude target and any score-related columns that would cause data leakage
+        exclude_cols = {target_col, 'team_1_score', 'team_2_score'}
+        feature_cols = [c for c in numeric_cols if c not in exclude_cols]
 
         X = df.select(feature_cols).to_numpy()
         game_info = {
@@ -117,18 +120,18 @@ class OUModel:
         # Merge remaining overrides
         default_params.update(xgb_params)
 
+        # Add early_stopping_rounds to params for XGBoost 3.x
+        default_params["early_stopping_rounds"] = 50
+
         # Build model
         self.model = xgb.XGBRegressor(**default_params)
 
-        # Early stopping via callback (works across XGBoost versions)
-        es = xgb.callback.EarlyStopping(rounds=50, save_best=True)
-
-        # Fit (no eval_metric in fit; it's in params)
+        # Fit
         self.model.fit(
             X_train,
             y_train,
             eval_set=[(X_test, y_test)],
-            callbacks=[es],
+            verbose=False
         )
 
         self.feature_names = feature_cols

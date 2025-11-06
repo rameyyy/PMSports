@@ -164,16 +164,17 @@ def calculate_trend(games_list: List[dict], stat_key: str, limit: Optional[int] 
 
 
 def find_closest_rank_games(team_hist: List[dict], opponent_rank: Optional[int],
-                           top_n: int = 3, rank_window: int = 50) -> Tuple[List[dict], List[float]]:
+                           top_n: int = 3, rank_window: int = 50, team_name: Optional[str] = None) -> Tuple[List[dict], List[float]]:
     """
     Find games in team history with closest opponent rank to current game
     Uses opponent barthag (power rating) to find similar matchups
 
     Args:
-        team_hist: List of historical games for a team (all games where team_1 == our team)
+        team_hist: List of historical games for a team (team can be team_1 OR team_2 in these games)
         opponent_rank: Opponent's rank in current game (None if unranked)
         top_n: Number of closest games to return
         rank_window: Initial rank window (±rank_window)
+        team_name: Name of the team (to identify which side they're on in historical games)
 
     Returns:
         Tuple of (closest games list, similarity weights list)
@@ -187,9 +188,18 @@ def find_closest_rank_games(team_hist: List[dict], opponent_rank: Optional[int],
         if not isinstance(game, dict):
             continue
 
-        # Get opponent leaderboard from historical game
-        # Since these are all team_1's perspective games, team_2 is the opponent
-        opp_lb = game.get('team_2_leaderboard')
+        # Determine which team in this historical game is OUR team and which is the opponent
+        # The team could be team_1 or team_2 in their match history
+        our_team_is_team1 = game.get('team_1') == team_name if team_name else True
+
+        # Get OPPONENT's leaderboard (not our team's leaderboard!)
+        if our_team_is_team1:
+            # Our team is team_1, so opponent is team_2
+            opp_lb = game.get('team_2_leaderboard')
+        else:
+            # Our team is team_2, so opponent is team_1
+            opp_lb = game.get('team_1_leaderboard')
+
         if not opp_lb or not isinstance(opp_lb, dict):
             continue
 
@@ -281,13 +291,14 @@ def get_top_n_players_by_minutes(game_player_stats: List[dict], top_n: int = 5) 
 
 
 def aggregate_top_players_stat(match_hist: List[dict], player_stat_key: str,
-                               top_n: int = 5, limit: Optional[int] = None) -> Optional[float]:
+                               team_name: str, top_n: int = 5, limit: Optional[int] = None) -> Optional[float]:
     """
     Aggregate a stat across top N players in recent games
 
     Args:
         match_hist: Match history list with team_1_player_stats/team_2_player_stats
         player_stat_key: Key to extract from player stat dicts (e.g., 'pts', 'bpm')
+        team_name: Name of the team (to match players by their 'team' field)
         top_n: Number of top players by minutes to aggregate
         limit: Limit on number of games to use
 
@@ -303,9 +314,24 @@ def aggregate_top_players_stat(match_hist: List[dict], player_stat_key: str,
         if not isinstance(game, dict):
             continue
 
-        # Get player stats for this game
-        player_stats = game.get('team_1_player_stats', [])
-        top_players = get_top_n_players_by_minutes(player_stats, top_n)
+        # Get ALL player stats from the game (both teams)
+        all_players = []
+        team_1_players = game.get('team_1_player_stats', [])
+        team_2_players = game.get('team_2_player_stats', [])
+
+        if isinstance(team_1_players, list):
+            all_players.extend(team_1_players)
+        if isinstance(team_2_players, list):
+            all_players.extend(team_2_players)
+
+        # Filter to only OUR team's players by matching the 'team' field
+        our_team_players = []
+        for player in all_players:
+            if isinstance(player, dict) and player.get('team') == team_name:
+                our_team_players.append(player)
+
+        # Get top N players by minutes
+        top_players = get_top_n_players_by_minutes(our_team_players, top_n)
 
         for player in top_players:
             stat_val = player.get(player_stat_key)
@@ -338,8 +364,8 @@ def assess_data_quality(team_hist_count: int, games_with_leaderboard: int,
     }
 
 
-def build_player_aggregated_features(match_hist: List[dict], team_prefix: str, windows: List[int],
-                                     top_n_players: int = 5) -> Dict[str, Optional[float]]:
+def build_player_aggregated_features(match_hist: List[dict], team_prefix: str, team_name: str,
+                                     windows: List[int], top_n_players: int = 5) -> Dict[str, Optional[float]]:
     """
     Build aggregated player-level features from match history
 
@@ -349,13 +375,13 @@ def build_player_aggregated_features(match_hist: List[dict], team_prefix: str, w
     Args:
         match_hist: List of historical games with player_stats embedded
         team_prefix: 'team_1' or 'team_2'
+        team_name: Name of the team (to match players by their 'team' field)
         windows: List of window sizes [1,2,3,5,7...]
         top_n_players: Number of top players to aggregate
 
     Returns:
         Dictionary with aggregated player features for each window
     """
-    player_stats_key = f'{team_prefix}_player_stats'
     features = {}
 
     if not match_hist:
@@ -384,12 +410,27 @@ def build_player_aggregated_features(match_hist: List[dict], team_prefix: str, w
             if not isinstance(game, dict):
                 continue
 
-            player_stats = game.get(player_stats_key, [])
-            if not player_stats:
+            # Get ALL player stats from the game (both teams)
+            all_players = []
+            team_1_players = game.get('team_1_player_stats', [])
+            team_2_players = game.get('team_2_player_stats', [])
+
+            if isinstance(team_1_players, list):
+                all_players.extend(team_1_players)
+            if isinstance(team_2_players, list):
+                all_players.extend(team_2_players)
+
+            # Filter to only OUR team's players by matching the 'team' field
+            our_team_players = []
+            for player in all_players:
+                if isinstance(player, dict) and player.get('team') == team_name:
+                    our_team_players.append(player)
+
+            if not our_team_players:
                 continue
 
             # Get top players by minutes in this game
-            top_players = get_top_n_players_by_minutes(player_stats, top_n_players)
+            top_players = get_top_n_players_by_minutes(our_team_players, top_n_players)
 
             for player in top_players:
                 if not isinstance(player, dict):
