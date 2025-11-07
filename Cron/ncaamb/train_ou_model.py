@@ -19,6 +19,76 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'models'))
 from models.ou_model import OUModel
 
 
+def check_excluded_columns(df):
+    """
+    Check and report which columns will be excluded from training.
+
+    Columns excluded:
+    - game_id, date, team_1, team_2 (identifiers, not features)
+    - team_1_score, team_2_score (outcome variables, data leakage)
+    - actual_total is kept as target but not used as feature
+
+    Args:
+        df: Polars DataFrame
+
+    Returns:
+        List of excluded columns
+    """
+    exclude_cols = {'game_id', 'date', 'team_1', 'team_2', 'team_1_score', 'team_2_score'}
+    cols_to_exclude = [c for c in exclude_cols if c in df.columns]
+
+    if cols_to_exclude:
+        print(f"\n5. Checking for data leakage concerns...")
+        print(f"   Columns that will be EXCLUDED from features:")
+        for col in cols_to_exclude:
+            print(f"   ✅ {col} - will be excluded (not used as feature)")
+        # actual_total is excluded from features but kept for target
+        if 'actual_total' in df.columns:
+            print(f"   ✅ actual_total - target variable (not used as feature)")
+
+    return cols_to_exclude
+
+
+def remove_rows_with_too_many_nulls(df, null_threshold=0.3):
+    """
+    Remove rows where null percentage exceeds threshold.
+    Excludes metadata columns from null count (they don't affect features).
+
+    Args:
+        df: Polars DataFrame
+        null_threshold: Maximum allowable null percentage (default: 0.3 = 30%)
+
+    Returns:
+        Filtered DataFrame and removal statistics
+    """
+    initial_count = len(df)
+
+    # Metadata columns to exclude from null check (identifiers, not features)
+    metadata_cols = {'game_id', 'date', 'team_1', 'team_2'}
+    feature_cols = [c for c in df.columns if c not in metadata_cols]
+
+    # Calculate null count per row for feature columns only
+    null_counts = df.select(feature_cols).select([
+        pl.sum_horizontal(pl.all().is_null()).alias('null_count')
+    ])
+
+    total_feature_cols = len(feature_cols)
+    null_pct = null_counts['null_count'] / total_feature_cols if total_feature_cols > 0 else 0
+
+    # Filter out rows exceeding threshold
+    valid_rows = null_pct <= null_threshold
+    df = df.filter(valid_rows)
+
+    removed_count = initial_count - len(df)
+
+    print(f"\n4. Removing rows with too many nulls (threshold: {null_threshold*100:.0f}%, excluding metadata)...")
+    print(f"   Initial rows: {initial_count}")
+    print(f"   Rows removed: {removed_count} ({removed_count/initial_count*100:.1f}%)")
+    print(f"   Rows retained: {len(df)} ({len(df)/initial_count*100:.1f}%)")
+
+    return df, {'initial': initial_count, 'removed': removed_count, 'retained': len(df)}
+
+
 def apply_data_quality_filters(df, min_bookmakers=2):
     """
     Apply data quality filters to remove low-quality rows
@@ -112,7 +182,7 @@ def main():
 
     # Load features
     print("\n1. Loading features...")
-    features_df = pl.read_csv("ou_features.csv")
+    features_df = pl.read_csv("features.csv")
     print(f"   Loaded {len(features_df)} games with {len(features_df.columns)} features")
 
     # Apply data quality filters
@@ -128,12 +198,27 @@ def main():
     print(f"   Filtered out: {filter_stats['filtered_out']} ({100-filter_stats['percent_retained']:.1f}%)")
     print(f"   Retained: {filter_stats['percent_retained']:.1f}%")
 
+    # Remove rows with too many nulls
+    features_df, null_stats = remove_rows_with_too_many_nulls(features_df, null_threshold=0.2)
+
+    # Ensure actual_total is not null (target variable requirement)
+    print(f"\n3. Ensuring actual_total is not null...")
+    before_target = len(features_df)
+    features_df = features_df.filter(pl.col('actual_total').is_not_null())
+    after_target = len(features_df)
+    print(f"   Rows with valid actual_total: {after_target}")
+    if before_target > after_target:
+        print(f"   Rows removed (null actual_total): {before_target - after_target}")
+
+    # Check excluded columns (but don't remove - OUModel will handle)
+    check_excluded_columns(features_df)
+
     # Initialize model
-    print("\n3. Initializing XGBoost model...")
+    print("\n6. Initializing XGBoost model...")
     model = OUModel()
 
     # Train model
-    print("\n4. Training model...")
+    print("\n7. Training model...")
     metrics = model.train(
         features_df,
         test_size=0.2,
@@ -142,16 +227,29 @@ def main():
         n_estimators=150,
     )
 
-    print("\n   Training Results:")
-    print(f"   - Training MAE: {metrics['train_mae']:.2f} points")
-    print(f"   - Test MAE: {metrics['test_mae']:.2f} points")
-    print(f"   - Training RMSE: {metrics['train_rmse']:.2f} points")
-    print(f"   - Test RMSE: {metrics['test_rmse']:.2f} points")
-    print(f"   - Train games: {metrics['n_train']}")
-    print(f"   - Test games: {metrics['n_test']}")
+    print("\n" + "="*80)
+    print("TRAINING RESULTS - MODEL PERFORMANCE")
+    print("="*80)
+
+    print(f"\nData Summary After Filtering:")
+    print(f"   Total rows after all filters: {len(features_df)}")
+    print(f"   Rows removed (nulls, leaderboard, bookmakers): {filter_stats['initial'] - len(features_df)}")
+    print(f"   Percent retained: {(len(features_df)/filter_stats['initial']*100):.1f}%")
+
+    print(f"\nDataset Split (80/20):")
+    print(f"   Train games: {metrics['n_train']}")
+    print(f"   Test games:  {metrics['n_test']}")
+
+    print(f"\nMean Absolute Error (MAE):")
+    print(f"   Train MAE: {metrics['train_mae']:.4f} points")
+    print(f"   Test MAE:  {metrics['test_mae']:.4f} points")
+
+    print(f"\nRoot Mean Squared Error (RMSE):")
+    print(f"   Train RMSE: {metrics['train_rmse']:.4f} points")
+    print(f"   Test RMSE:  {metrics['test_rmse']:.4f} points")
 
     # Feature importance
-    print("\n5. Top 20 Most Important Features:")
+    print("\n8. Top 20 Most Important Features:")
     importance = model.get_feature_importance(top_n=20)
 
     # Map feature indices to actual names
@@ -161,13 +259,8 @@ def main():
         feat_name = feature_name_map.get(feat, feat)
         print(f"   {i:2d}. {feat_name:<50s} {score:>8.1f}")
 
-    # Save model
-    print("\n6. Saving model...")
-    model_path = "ou_model.pkl"
-    model.save_model(model_path)
-
     # Make predictions on all data
-    print("\n7. Making predictions on filtered games...")
+    print("\n9. Making predictions on filtered games...")
     predictions = model.predict(features_df)
 
     # Show sample predictions
@@ -190,7 +283,7 @@ def main():
             print(f"   {game_id:<35} {t1:<15} {t2:<15} {'N/A':>7} {pred:>9.1f} {'N/A':>7}")
 
     # Save predictions
-    print("\n8. Saving predictions to CSV...")
+    print("\n10. Saving predictions to CSV...")
     pred_df = pl.DataFrame({
         'game_id': predictions['game_id'],
         'date': predictions['date'],

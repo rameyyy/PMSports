@@ -9,13 +9,27 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'models'))
 from models.build_ou_features import build_ou_features
 
+# ============================================================================
+# CONFIGURATION - EDIT YEAR HERE
+# ============================================================================
+YEAR = "2025"  # Change this to desired year (e.g., "2021", "2022", "2023", or leave blank for "sample")
+# =========================================oi===================================
+
 print("="*80)
 print("GENERATING FEATURES AND VALIDATING")
 print("="*80)
 
+# Determine input and output filenames based on year
+if YEAR and YEAR.strip():
+    input_file = f"sample{YEAR}.parquet"
+    output_file = f"features{YEAR}.csv"
+else:
+    input_file = "sample.parquet"
+    output_file = "features.csv"
+
 # Load sample.parquet
-print("\n1. Loading sample.parquet...")
-flat_df = pl.read_parquet("sample.parquet")
+print(f"\n1. Loading {input_file}...")
+flat_df = pl.read_parquet(input_file)
 print(f"   Loaded {len(flat_df)} games")
 
 # Build features
@@ -24,9 +38,9 @@ features_df = build_ou_features(flat_df)
 print(f"   Built features: {len(features_df)} rows, {len(features_df.columns)} columns")
 
 # Save features
-print("\n3. Saving to ou_features.csv...")
-features_df.write_csv("ou_features.csv")
-print("   ✅ Saved to ou_features.csv")
+print(f"\n3. Saving to {output_file}...")
+features_df.write_csv(output_file)
+print(f"   ✅ Saved to {output_file}")
 
 # Show sample row with game_id and actual_total for validation
 print("\n4. Sample row for validation:")

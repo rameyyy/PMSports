@@ -23,7 +23,7 @@ def get_missing_dates_for_season(year):
     """
     # Seasons run from November 1 to April 5
     # 2024 season = Nov 1, 2023 - Apr 5, 2024
-    season_start = datetime(year - 1, 11, 1)
+    season_start = datetime(year - 1, 11, 30)
     season_end = datetime(year, 4, 5)
     today = datetime.now()
 
@@ -81,7 +81,7 @@ def get_missing_dates_for_season(year):
 
 def run_season_scrapes():
     """Run the leaderboard scraper for multiple seasons (2020-2025)"""
-    seasons_to_scrape = [2021, 2022, 2023, 2024, 2025]
+    seasons_to_scrape = [2025]
 
     print("🏀 Starting NCAAMB multi-season scrape")
     print(f"📊 Seasons to scrape: {', '.join(map(str, seasons_to_scrape))}")

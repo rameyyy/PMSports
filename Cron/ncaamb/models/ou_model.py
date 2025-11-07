@@ -35,9 +35,9 @@ class OUModel:
         for c in df.columns:
             if c == target_col:
                 continue
-            if df[c].dtype in (pl.String, pl.Utf8):
+            if df[c].dtype == pl.String:
                 try:
-                    df = df.with_columns(pl.col(c).cast(pl.Float64, strict=False))
+                    df = df.with_columns(pl.col(c).cast(pl.Float64).fill_null(strategy="forward"))
                 except Exception:
                     pass
 
@@ -45,7 +45,8 @@ class OUModel:
         numeric_cols = [c for c, dt in zip(df.columns, df.dtypes) if dt in numeric_types]
 
         # Exclude target and any score-related columns that would cause data leakage
-        exclude_cols = {target_col, 'team_1_score', 'team_2_score'}
+        # Also exclude metadata columns (identifiers, not features)
+        exclude_cols = {target_col, 'team_1_score', 'team_2_score', 'game_id', 'date', 'team_1', 'team_2'}
         feature_cols = [c for c in numeric_cols if c not in exclude_cols]
 
         X = df.select(feature_cols).to_numpy()
@@ -74,12 +75,16 @@ class OUModel:
 
         Args:
             features_df: Polars DataFrame with computed features
-            test_size: Fraction of data to use for validation (chronological split)
+            test_size: Fraction of data to use for validation (chronological split on most recent)
             **xgb_params: XGBoost parameters (may include 'random_state')
 
         Returns:
             Dictionary with training metrics
         """
+        # Sort by date (assuming 'date' column exists) to ensure chronological order
+        if 'date' in features_df.columns:
+            features_df = features_df.sort('date')
+
         # Prepare features/target
         X, feature_cols, game_info = self.prepare_features(features_df)
         y = np.array(game_info["actual_total"], dtype=float)
@@ -89,7 +94,7 @@ class OUModel:
         X = X[valid_idx]
         y = y[valid_idx]
 
-        # Chronological split (assumes input is sorted by date upstream)
+        # Chronological split: train on older games, test on most recent games
         n_samples = len(X)
         n_test = int(n_samples * test_size)
         n_train = max(1, n_samples - n_test)
