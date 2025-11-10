@@ -6,9 +6,9 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import polars as pl
 
-from models.ou_model import OUModel
-from models.lgb_model import LGBModel
-from models.cat_model import CatModel
+from .ou_model import OUModel
+from .lgb_model import LGBModel
+from .cat_model import CatModel
 
 
 class Ensemble3Model:

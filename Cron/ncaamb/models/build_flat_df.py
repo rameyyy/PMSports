@@ -208,7 +208,8 @@ def build_flat_df(season: Optional[int] = None, limit: Optional[int] = None, tar
                   target_date_start: Optional[str] = None, target_date_end: Optional[str] = None,
                   games_df: Optional[pl.DataFrame] = None, teams_df: Optional[pl.DataFrame] = None,
                   leaderboard_df: Optional[pl.DataFrame] = None, player_stats_df: Optional[pl.DataFrame] = None,
-                  odds_dict: Optional[dict] = None) -> List[dict]:
+                  odds_dict: Optional[dict] = None, filter_incomplete_data: bool = False,
+                  min_match_history: int = 1, require_leaderboard: bool = True) -> List[dict]:
     """
     Build flat dataset with raw historical match data for all games
 
@@ -221,6 +222,9 @@ def build_flat_df(season: Optional[int] = None, limit: Optional[int] = None, tar
         leaderboard_df: Optional pre-loaded leaderboard DataFrame (skips fetch if provided)
         player_stats_df: Optional pre-loaded player stats DataFrame (skips fetch if provided)
         odds_dict: Optional dictionary mapping game_id to odds data (skips fetch if provided)
+        filter_incomplete_data: If True, skip games missing leaderboard or insufficient match history
+        min_match_history: Minimum number of games each team must have played (default: 1)
+        require_leaderboard: If True, both teams must have leaderboard data from day before (default: True)
 
     Returns:
         List of dictionaries, each containing game info and historical matches
@@ -272,14 +276,38 @@ def build_flat_df(season: Optional[int] = None, limit: Optional[int] = None, tar
     else:
         games_to_process = games_df
 
+    skipped_games = 0
     for i, row in enumerate(games_to_process.iter_rows(named=True)):
         if i % 100 == 0:
             print(f"Processing game {i+1}/{len(games_to_process)}...")
 
+        # Build the flat row
         flat_row = build_flat_row_for_game(row, games_df, leaderboard_df, player_stats_df, odds_dict)
+
+        # Apply filtering if enabled
+        if filter_incomplete_data:
+            team_1 = flat_row['team_1']
+            team_2 = flat_row['team_2']
+            team_1_hist_count = flat_row['team_1_hist_count']
+            team_2_hist_count = flat_row['team_2_hist_count']
+            team_1_leaderboard = flat_row['team_1_leaderboard']
+            team_2_leaderboard = flat_row['team_2_leaderboard']
+
+            # Check match history threshold
+            if team_1_hist_count < min_match_history or team_2_hist_count < min_match_history:
+                skipped_games += 1
+                continue
+
+            # Check leaderboard requirement
+            if require_leaderboard and (team_1_leaderboard is None or team_2_leaderboard is None):
+                skipped_games += 1
+                continue
+
         flat_rows.append(flat_row)
 
     print(f"\nFlat dataset built with {len(flat_rows)} games")
+    if filter_incomplete_data and skipped_games > 0:
+        print(f"Skipped {skipped_games} games due to incomplete data (filter_incomplete_data=True)")
 
     # Convert to polars DataFrame for efficient processing
     # Keep all nested structures (match history with player stats, leaderboard dicts)

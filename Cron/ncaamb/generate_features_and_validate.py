@@ -7,7 +7,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'models'))
-from models.build_ou_features import build_ou_features
+from models.overunder.build_ou_features import build_ou_features
 
 # ============================================================================
 # CONFIGURATION - EDIT YEAR HERE

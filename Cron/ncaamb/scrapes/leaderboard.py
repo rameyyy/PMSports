@@ -169,8 +169,8 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
             # Push to database
             success = sqlconn.execute_query(df=df, table_name='leaderboard', if_exists='append')
 
-            # Clean up: Remove ALL CSV files in the download directory
-            csv_files = [f for f in os.listdir(download_dir) if f.endswith('.csv')]
+            # Clean up: Remove only trank_data CSV files in the download directory
+            csv_files = [f for f in os.listdir(download_dir) if f.startswith('trank_data') and f.endswith('.csv')]
             for csv_file in csv_files:
                 csv_path = os.path.join(download_dir, csv_file)
                 try:

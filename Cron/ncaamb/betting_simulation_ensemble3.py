@@ -18,7 +18,7 @@ import numpy as np
 # Add models directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'models'))
 
-from models.ensemble3_model import Ensemble3Model
+from models.overunder.ensemble3_model import Ensemble3Model
 
 
 def apply_data_quality_filters(df, min_bookmakers=2):

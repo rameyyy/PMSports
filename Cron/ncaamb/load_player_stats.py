@@ -37,6 +37,7 @@ def construct_game_id(date_str, team, opponent):
 def load_player_stats_to_db(year='2025', season=2025):
     """
     Load player stats from Bart Torvik API into player_stats table.
+    Only inserts stats for games that exist in the games table.
 
     Args:
         year: Season year (e.g., '2025')
@@ -63,6 +64,12 @@ def load_player_stats_to_db(year='2025', season=2025):
         )
 
         cursor = conn.cursor()
+
+        # First, fetch all existing game_ids for this season to filter player stats
+        print(f"Fetching existing game_ids from database...")
+        cursor.execute("SELECT DISTINCT game_id FROM games WHERE season = %s", (season,))
+        existing_game_ids = set(row[0] for row in cursor.fetchall())
+        print(f"  Found {len(existing_game_ids)} games in database for season {season}\n")
 
         # Prepare insert statement
         insert_query = """
@@ -103,14 +110,20 @@ def load_player_stats_to_db(year='2025', season=2025):
 
         successful = 0
         failed = 0
+        skipped = 0
 
         for idx, row in df.iterrows():
             try:
-                # Construct game_id
-                game_id = construct_game_id(row.get('datetext'), row.get('tt'), row.get('opponent'))
+                # Construct game_id using numdate (YYYYMMDD format) instead of datetext (M-D format)
+                game_id = construct_game_id(str(row.get('numdate')), row.get('tt'), row.get('opponent'))
 
                 if not game_id:
                     failed += 1
+                    continue
+
+                # Skip if game doesn't exist in database
+                if game_id not in existing_game_ids:
+                    skipped += 1
                     continue
 
                 # Prepare values - convert NaN to None for SQL NULL
@@ -143,16 +156,20 @@ def load_player_stats_to_db(year='2025', season=2025):
                     print(f"Processed {successful + failed}/{len(df)} records...")
 
             except Exception as e:
-                failed += 1
-                if failed <= 10:  # Print first 10 errors
-                    print(f"Error inserting row {idx}: {e}")
+                # Skip foreign key constraint errors (game_id doesn't exist) but count as warning
+                if "1452" in str(e) or "foreign key" in str(e).lower():
+                    failed += 1
+                else:
+                    failed += 1
+                    if failed <= 10:  # Print first 10 non-FK errors
+                        print(f"Error inserting row {idx}: {e}")
 
         conn.commit()
         cursor.close()
         conn.close()
 
         print(f"\n{'='*100}")
-        print(f"Load complete: {successful} successful, {failed} failed out of {len(df)} records")
+        print(f"Load complete: {successful} inserted, {skipped} skipped (game not in DB), {failed} failed out of {len(df)} records")
         print(f"{'='*100}")
 
     except Exception as e:

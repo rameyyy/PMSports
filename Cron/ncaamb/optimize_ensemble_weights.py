@@ -18,8 +18,8 @@ import pandas as pd
 # Add models directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'models'))
 
-from models.ou_model import OUModel
-from models.lgb_model import LGBModel
+from models.overunder.ou_model import OUModel
+from models.overunder.lgb_model import LGBModel
 
 
 def apply_data_quality_filters(df, min_bookmakers=2):
