@@ -788,23 +788,21 @@ def main():
         print("\n" + "-"*80)
         print("STEP 1: Pushing games to database")
         print("-"*80 + "\n")
-        # success = push_todays_games_to_db(todays_games)
-        # game_data = get_game_data_for_games(todays_games, season='2026')
-        success=True
+        success = push_todays_games_to_db(todays_games)
+        game_data = get_game_data_for_games(todays_games, season='2026')
 
         if success:
             # Step 1.3: Fetch and push leaderboard
-            # fetch_and_push_leaderboard(season='2026')
+            fetch_and_push_leaderboard(season='2026')
 
             # Step 1.5: Push match history for today's teams
-            # push_match_history(game_data, season='2026')
+            push_match_history(game_data, season='2026')
 
             # Step 2: Load player stats
-            # load_player_stats(season='2026')
+            load_player_stats(season='2026')
 
             # Step 1.5b: Fetch and push odds data
-            # odds_success = fetch_and_push_odds_data()
-            odds_success=True
+            odds_success = fetch_and_push_odds_data()
 
             if odds_success:
                 # Step 3: Build flat DataFrame for today's games
