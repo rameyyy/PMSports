@@ -1,272 +1,349 @@
-Arlington Baptist vs UT Arlington
-  Game ID: 20251110_Arlington Baptist_UT Arlington
-  XGBoost:  125.5
-  LightGBM: 125.8
-  CatBoost: 131.9
-  Ensemble: 126.2
+Abilene Christian vs Stephen F. Austin
+  Game ID: 20251114_Abilene Christian_Stephen F. Austin
+  XGBoost:  142.8
+  LightGBM: 142.8
+  CatBoost: 144.6
+  Ensemble: 143.0
 
-Biblical Stud. (TX) vs McNeese St.
-  Game ID: 20251110_Biblical Stud. (TX)_McNeese St.
-  XGBoost:  125.5
-  LightGBM: 125.8
-  CatBoost: 131.9
-  Ensemble: 126.2
+Alabama St. vs Virginia-Lynchburg
+  Game ID: 20251114_Alabama St._Virginia-Lynchburg
+  XGBoost:  125.1
+  LightGBM: 124.7
+  CatBoost: 132.3
+  Ensemble: 125.6
 
-Cal St. Fullerton vs California
-  Game ID: 20251110_Cal St. Fullerton_California
-  XGBoost:  158.2
-  LightGBM: 155.2
-  CatBoost: 153.5
-  Ensemble: 156.3
+Albany vs Rhode Island
+  Game ID: 20251114_Albany_Rhode Island
+  XGBoost:  151.2
+  LightGBM: 150.3
+  CatBoost: 150.5
+  Ensemble: 150.7
 
-Charleston Southern vs The Citadel
-  Game ID: 20251110_Charleston Southern_The Citadel
-  XGBoost:  143.3
-  LightGBM: 140.7
-  CatBoost: 144.7
-  Ensemble: 142.2
+Arizona St. vs Gonzaga
+  Game ID: 20251114_Arizona St._Gonzaga
+  XGBoost:  160.5
+  LightGBM: 161.3
+  CatBoost: 159.4
+  Ensemble: 160.8
 
-Cleveland St. vs Northwestern
-  Game ID: 20251110_Cleveland St._Northwestern
-  XGBoost:  150.7
-  LightGBM: 146.5
-  CatBoost: 147.4
-  Ensemble: 148.5
+Arizona vs UCLA
+  Game ID: 20251114_Arizona_UCLA
+  XGBoost:  151.7
+  LightGBM: 155.0
+  CatBoost: 153.1
+  Ensemble: 153.3
 
-Columbia Int'l vs Furman
-  Game ID: 20251110_Columbia Int'l_Furman
-  XGBoost:  125.5
-  LightGBM: 125.8
-  CatBoost: 132.9
-  Ensemble: 126.3
+Arkansas vs Samford
+  Game ID: 20251114_Arkansas_Samford
+  XGBoost:  158.8
+  LightGBM: 160.9
+  CatBoost: 158.8
+  Ensemble: 159.8
 
-Columbia vs Connecticut
-  Game ID: 20251110_Columbia_Connecticut
-  XGBoost:  160.4
-  LightGBM: 155.1
-  CatBoost: 153.6
-  Ensemble: 157.3
+Baylor vs Tarleton St.
+  Game ID: 20251114_Baylor_Tarleton St.
+  XGBoost:  152.9
+  LightGBM: 152.4
+  CatBoost: 152.1
+  Ensemble: 152.6
 
-Delaware St. vs Niagara
-  Game ID: 20251110_Delaware St._Niagara
-  XGBoost:  139.3
-  LightGBM: 138.5
-  CatBoost: 138.0
-  Ensemble: 138.8
+Brown vs Hampton
+  Game ID: 20251114_Brown_Hampton
+  XGBoost:  142.5
+  LightGBM: 140.1
+  CatBoost: 143.7
+  Ensemble: 141.5
 
-Drake vs Simpson
-  Game ID: 20251110_Drake_Simpson
-  XGBoost:  125.5
-  LightGBM: 126.7
-  CatBoost: 132.4
-  Ensemble: 126.7
+Bucknell vs Hofstra
+  Game ID: 20251114_Bucknell_Hofstra
+  XGBoost:  140.5
+  LightGBM: 140.4
+  CatBoost: 140.1
+  Ensemble: 140.4
 
-Eastern Kentucky vs Western Kentucky
-  Game ID: 20251110_Eastern Kentucky_Western Kentucky
-  XGBoost:  162.1
-  LightGBM: 162.8
-  CatBoost: 158.5
-  Ensemble: 162.1
+Cal Baptist vs Western Illinois
+  Game ID: 20251114_Cal Baptist_Western Illinois
+  XGBoost:  142.8
+  LightGBM: 142.5
+  CatBoost: 144.2
+  Ensemble: 142.8
 
-Eastern Michigan vs Pittsburgh
-  Game ID: 20251110_Eastern Michigan_Pittsburgh
-  XGBoost:  150.7
-  LightGBM: 146.5
-  CatBoost: 147.3
-  Ensemble: 148.5
+Cal Poly vs Montana
+  Game ID: 20251114_Cal Poly_Montana
+  XGBoost:  165.1
+  LightGBM: 165.1
+  CatBoost: 158.6
+  Ensemble: 164.5
 
-Ecclesia vs Southern
-  Game ID: 20251110_Ecclesia_Southern
-  XGBoost:  125.5
-  LightGBM: 125.8
-  CatBoost: 132.9
-  Ensemble: 126.3
+Cal St. Bakersfield vs Mississippi
+  Game ID: 20251114_Cal St. Bakersfield_Mississippi
+  XGBoost:  148.0
+  LightGBM: 146.1
+  CatBoost: 146.5
+  Ensemble: 147.0
 
-Fairfield vs Seton Hall
-  Game ID: 20251110_Fairfield_Seton Hall
+Central Michigan vs Coppin St.
+  Game ID: 20251114_Central Michigan_Coppin St.
+  XGBoost:  142.0
+  LightGBM: 142.2
+  CatBoost: 144.1
+  Ensemble: 142.3
+
+Charleston Southern vs Lindenwood
+  Game ID: 20251114_Charleston Southern_Lindenwood
+  XGBoost:  160.6
+  LightGBM: 159.0
+  CatBoost: 157.2
+  Ensemble: 159.5
+
+Charleston vs South Carolina St.
+  Game ID: 20251114_Charleston_South Carolina St.
+  XGBoost:  158.7
+  LightGBM: 159.5
+  CatBoost: 157.8
+  Ensemble: 159.0
+
+Coastal Carolina vs Jacksonville St.
+  Game ID: 20251114_Coastal Carolina_Jacksonville St.
   XGBoost:  139.8
   LightGBM: 139.7
-  CatBoost: 141.2
+  CatBoost: 141.1
   Ensemble: 139.9
 
-Geneva vs Robert Morris
-  Game ID: 20251110_Geneva_Robert Morris
-  XGBoost:  125.5
-  LightGBM: 125.6
-  CatBoost: 132.9
-  Ensemble: 126.2
+Colgate vs Illinois
+  Game ID: 20251114_Colgate_Illinois
+  XGBoost:  163.9
+  LightGBM: 164.2
+  CatBoost: 159.2
+  Ensemble: 163.6
 
-Georgia St. vs Presbyterian
-  Game ID: 20251110_Georgia St._Presbyterian
-  XGBoost:  139.6
-  LightGBM: 139.5
-  CatBoost: 138.9
-  Ensemble: 139.5
-
-Georgia Tech vs Southeastern Louisiana
-  Game ID: 20251110_Georgia Tech_Southeastern Louisiana
-  XGBoost:  140.9
-  LightGBM: 138.0
-  CatBoost: 139.5
-  Ensemble: 139.4
-
-Grand Canyon vs Northern Illinois
-  Game ID: 20251110_Grand Canyon_Northern Illinois
-  XGBoost:  163.0
-  LightGBM: 163.5
-  CatBoost: 158.8
-  Ensemble: 162.9
-
-Green Bay vs Ripon
-  Game ID: 20251110_Green Bay_Ripon
-  XGBoost:  125.5
-  LightGBM: 125.1
-  CatBoost: 131.9
-  Ensemble: 125.9
-
-Hofstra vs Molloy
-  Game ID: 20251110_Hofstra_Molloy
-  XGBoost:  125.1
-  LightGBM: 126.3
-  CatBoost: 132.3
-  Ensemble: 126.4
-
-Holy Cross vs Utah
-  Game ID: 20251110_Holy Cross_Utah
-  XGBoost:  156.2
-  LightGBM: 155.4
-  CatBoost: 153.5
-  Ensemble: 155.6
-
-Indiana St. vs SIU Edwardsville
-  Game ID: 20251110_Indiana St._SIU Edwardsville
-  XGBoost:  158.5
-  LightGBM: 157.4
-  CatBoost: 155.1
-  Ensemble: 157.7
-
-Iowa St. vs Mississippi St.
-  Game ID: 20251110_Iowa St._Mississippi St.
-  XGBoost:  150.0
-  LightGBM: 148.8
-  CatBoost: 149.5
-  Ensemble: 149.4
-
-Jacksonville St. vs Reinhardt
-  Game ID: 20251110_Jacksonville St._Reinhardt
-  XGBoost:  125.5
-  LightGBM: 125.8
-  CatBoost: 131.9
-  Ensemble: 126.2
-
-Kent St. vs UNC Wilmington
-  Game ID: 20251110_Kent St._UNC Wilmington
+Colorado vs Providence
+  Game ID: 20251114_Colorado_Providence
   XGBoost:  162.1
-  LightGBM: 162.8
-  CatBoost: 158.7
-  Ensemble: 162.1
+  LightGBM: 163.6
+  CatBoost: 159.2
+  Ensemble: 162.5
 
-Lamar vs TCU
-  Game ID: 20251110_Lamar_TCU
-  XGBoost:  150.4
-  LightGBM: 146.5
-  CatBoost: 146.9
-  Ensemble: 148.3
+Creighton vs Maryland Eastern Shore
+  Game ID: 20251114_Creighton_Maryland Eastern Shore
+  XGBoost:  142.6
+  LightGBM: 141.7
+  CatBoost: 143.6
+  Ensemble: 142.3
 
-Lincoln (CA) vs UC Irvine
-  Game ID: 20251110_Lincoln (CA)_UC Irvine
-  XGBoost:  125.5
-  LightGBM: 125.8
-  CatBoost: 131.9
-  Ensemble: 126.2
+DePaul vs Northwestern
+  Game ID: 20251114_DePaul_Northwestern
+  XGBoost:  141.4
+  LightGBM: 141.1
+  CatBoost: 139.6
+  Ensemble: 141.1
 
-Lindenwood vs Saint Louis
-  Game ID: 20251110_Lindenwood_Saint Louis
-  XGBoost:  163.0
-  LightGBM: 163.1
-  CatBoost: 158.8
-  Ensemble: 162.7
+Drake vs SIU Edwardsville
+  Game ID: 20251114_Drake_SIU Edwardsville
+  XGBoost:  140.1
+  LightGBM: 139.7
+  CatBoost: 140.5
+  Ensemble: 139.9
 
-Little Rock vs Milwaukee
-  Game ID: 20251110_Little Rock_Milwaukee
+Duke vs Indiana St.
+  Game ID: 20251114_Duke_Indiana St.
+  XGBoost:  164.5
+  LightGBM: 162.6
+  CatBoost: 158.9
+  Ensemble: 163.1
+
+East Texas A&M vs Rice
+  Game ID: 20251114_East Texas A&M_Rice
+  XGBoost:  126.4
+  LightGBM: 125.3
+  CatBoost: 132.7
+  Ensemble: 126.5
+
+Eastern Illinois vs Kentucky
+  Game ID: 20251114_Eastern Illinois_Kentucky
+  XGBoost:  152.3
+  LightGBM: 152.4
+  CatBoost: 149.9
+  Ensemble: 152.1
+
+Eastern Michigan vs IU Indy
+  Game ID: 20251114_Eastern Michigan_IU Indy
+  XGBoost:  166.9
+  LightGBM: 166.9
+  CatBoost: 159.5
+  Ensemble: 166.2
+
+Ecclesia vs Northwestern St.
+  Game ID: 20251114_Ecclesia_Northwestern St.
+  XGBoost:  125.9
+  LightGBM: 126.7
+  CatBoost: 133.4
+  Ensemble: 127.0
+
+Fairfield vs Stonehill
+  Game ID: 20251114_Fairfield_Stonehill
+  XGBoost:  144.7
+  LightGBM: 145.4
+  CatBoost: 145.9
+  Ensemble: 145.1
+
+Fordham vs Iona
+  Game ID: 20251114_Fordham_Iona
   XGBoost:  158.7
-  LightGBM: 160.1
+  LightGBM: 160.3
   CatBoost: 158.4
-  Ensemble: 159.3
+  Ensemble: 159.4
 
-Louisiana Monroe vs Rust
-  Game ID: 20251110_Louisiana Monroe_Rust
-  XGBoost:  125.5
-  LightGBM: 125.1
-  CatBoost: 132.4
-  Ensemble: 125.9
+Furman vs Northern Iowa
+  Game ID: 20251114_Furman_Northern Iowa
+  XGBoost:  139.8
+  LightGBM: 139.7
+  CatBoost: 141.3
+  Ensemble: 139.9
 
-LSU vs New Orleans
-  Game ID: 20251110_LSU_New Orleans
-  XGBoost:  159.6
-  LightGBM: 160.4
-  CatBoost: 158.3
-  Ensemble: 159.9
-
-Maine vs Rutgers
-  Game ID: 20251110_Maine_Rutgers
-  XGBoost:  125.5
-  LightGBM: 125.8
-  CatBoost: 131.9
-  Ensemble: 126.2
-
-Miami FL vs Stetson
-  Game ID: 20251110_Miami FL_Stetson
-  XGBoost:  125.8
-  LightGBM: 126.9
-  CatBoost: 131.9
-  Ensemble: 126.9
-
-New Haven vs UMass Lowell
-  Game ID: 20251110_New Haven_UMass Lowell
-  XGBoost:  124.6
-  LightGBM: 124.2
-  CatBoost: 132.0
-  Ensemble: 125.1
-
-North Carolina A&T vs South Carolina St.
-  Game ID: 20251110_North Carolina A&T_South Carolina St.
-  XGBoost:  158.7
-  LightGBM: 158.9
-  CatBoost: 155.5
-  Ensemble: 158.5
-
-Penn St.-Shenango vs Youngstown St.
-  Game ID: 20251110_Penn St.-Shenango_Youngstown St.
-  XGBoost:  125.5
-  LightGBM: 126.3
-  CatBoost: 132.9
-  Ensemble: 126.6
-
-Santa Clara vs Xavier
-  Game ID: 20251110_Santa Clara_Xavier
-  XGBoost:  158.5
-  LightGBM: 157.6
-  CatBoost: 154.9
-  Ensemble: 157.7
-
-St. Thomas vs Washington St.
-  Game ID: 20251110_St. Thomas_Washington St.
-  XGBoost:  160.5
-  LightGBM: 160.6
-  CatBoost: 158.8
-  Ensemble: 160.4
-
-Tennessee Tech vs Virginia-Lynchburg
-  Game ID: 20251110_Tennessee Tech_Virginia-Lynchburg
+Georgia Southern vs Johnson C. Smith
+  Game ID: 20251114_Georgia Southern_Johnson C. Smith
   XGBoost:  125.5
   LightGBM: 126.7
-  CatBoost: 132.4
+  CatBoost: 133.0
   Ensemble: 126.7
 
-UCLA vs West Georgia
-  Game ID: 20251110_UCLA_West Georgia
-  XGBoost:  149.4
-  LightGBM: 145.3
-  CatBoost: 148.4
-  Ensemble: 147.4
+Georgia vs Georgia Tech
+  Game ID: 20251114_Georgia_Georgia Tech
+  XGBoost:  152.5
+  LightGBM: 150.1
+  CatBoost: 149.4
+  Ensemble: 151.1
+
+Hawaii vs Manhattan
+  Game ID: 20251114_Hawaii_Manhattan
+  XGBoost:  154.7
+  LightGBM: 155.2
+  CatBoost: 154.0
+  Ensemble: 154.9
+
+High Point vs UAB
+  Game ID: 20251114_High Point_UAB
+  XGBoost:  164.5
+  LightGBM: 165.1
+  CatBoost: 159.7
+  Ensemble: 164.3
+
+Illinois St. vs USC
+  Game ID: 20251114_Illinois St._USC
+  XGBoost:  157.8
+  LightGBM: 158.5
+  CatBoost: 156.4
+  Ensemble: 158.0
+
+Iowa vs Xavier
+  Game ID: 20251114_Iowa_Xavier
+  XGBoost:  142.6
+  LightGBM: 142.6
+  CatBoost: 143.4
+  Ensemble: 142.7
+
+Lehigh vs Rutgers
+  Game ID: 20251114_Lehigh_Rutgers
+  XGBoost:  139.8
+  LightGBM: 139.2
+  CatBoost: 141.1
+  Ensemble: 139.6
+
+Louisiana vs McNeese St.
+  Game ID: 20251114_Louisiana_McNeese St.
+  XGBoost:  135.1
+  LightGBM: 135.6
+  CatBoost: 134.2
+  Ensemble: 135.2
+
+Loyola Marymount vs Troy
+  Game ID: 20251114_Loyola Marymount_Troy
+  XGBoost:  141.3
+  LightGBM: 141.5
+  CatBoost: 141.9
+  Ensemble: 141.5
+
+Michigan vs TCU
+  Game ID: 20251114_Michigan_TCU
+  XGBoost:  156.7
+  LightGBM: 158.4
+  CatBoost: 156.5
+  Ensemble: 157.5
+
+Milwaukee vs Texas Tech
+  Game ID: 20251114_Milwaukee_Texas Tech
+  XGBoost:  163.0
+  LightGBM: 163.6
+  CatBoost: 159.2
+  Ensemble: 162.9
+
+Mississippi Valley St. vs Utah Tech
+  Game ID: 20251114_Mississippi Valley St._Utah Tech
+  XGBoost:  148.6
+  LightGBM: 146.9
+  CatBoost: 146.7
+  Ensemble: 147.6
+
+Navy vs Washington Col.
+  Game ID: 20251114_Navy_Washington Col.
+  XGBoost:  124.6
+  LightGBM: 126.0
+  CatBoost: 132.8
+  Ensemble: 126.0
+
+New Orleans vs Tulane
+  Game ID: 20251114_New Orleans_Tulane
+  XGBoost:  152.2
+  LightGBM: 152.6
+  CatBoost: 151.7
+  Ensemble: 152.3
+
+Norfolk St. vs Towson
+  Game ID: 20251114_Norfolk St._Towson
+  XGBoost:  138.3
+  LightGBM: 138.3
+  CatBoost: 137.2
+  Ensemble: 138.2
+
+North Carolina vs North Carolina Central
+  Game ID: 20251114_North Carolina_North Carolina Central
+  XGBoost:  160.3
+  LightGBM: 161.7
+  CatBoost: 159.2
+  Ensemble: 160.9
+
+North Texas vs Saint Mary's
+  Game ID: 20251114_North Texas_Saint Mary's
+  XGBoost:  132.8
+  LightGBM: 132.0
+  CatBoost: 131.9
+  Ensemble: 132.3
+
+Sacramento St. vs UC Davis
+  Game ID: 20251114_Sacramento St._UC Davis
+  XGBoost:  151.0
+  LightGBM: 148.0
+  CatBoost: 149.1
+  Ensemble: 149.4
+
+Texas A&M vs UCF
+  Game ID: 20251114_Texas A&M_UCF
+  XGBoost:  168.1
+  LightGBM: 167.4
+  CatBoost: 159.4
+  Ensemble: 167.0
+
+The Citadel vs West Georgia
+  Game ID: 20251114_The Citadel_West Georgia
+  XGBoost:  147.1
+  LightGBM: 145.9
+  CatBoost: 147.7
+  Ensemble: 146.6
+
+Washington vs Washington St.
+  Game ID: 20251114_Washington_Washington St.
+  XGBoost:  157.3
+  LightGBM: 159.7
+  CatBoost: 158.4
+  Ensemble: 158.5
