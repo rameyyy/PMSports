@@ -402,25 +402,22 @@ def main():
     # Define allowed bookmakers
     allowed_bookmakers = {'BetOnline.ag', 'Bovada', 'MyBookie.ag', 'betonlineag'}
 
-    # Step 1: Get OU predictions and flat df (commented out ou_main to avoid re-scraping)
-    print("STEP 1: Loading OU Predictions & Building Features")
+    # Step 1: Build features from today's games (ou_main already scraped)
+    print("STEP 1: Loading Today's Games & Building Features")
     print("-"*80 + "\n")
-    # ou_features_df, ou_predictions_df = ou_main()
-    # For now, just get ou_main to scrape but don't rebuild features
-    print("[*] Calling ou_main to scrape/fetch today's games...\n")
-    ou_features_df, ou_predictions_df = ou_main()
+    # Build flat dataframe for today's games
+    flat_df = build_flat_df(limit=None, target_date=get_todays_date())
 
-    if ou_features_df is None or ou_predictions_df is None:
-        print("[-] Failed to get OU predictions")
+    if flat_df is None or len(flat_df) == 0:
+        print(f"[-] No games found for today ({get_todays_date()})")
         return
 
-    print(f"[+] Loaded {len(ou_predictions_df)} OU predictions")
-    print(f"[+] OU features (raw) shape: {ou_features_df.shape}\n")
+    print(f"[+] Loaded flat dataframe: {flat_df.shape[0]} games x {flat_df.shape[1]} columns\n")
 
     # Rebuild features for today to ensure proper column alignment
     print("STEP 2: Rebuilding Features for ML Model")
     print("-"*80 + "\n")
-    features_df = rebuild_features_for_today(ou_features_df)
+    features_df = rebuild_features_for_today(flat_df)
 
     if features_df is None or len(features_df) == 0:
         print("[-] Failed to rebuild features")
@@ -440,10 +437,11 @@ def main():
     print(f"[+] Found {len(ml_bets)} ML bets with EV > 9%\n")
 
     # Step 5: Get OU predictions and filter for difference > 2.3
-    print("STEP 5: Getting OU Predictions (Difference > 2.3)")
-    print("-"*80 + "\n")
-    ou_bets = get_ou_bets(ou_predictions_df, difference_threshold=2.3, allowed_bookmakers=allowed_bookmakers)
-    print(f"[+] Found {len(ou_bets)} OU bets with difference > 2.3\n")
+    # print("STEP 5: Getting OU Predictions (Difference > 2.3)")
+    # print("-"*80 + "\n")
+    # ou_bets = get_ou_bets(ou_predictions_df, difference_threshold=2.3, allowed_bookmakers=allowed_bookmakers)
+    # print(f"[+] Found {len(ou_bets)} OU bets with difference > 2.3\n")
+    ou_bets = []
 
     # Step 5: Print combined futures report
     print("\n" + "="*80)
