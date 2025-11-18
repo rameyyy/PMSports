@@ -147,12 +147,31 @@ def load_odds_for_games(game_ids: list) -> dict:
         return {}
 
 
-def calculate_ev(win_prob: float, decimal_odds: float) -> float:
-    """Calculate expected value as decimal"""
+def calculate_ev(win_prob: float, american_odds: int, stake: float = 100) -> float:
+    """
+    Calculate expected value as a percentage based on actual profit
+
+    EV = (win_prob * profit_if_win) - ((1 - win_prob) * stake) / stake
+
+    For negative odds (favorite): profit = stake * (100 / |odds|)
+    For positive odds (underdog): profit = stake * (odds / 100)
+    """
     win_prob = float(win_prob)
-    decimal_odds = float(decimal_odds)
-    ev = (win_prob * (decimal_odds - 1)) - (1 - win_prob)
-    return float(ev)
+    american_odds = int(american_odds)
+
+    # Calculate profit if bet wins
+    if american_odds < 0:
+        # Favorite: profit = stake * (100 / |odds|)
+        profit_if_win = stake * (100 / abs(american_odds))
+    else:
+        # Underdog: profit = stake * (odds / 100)
+        profit_if_win = stake * (american_odds / 100)
+
+    # Expected value = (win_prob * profit) - (loss_prob * stake)
+    ev = (win_prob * profit_if_win) - ((1 - win_prob) * stake)
+
+    # Return as percentage (EV / stake)
+    return float(ev / stake)
 
 
 def get_ml_bets(features_df: pl.DataFrame, model: XGBClassifier, allowed_bookmakers: set, ev_threshold: float = 0.09) -> list:
@@ -208,8 +227,8 @@ def get_ml_bets(features_df: pl.DataFrame, model: XGBClassifier, allowed_bookmak
             team_2_home_away = 'NEUTRAL'
 
         # Check team 1
-        if team_1_odds is not None and team_1_decimal is not None:
-            team_1_ev = calculate_ev(team_1_prob, team_1_decimal)
+        if team_1_odds is not None:
+            team_1_ev = calculate_ev(team_1_prob, team_1_odds, stake=100)
             if team_1_ev > ev_threshold:
                 ml_bets.append({
                     'type': 'ML',
@@ -227,8 +246,8 @@ def get_ml_bets(features_df: pl.DataFrame, model: XGBClassifier, allowed_bookmak
                 })
 
         # Check team 2
-        if team_2_odds is not None and team_2_decimal is not None:
-            team_2_ev = calculate_ev(team_2_prob, team_2_decimal)
+        if team_2_odds is not None:
+            team_2_ev = calculate_ev(team_2_prob, team_2_odds, stake=100)
             if team_2_ev > ev_threshold:
                 ml_bets.append({
                     'type': 'ML',
