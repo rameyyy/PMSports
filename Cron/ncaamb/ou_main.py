@@ -119,17 +119,17 @@ def fetch_and_push_odds_data():
     odds_data = get_historical_odds(today_iso)
 
     if not odds_data or 'data' not in odds_data:
-        print("  ✗ Failed to fetch odds data from OddsAPI")
+        print("  [-] Failed to fetch odds data from OddsAPI")
         return False
 
     # Parse the response
     odds_df = parse_odds_response(odds_data, today_iso)
 
     if odds_df.empty:
-        print("  ✗ No odds data returned from OddsAPI")
+        print("  [-] No odds data returned from OddsAPI")
         return False
 
-    print(f"  ✓ Retrieved {len(odds_df)} odds records from {len(odds_df['bookmaker'].unique())} bookmakers\n")
+    print(f"  [+] Retrieved {len(odds_df)} odds records from {len(odds_df['bookmaker'].unique())} bookmakers\n")
 
     # Load team mappings and available game_ids for matching
     print("Loading team mappings and game_ids for matching...\n")
@@ -137,7 +137,7 @@ def fetch_and_push_odds_data():
     available_game_ids = load_all_game_ids()
 
     if not mappings or not available_game_ids:
-        print("  ⚠️  Warning: Could not load team mappings or game_ids, using raw odds data\n")
+        print("  [!]  Warning: Could not load team mappings or game_ids, using raw odds data\n")
     else:
         # Map each odds record to find the correct game_id
         matched_count = 0
@@ -243,20 +243,20 @@ def fetch_and_push_odds_data():
         print(f"  Skipping {skipped} odds records without game_id match\n")
 
     if odds_df.empty:
-        print("  ✗ No matched odds records to push\n")
+        print("  [-] No matched odds records to push\n")
         return False
 
     # Push to database
     try:
         success = sqlconn.execute_query(df=odds_df, table_name='odds', if_exists='append')
         if success:
-            print(f"  ✓ Pushed {len(odds_df)} odds records to odds table\n")
+            print(f"  [+] Pushed {len(odds_df)} odds records to odds table\n")
             return True
         else:
-            print(f"  ✗ Failed to push odds records to database\n")
+            print(f"  [-] Failed to push odds records to database\n")
             return False
     except Exception as e:
-        print(f"  ✗ Error pushing odds to database: {e}\n")
+        print(f"  [-] Error pushing odds to database: {e}\n")
         return False
 
 
@@ -284,14 +284,14 @@ def fetch_and_push_leaderboard(season: str = '2026'):
         leaderboard_df = scrape_barttorvik_csv(year=season, end_date=end_date)
 
         if leaderboard_df is not None and len(leaderboard_df) > 0:
-            print(f"  ✓ Retrieved leaderboard with {len(leaderboard_df)} teams\n")
+            print(f"  [+] Retrieved leaderboard with {len(leaderboard_df)} teams\n")
             return True
         else:
-            print(f"  ✗ Failed to fetch leaderboard data\n")
+            print(f"  [-] Failed to fetch leaderboard data\n")
             return False
 
     except Exception as e:
-        print(f"  ✗ Error fetching leaderboard: {e}\n")
+        print(f"  [-] Error fetching leaderboard: {e}\n")
         return False
 
 
@@ -356,9 +356,9 @@ def push_match_history(game_data: dict, season: str):
                 conn.close()
 
                 if teams_inserted > 0:
-                    print(f"  ✓ Inserted {teams_inserted} missing teams from match history\n")
+                    print(f"  [+] Inserted {teams_inserted} missing teams from match history\n")
         except Exception as e:
-            print(f"  ⚠️  Warning: Could not insert teams for match history: {e}\n")
+            print(f"  [!]  Warning: Could not insert teams for match history: {e}\n")
 
     # Extract game histories from game_data
     for game_id, data in game_data.items():
@@ -370,9 +370,9 @@ def push_match_history(game_data: dict, season: str):
                     sqlconn.push_to_games(data['team_1_history'], int(season), season)
                     teams_pushed.add(team1)
                     total_games_pushed += len(data['team_1_history'])
-                    print(f"  ✓ {team1}: {len(data['team_1_history'])} games pushed")
+                    print(f"  [+] {team1}: {len(data['team_1_history'])} games pushed")
                 except Exception as e:
-                    print(f"  ✗ {team1}: Error - {e}")
+                    print(f"  [-] {team1}: Error - {e}")
 
         # Push team_2 history
         if data.get('team_2_history') is not None and len(data['team_2_history']) > 0:
@@ -382,9 +382,9 @@ def push_match_history(game_data: dict, season: str):
                     sqlconn.push_to_games(data['team_2_history'], int(season), season)
                     teams_pushed.add(team2)
                     total_games_pushed += len(data['team_2_history'])
-                    print(f"  ✓ {team2}: {len(data['team_2_history'])} games pushed")
+                    print(f"  [+] {team2}: {len(data['team_2_history'])} games pushed")
                 except Exception as e:
-                    print(f"  ✗ {team2}: Error - {e}")
+                    print(f"  [-] {team2}: Error - {e}")
 
     print(f"\n  Pushed {total_games_pushed} total games from {len(teams_pushed)} teams\n")
     return len(teams_pushed)
@@ -410,7 +410,7 @@ def load_player_stats(season: str = '2026'):
         print()
         return True
     except Exception as e:
-        print(f"  ⚠️  Warning: Error loading player stats: {e}\n")
+        print(f"  [!]  Warning: Error loading player stats: {e}\n")
         # Don't fail completely, player stats are optional
         return True
 
@@ -433,18 +433,21 @@ def generate_features(flat_df: pl.DataFrame):
         print("Building features from flat DataFrame...")
         features_df = build_ou_features(flat_df)
 
-        print(f"  ✓ Generated {len(features_df)} games with {len(features_df.columns)} feature columns\n")
+        print(f"  [+] Generated {len(features_df)} games with {len(features_df.columns)} feature columns\n")
 
         # Show sample for validation
         print("Sample row for validation:")
         sample = features_df.select(['game_id', 'date', 'team_1', 'team_2', 'actual_total']).head(1)
-        print(sample)
+        # Don't print the dataframe directly due to encoding issues, just show it's there
+        if len(sample) > 0:
+            row = sample.to_dicts()[0]
+            print(f"  Game ID: {row['game_id']}, Date: {row['date']}, Teams: {row['team_1']} vs {row['team_2']}, Total: {row['actual_total']}")
         print()
 
         # Save to CSV
         print("Saving features to tempfeatures.csv...")
         features_df.write_csv('tempfeatures.csv')
-        print(f"  ✓ Features saved to tempfeatures.csv")
+        print(f"  [+] Features saved to tempfeatures.csv")
 
         # Check null percentages
         print("\nNull value analysis (top 20 columns by null %):")
@@ -464,7 +467,7 @@ def generate_features(flat_df: pl.DataFrame):
         return features_df
 
     except Exception as e:
-        print(f"  ✗ Error generating features: {e}\n")
+        print(f"  [-] Error generating features: {e}\n")
         import traceback
         traceback.print_exc()
         return None
@@ -499,17 +502,17 @@ def make_ou_predictions(features_df: pl.DataFrame):
         # Load XGBoost model (JSON format)
         xgb_model = XGBRegressor()
         xgb_model.load_model(str(models_dir / "xgboost_model.pkl"))
-        print("  ✓ Loaded XGBoost model")
+        print("  [+] Loaded XGBoost model")
 
         # Load LightGBM model (JSON format)
         from lightgbm import Booster
         lgb_booster = Booster(model_file=str(models_dir / "lightgbm_model.pkl"))
-        print("  ✓ Loaded LightGBM model")
+        print("  [+] Loaded LightGBM model")
 
         # Load CatBoost model (JSON format)
         cb_model = CatBoostRegressor(verbose=False)
         cb_model.load_model(str(models_dir / "catboost_model.pkl"))
-        print("  ✓ Loaded CatBoost model\n")
+        print("  [+] Loaded CatBoost model\n")
 
         # Convert Polars to Pandas for sklearn compatibility
         print("Converting features to Pandas for prediction...")
@@ -539,7 +542,7 @@ def make_ou_predictions(features_df: pl.DataFrame):
                        if col not in metadata_cols
                        and np.issubdtype(features_pd[col].dtype, np.number)]
 
-        print(f"  ✓ Using {len(feature_cols)} numeric feature columns\n")
+        print(f"  [+] Using {len(feature_cols)} numeric feature columns\n")
 
         # Get feature data
         X = features_pd[feature_cols].copy()
@@ -547,7 +550,7 @@ def make_ou_predictions(features_df: pl.DataFrame):
         # Check for NaN values and fill them with 0
         null_cols = X.columns[X.isnull().any()].tolist()
         if null_cols:
-            print(f"  ⚠️  {len(null_cols)} columns have NaN values - filling with 0")
+            print(f"  [!]  {len(null_cols)} columns have NaN values - filling with 0")
             print(f"     Examples: {null_cols[:5]}{'...' if len(null_cols) > 5 else ''}\n")
             X = X.fillna(0)
 
@@ -557,13 +560,13 @@ def make_ou_predictions(features_df: pl.DataFrame):
         # Make predictions with each model
         print("Making predictions...\n")
         xgb_preds = xgb_model.predict(X)
-        print(f"  ✓ XGBoost predictions shape: {xgb_preds.shape}")
+        print(f"  [+] XGBoost predictions shape: {xgb_preds.shape}")
 
         lgb_preds = lgb_booster.predict(X.values)
-        print(f"  ✓ LightGBM predictions shape: {lgb_preds.shape}")
+        print(f"  [+] LightGBM predictions shape: {lgb_preds.shape}")
 
         cb_preds = cb_model.predict(X)
-        print(f"  ✓ CatBoost predictions shape: {cb_preds.shape}\n")
+        print(f"  [+] CatBoost predictions shape: {cb_preds.shape}\n")
 
         # Ensemble: equal weights (can be optimized with BEST_OPTIMIZATIONS weights)
         # BEST_OPTIMIZATIONS: 44.1% XGB, 46.6% LGB, 9.3% CatBoost
@@ -608,7 +611,7 @@ def make_ou_predictions(features_df: pl.DataFrame):
         return features_df
 
     except Exception as e:
-        print(f"  ✗ Error making predictions: {e}\n")
+        print(f"  [-] Error making predictions: {e}\n")
         import traceback
         traceback.print_exc()
         return None
@@ -641,7 +644,7 @@ def build_todays_games_df(season: str = '2026'):
         games_df = fetch_games(season=int(season))
         teams_df = fetch_teams(season=int(season))
         leaderboard_df = fetch_leaderboard()
-        print(f"  ✓ Loaded {len(games_df)} games, {len(teams_df)} teams\n")
+        print(f"  [+] Loaded {len(games_df)} games, {len(teams_df)} teams\n")
 
         # Fetch odds for all games first
         print("Fetching odds for all games...")
@@ -669,11 +672,11 @@ def build_todays_games_df(season: str = '2026'):
                         odds_dict[gid] = []
                     odds_dict[gid].append(row)
 
-                print(f"  ✓ Retrieved odds for {len(odds_dict)} games\n")
+                print(f"  [+] Retrieved odds for {len(odds_dict)} games\n")
             else:
-                print("  ⚠️  Warning: Could not connect to database for odds\n")
+                print("  [!] Warning: Could not connect to database for odds\n")
         else:
-            print("  ℹ️  No games found for today, skipping odds fetch\n")
+            print("  [*] No games found for today, skipping odds fetch\n")
 
         # Build flat dataset for today only
         print(f"Building flat DataFrame for {today_date}...")
@@ -691,22 +694,22 @@ def build_todays_games_df(season: str = '2026'):
         )
 
         if flat_df.is_empty():
-            print(f"  ✗ No games found for today")
+            print(f"  [-] No games found for today")
             return None
 
-        print(f"  ✓ Built flat dataset with {len(flat_df)} games\n")
+        print(f"  [+] Built flat dataset with {len(flat_df)} games\n")
 
         # Add odds as a column (for feature engineering)
         print("Adding odds column...")
         game_ids_in_range = flat_df['game_id'].to_list()
         odds_list = [odds_dict.get(game_id, []) for game_id in game_ids_in_range]
         flat_df = flat_df.with_columns(pl.Series("game_odds", odds_list))
-        print(f"  ✓ DataFrame shape: {flat_df.shape}\n")
+        print(f"  [+] DataFrame shape: {flat_df.shape}\n")
 
         return flat_df
 
     except Exception as e:
-        print(f"  ✗ Error building games DataFrame: {e}\n")
+        print(f"  [-] Error building games DataFrame: {e}\n")
         import traceback
         traceback.print_exc()
         return None
@@ -745,12 +748,12 @@ def get_game_data_for_games(games_df: pd.DataFrame, season: str):
             hist = scrape_game_history(year=season, team=team)
             if hist is not None:
                 game_histories[team] = hist
-                print(f"  ✓ {team}: {len(hist)} games retrieved")
+                print(f"  [+] {team}: {len(hist)} games retrieved")
             else:
-                print(f"  ✗ {team}: No game history found")
+                print(f"  [-] {team}: No game history found")
                 game_histories[team] = None
         except Exception as e:
-            print(f"  ✗ {team}: Error - {e}")
+            print(f"  [-] {team}: Error - {e}")
             game_histories[team] = None
 
     # Create game data dictionary with game histories
@@ -819,11 +822,11 @@ def main():
                         if predictions_df is not None:
                             print("✅ Prediction pipeline complete!")
                         else:
-                            print("\n⚠️  Warning: Could not make predictions")
+                            print("\n[!]  Warning: Could not make predictions")
                     else:
-                        print("\n⚠️  Warning: Could not generate features")
+                        print("\n[!]  Warning: Could not generate features")
                 else:
-                    print("\n⚠️  Warning: Could not build flat DataFrame for today's games")
+                    print("\n[!]  Warning: Could not build flat DataFrame for today's games")
             else:
                 print("\nWarning: Error fetching odds data, but continuing with other steps")
                 # Still proceed with game data fetching even if odds failed
@@ -834,6 +837,8 @@ def main():
         print("\nNo games today. Check back later!")
 
     print("\n" + "="*80 + "\n")
+    
+    return features_df, predictions_df
 
 
 if __name__ == "__main__":

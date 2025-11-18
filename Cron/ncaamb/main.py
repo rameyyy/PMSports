@@ -19,56 +19,38 @@ from xgboost import XGBClassifier
 ncaamb_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ncaamb_dir)
 
-from ou_main import main as ou_main
 from scrapes import sqlconn
-from models.build_flat_df import build_flat_df
-from models.overunder.build_ou_features import build_ou_features
+from ou_main import build_todays_games_df, generate_features
+
+
+def load_team_mappings() -> dict:
+    """Load team mappings from CSV (odds_team_name -> my_team_name)"""
+    try:
+        mappings_file = Path(__file__).parent / "bookmaker" / "team_mappings.csv"
+        if not mappings_file.exists():
+            print(f"[-] Team mappings file not found: {mappings_file}")
+            return {}
+
+        df = pl.read_csv(str(mappings_file))
+        # Create dict mapping from_odds_team_name -> my_team_name
+        mapping_dict = {}
+        for row in df.iter_rows(named=True):
+            mapping_dict[row['from_odds_team_name']] = row['my_team_name']
+
+        return mapping_dict
+    except Exception as e:
+        print(f"[-] Error loading team mappings: {e}")
+        return {}
 
 
 def get_todays_date():
+    """Get today's date in YYYY-MM-DD format"""
+    return datetime.now().strftime('%Y-%m-%d')
+
+
+def get_todays_date_yyyymmdd():
     """Get today's date in YYYYMMDD format"""
     return datetime.now().strftime('%Y%m%d')
-
-
-def rebuild_features_for_today(flat_df: pl.DataFrame) -> pl.DataFrame:
-    """
-    Rebuild features for today's games using the same logic as OU features
-    This ensures the feature columns match what the ML model expects
-    """
-    print("Rebuilding features for today's games...")
-
-    # Filter for today's games
-    today = get_todays_date()
-    today_games = flat_df.filter(
-        pl.col('game_id').str.starts_with(today)
-    )
-
-    if len(today_games) == 0:
-        print(f"[-] No games found for today ({today})")
-        return None
-
-    print(f"[+] Found {len(today_games)} games for today\n")
-
-    # Build OU features (which includes all the numeric features needed)
-    try:
-        features_df = build_ou_features(today_games)
-        print(f"[+] Built features: {features_df.shape[0]} games x {features_df.shape[1]} features")
-
-        # Check for null values
-        null_counts = features_df.null_count().to_dicts()[0]
-        null_cols = {col: count for col, count in null_counts.items() if count > 0}
-
-        if null_cols:
-            print(f"\n[!] Warning: Found null values in {len(null_cols)} columns:")
-            for col, count in sorted(null_cols.items(), key=lambda x: x[1], reverse=True)[:10]:
-                print(f"    {col}: {count} nulls ({count/len(features_df)*100:.1f}%)")
-            print()
-
-        return features_df
-
-    except Exception as e:
-        print(f"[-] Error building features: {e}\n")
-        return None
 
 
 def load_model():
@@ -82,23 +64,20 @@ def load_model():
 
     model = XGBClassifier()
     model.load_model(str(model_path))
-    print(f"[+] Model loaded from {model_path}\n")
+    print(f"[+] Model loaded from {model_path}")
+    print(f"    Expected features: {model.n_features_in_}\n")
     return model
 
 
 def identify_feature_columns(df: pl.DataFrame) -> list:
-    """Identify numeric feature columns"""
+    """Identify numeric feature columns (same as make_ou_predictions)"""
     metadata_cols = {
-        'game_id', 'date', 'season', 'team_1', 'team_2',
-        'team_1_score', 'team_2_score', 'actual_total',
-        'team_1_conference', 'team_2_conference',
-        'team_1_is_home', 'team_2_is_home', 'location',
-        'total_score_outcome', 'team_1_winloss',
-        'team_1_leaderboard', 'team_2_leaderboard',
-        'team_1_match_hist', 'team_2_match_hist',
-        'team_1_hist_count', 'team_2_hist_count',
-        'start_time', 'game_odds', 'ml_target',
-        'avg_ml_home', 'avg_ml_away'
+        'game_id', 'date', 'season', 'team_1', 'team_2', 'actual_total',
+        'team_1_conference', 'team_2_conference', 'team_1_is_home', 'team_2_is_home',
+        'location', 'team_1_score', 'team_2_score', 'total_score_outcome', 'team_1_winloss',
+        'team_1_leaderboard', 'team_2_leaderboard', 'team_1_match_hist', 'team_2_match_hist',
+        'team_1_hist_count', 'team_2_hist_count', 'start_time', 'game_odds',
+        'avg_ml_home', 'avg_ml_away'  # Exclude odds from features
     }
 
     feature_cols = []
@@ -115,6 +94,76 @@ def prepare_data(df: pl.DataFrame, feature_cols: list) -> np.ndarray:
     """Prepare X features"""
     X = df.select(feature_cols).fill_null(0).to_numpy()
     return X
+
+
+def load_expected_feature_columns() -> list:
+    """Load the list of expected feature columns from file"""
+    expected_file = Path(__file__).parent / "expected_feature_columns.txt"
+
+    if expected_file.exists():
+        with open(expected_file, 'r') as f:
+            return [line.strip() for line in f if line.strip()]
+
+    return None
+
+
+def align_features_to_model(df: pl.DataFrame, model: XGBClassifier) -> tuple:
+    """
+    Ensure dataframe has exactly the features the model expects.
+    Returns (X array, feature_cols list) or (None, None) if alignment fails.
+    """
+    # Get expected feature list
+    expected_features = load_expected_feature_columns()
+
+    if expected_features is None:
+        print("[-] Could not load expected feature columns")
+        return None, None
+
+    # Check which expected features are present in df
+    df_cols = set(df.columns)
+    missing_features = [f for f in expected_features if f not in df_cols]
+    extra_features = [c for c in df.columns if c not in set(expected_features) and c not in {
+        'game_id', 'date', 'season', 'team_1', 'team_2', 'actual_total',
+        'team_1_conference', 'team_2_conference', 'team_1_is_home', 'team_2_is_home',
+        'location', 'team_1_score', 'team_2_score', 'total_score_outcome', 'team_1_winloss',
+        'team_1_leaderboard', 'team_2_leaderboard', 'team_1_match_hist', 'team_2_match_hist',
+        'team_1_hist_count', 'team_2_hist_count', 'start_time', 'game_odds',
+        'avg_ml_home', 'avg_ml_away'
+    }]
+
+    # Report feature alignment status
+    print(f"[*] Feature alignment check:")
+    print(f"    Expected features: {len(expected_features)}")
+    print(f"    Features present in data: {len([f for f in expected_features if f in df_cols])}")
+    print(f"    Missing features: {len(missing_features)}")
+    print(f"    Extra features (will be dropped): {len(extra_features)}\n")
+
+    if missing_features:
+        print(f"[!] Missing {len(missing_features)} expected features:")
+        for f in missing_features[:5]:
+            print(f"    - {f}")
+        if len(missing_features) > 5:
+            print(f"    ... and {len(missing_features) - 5} more")
+        print(f"    These will be filled with 0s\n")
+
+        # Add missing features with 0 values
+        for feature in missing_features:
+            df = df.with_columns(pl.lit(0.0).alias(feature))
+
+    # Select features in EXACT order expected by model
+    # This is critical - the order must match training order
+    try:
+        X = df.select(expected_features).fill_null(0).to_numpy()
+    except Exception as e:
+        print(f"[-] Error selecting features in order: {e}\n")
+        return None, None
+
+    print(f"[+] Feature matrix prepared:")
+    print(f"    Shape: {X.shape}")
+    print(f"    Columns in order: {len(expected_features)} (matching model training)")
+    print(f"    Nulls filled with 0.0\n")
+
+    return X, expected_features
 
 
 def american_to_decimal(american_odds: float) -> float:
@@ -164,10 +213,10 @@ def load_odds_for_games(game_ids: list) -> dict:
             print("[-] Failed to connect to database")
             return {}
 
-        # Build query for all odds
+        # Build query for all odds - include home_team and away_team names
         placeholders = ','.join(['%s'] * len(game_ids))
         query = f"""
-            SELECT game_id, bookmaker, ml_home, ml_away
+            SELECT game_id, bookmaker, home_team, away_team, ml_home, ml_away
             FROM odds
             WHERE game_id IN ({placeholders})
             ORDER BY game_id, bookmaker
@@ -184,6 +233,8 @@ def load_odds_for_games(game_ids: list) -> dict:
                 odds_dict[gid] = []
             odds_dict[gid].append({
                 'bookmaker': row['bookmaker'],
+                'home_team': row['home_team'],
+                'away_team': row['away_team'],
                 'ml_home': row['ml_home'],
                 'ml_away': row['ml_away']
             })
@@ -196,7 +247,7 @@ def load_odds_for_games(game_ids: list) -> dict:
         return {}
 
 
-def calculate_ev(win_prob: float, american_odds: int, stake: float = 100) -> float:
+def calculate_ev(win_prob: float, american_odds: int, stake: float = 10) -> float:
     """
     Calculate expected value as a percentage based on actual profit
 
@@ -223,29 +274,37 @@ def calculate_ev(win_prob: float, american_odds: int, stake: float = 100) -> flo
     return float(ev / stake)
 
 
-def get_ml_bets(features_df: pl.DataFrame, model: XGBClassifier, allowed_bookmakers: set, ev_threshold: float = 0.09) -> list:
+def get_ml_bets(features_df: pl.DataFrame, model: XGBClassifier, allowed_bookmakers: set, ev_threshold: float = 0.09, team_mappings: dict = None) -> list:
     """
     Get moneyline bets with EV > threshold using allowed bookmakers only
     """
     ml_bets = []
 
-    # Identify features and prepare data
-    feature_cols = identify_feature_columns(features_df)
+    print("STEP 2.5: Aligning Features to Model")
+    print("-"*80 + "\n")
 
-    # Check if we have enough features
-    if len(feature_cols) < 319:
-        print(f"[-] Warning: Only {len(feature_cols)} features found, model expects 319")
-        print(f"[-] This likely means OU features are missing some ML-required columns")
-        print(f"[-] Proceeding anyway, but predictions may fail...\n")
+    # Align features to model requirements
+    X, feature_cols = align_features_to_model(features_df, model)
 
-    X = prepare_data(features_df, feature_cols)
+    if X is None:
+        print("[-] Could not align features to model\n")
+        return ml_bets
 
     # Make predictions
-    pred_proba = model.predict_proba(X)
+    try:
+        pred_proba = model.predict_proba(X)
+        print(f"[+] Made predictions for {len(X)} games\n")
+    except Exception as e:
+        print(f"[-] Error during prediction: {e}")
+        print(f"    Feature array shape: {X.shape}")
+        print(f"    Expected features: {model.n_features_in_}\n")
+        return ml_bets
 
     # Load odds
     game_ids = features_df['game_id'].to_list()
     odds_dict = load_odds_for_games(game_ids)
+
+    print(f"[*] Evaluating {len(game_ids)} games for positive EV (threshold: {ev_threshold*100:.0f}%)\n")
 
     # Evaluate each game
     for idx, game in enumerate(features_df.iter_rows(named=True)):
@@ -257,6 +316,7 @@ def get_ml_bets(features_df: pl.DataFrame, model: XGBClassifier, allowed_bookmak
 
         # Get odds
         all_odds = odds_dict.get(game_id, [])
+
         if not all_odds:
             continue
 
@@ -264,27 +324,93 @@ def get_ml_bets(features_df: pl.DataFrame, model: XGBClassifier, allowed_bookmak
         team_1_prob = float(pred_proba[idx, 1])
         team_2_prob = float(pred_proba[idx, 0])
 
-        # Determine home/away
-        if team_1_is_home == 1:
-            team_1_odds, team_1_decimal, team_1_bm = get_best_odds_from_bookmakers(all_odds, 'home', allowed_bookmakers)
-            team_2_odds, team_2_decimal, team_2_bm = get_best_odds_from_bookmakers(all_odds, 'away', allowed_bookmakers)
-            team_1_home_away = 'HOME'
-            team_2_home_away = 'AWAY'
-        elif team_1_is_home == 0:
-            team_1_odds, team_1_decimal, team_1_bm = get_best_odds_from_bookmakers(all_odds, 'away', allowed_bookmakers)
-            team_2_odds, team_2_decimal, team_2_bm = get_best_odds_from_bookmakers(all_odds, 'home', allowed_bookmakers)
-            team_1_home_away = 'AWAY'
-            team_2_home_away = 'HOME'
-        else:
-            # Neutral
-            team_1_odds, team_1_decimal, team_1_bm = get_best_odds_from_bookmakers(all_odds, 'home', allowed_bookmakers)
-            team_2_odds, team_2_decimal, team_2_bm = get_best_odds_from_bookmakers(all_odds, 'away', allowed_bookmakers)
-            team_1_home_away = 'NEUTRAL'
-            team_2_home_away = 'NEUTRAL'
+        # Find best odds for each team from allowed bookmakers
+        team_1_best_odds = None
+        team_1_best_bm = None
+        team_2_best_odds = None
+        team_2_best_bm = None
 
-        # Check team 1
-        if team_1_odds is not None:
-            team_1_ev = calculate_ev(team_1_prob, team_1_odds, stake=100)
+        # DEBUG for Rider/Texas game
+        if 'Rider' in game_id:
+            print(f"  DEBUG: Starting odds loop, all_odds has {len(all_odds)} records")
+
+        # TODO: Filter to allowed_bookmakers - for now show all
+        # allowed_normalized = set(bm_allowed.lower().replace('.', '') for bm_allowed in allowed_bookmakers)
+
+        for odds_rec in all_odds:
+            # bm = odds_rec.get('bookmaker', '').lower().replace('.', '')
+            # if bm not in allowed_normalized:
+            #     continue
+
+            bm_name = odds_rec.get('bookmaker')
+
+            # Get team_a and team_b from odds (these are just arbitrary labels)
+            team_a_odds_name = odds_rec.get('home_team')
+            team_b_odds_name = odds_rec.get('away_team')
+            ml_team_a = odds_rec.get('ml_home')
+            ml_team_b = odds_rec.get('ml_away')
+
+            # Map odds team names to our team names using team_mappings
+            team_a_mapped = team_a_odds_name
+            team_b_mapped = team_b_odds_name
+            if team_mappings:
+                team_a_mapped = team_mappings.get(team_a_odds_name, team_a_odds_name)
+                team_b_mapped = team_mappings.get(team_b_odds_name, team_b_odds_name)
+
+            # DEBUG for Rider/Texas game
+            if 'Rider' in game_id:
+                print(f"    DEBUG: team_a_odds_name={team_a_odds_name} -> team_a_mapped={team_a_mapped}, ml_team_a={ml_team_a}")
+                print(f"    DEBUG: team_b_odds_name={team_b_odds_name} -> team_b_mapped={team_b_mapped}, ml_team_b={ml_team_b}")
+                print(f"    DEBUG: team_1={team_1}, team_2={team_2}")
+
+            # Figure out which is team_1 and which is team_2
+            if team_a_mapped == team_1 and ml_team_a is not None:
+                if team_1_best_odds is None or american_to_decimal(ml_team_a) > american_to_decimal(team_1_best_odds):
+                    team_1_best_odds = ml_team_a
+                    team_1_best_bm = bm_name
+
+            if team_b_mapped == team_1 and ml_team_b is not None:
+                if team_1_best_odds is None or american_to_decimal(ml_team_b) > american_to_decimal(team_1_best_odds):
+                    team_1_best_odds = ml_team_b
+                    team_1_best_bm = bm_name
+
+            if team_a_mapped == team_2 and ml_team_a is not None:
+                if team_2_best_odds is None or american_to_decimal(ml_team_a) > american_to_decimal(team_2_best_odds):
+                    team_2_best_odds = ml_team_a
+                    team_2_best_bm = bm_name
+
+            if team_b_mapped == team_2 and ml_team_b is not None:
+                if team_2_best_odds is None or american_to_decimal(ml_team_b) > american_to_decimal(team_2_best_odds):
+                    team_2_best_odds = ml_team_b
+                    team_2_best_bm = bm_name
+
+        # Calculate EVs
+        team_1_ev = None
+        team_2_ev = None
+        if team_1_best_odds:
+            team_1_ev = calculate_ev(team_1_prob, team_1_best_odds, stake=10)
+        if team_2_best_odds:
+            team_2_ev = calculate_ev(team_2_prob, team_2_best_odds, stake=10)
+
+        # Print game info
+        print(f"Game: {game_id}")
+        print(f"  team_1={team_1}, team_2={team_2}, team_1_is_home={team_1_is_home}")
+        if team_1_best_odds:
+            ev_marker = "[+]" if team_1_ev > ev_threshold else "[-]"
+            print(f"  {team_1}: odds={int(team_1_best_odds)} ({team_1_best_bm}), prob={team_1_prob:.4f}, decimal={american_to_decimal(team_1_best_odds):.3f}, EV={team_1_ev*100:7.2f}% {ev_marker}")
+        else:
+            print(f"  {team_1}: no odds found, prob={team_1_prob:.4f}")
+
+        if team_2_best_odds:
+            ev_marker = "[+]" if team_2_ev > ev_threshold else "[-]"
+            print(f"  {team_2}: odds={int(team_2_best_odds)} ({team_2_best_bm}), prob={team_2_prob:.4f}, decimal={american_to_decimal(team_2_best_odds):.3f}, EV={team_2_ev*100:7.2f}% {ev_marker}")
+        else:
+            print(f"  {team_2}: no odds found, prob={team_2_prob:.4f}")
+        print()
+
+        # Collect bets where EV > threshold
+        if team_1_best_odds is not None:
+            team_1_ev = calculate_ev(team_1_prob, team_1_best_odds, stake=10)
             if team_1_ev > ev_threshold:
                 ml_bets.append({
                     'type': 'ML',
@@ -292,18 +418,16 @@ def get_ml_bets(features_df: pl.DataFrame, model: XGBClassifier, allowed_bookmak
                     'date': date,
                     'team': team_1,
                     'opponent': team_2,
-                    'position': team_1_home_away,
-                    'odds': int(team_1_odds),
-                    'decimal': round(team_1_decimal, 4),
-                    'win_prob': round(team_1_prob, 4),
-                    'ev': round(team_1_ev, 4),
-                    'ev_percent': round(team_1_ev * 100, 2),
-                    'bookmaker': team_1_bm
+                    'odds': int(team_1_best_odds),
+                    'decimal': american_to_decimal(team_1_best_odds),
+                    'win_prob': team_1_prob,
+                    'ev': team_1_ev,
+                    'ev_percent': team_1_ev * 100,
+                    'bookmaker': team_1_best_bm
                 })
 
-        # Check team 2
-        if team_2_odds is not None:
-            team_2_ev = calculate_ev(team_2_prob, team_2_odds, stake=100)
+        if team_2_best_odds is not None:
+            team_2_ev = calculate_ev(team_2_prob, team_2_best_odds, stake=10)
             if team_2_ev > ev_threshold:
                 ml_bets.append({
                     'type': 'ML',
@@ -311,13 +435,12 @@ def get_ml_bets(features_df: pl.DataFrame, model: XGBClassifier, allowed_bookmak
                     'date': date,
                     'team': team_2,
                     'opponent': team_1,
-                    'position': team_2_home_away,
-                    'odds': int(team_2_odds),
-                    'decimal': round(team_2_decimal, 4),
-                    'win_prob': round(team_2_prob, 4),
-                    'ev': round(team_2_ev, 4),
-                    'ev_percent': round(team_2_ev * 100, 2),
-                    'bookmaker': team_2_bm
+                    'odds': int(team_2_best_odds),
+                    'decimal': american_to_decimal(team_2_best_odds),
+                    'win_prob': team_2_prob,
+                    'ev': team_2_ev,
+                    'ev_percent': team_2_ev * 100,
+                    'bookmaker': team_2_best_bm
                 })
 
     return ml_bets
@@ -402,53 +525,122 @@ def main():
     # Define allowed bookmakers
     allowed_bookmakers = {'BetOnline.ag', 'Bovada', 'MyBookie.ag', 'betonlineag'}
 
-    # Step 1: Build features from today's games (ou_main already scraped)
-    print("STEP 1: Loading Today's Games & Building Features")
+    # Step 1: Build today's games dataframe and generate features
+    print("STEP 1: Building Today's Games & Generating Features")
     print("-"*80 + "\n")
-    # Build flat dataframe for today's games
-    flat_df = build_flat_df(limit=None, target_date=get_todays_date())
 
-    if flat_df is None or len(flat_df) == 0:
-        print(f"[-] No games found for today ({get_todays_date()})")
+    # Build today's games for 2026 season
+    todays_games_df = build_todays_games_df(season='2026')
+
+    if todays_games_df is None or len(todays_games_df) == 0:
+        print("[-] No games found for today")
         return
 
-    print(f"[+] Loaded flat dataframe: {flat_df.shape[0]} games x {flat_df.shape[1]} columns\n")
+    print(f"[+] Built flat dataframe: {todays_games_df.shape[0]} games x {todays_games_df.shape[1]} columns")
 
-    # Rebuild features for today to ensure proper column alignment
-    print("STEP 2: Rebuilding Features for ML Model")
-    print("-"*80 + "\n")
-    features_df = rebuild_features_for_today(flat_df)
+    features_df = generate_features(todays_games_df)
 
     if features_df is None or len(features_df) == 0:
-        print("[-] Failed to rebuild features")
+        print("[-] Failed to generate features")
         return
 
+    print(f"[+] Generated features: {features_df.shape[0]} games x {features_df.shape[1]} columns")
+
+    # Drop rows with missing odds
+    before = len(features_df)
+    features_df = features_df.filter(
+        pl.col('avg_ml_home').is_not_null() &
+        pl.col('avg_ml_away').is_not_null()
+    )
+    dropped = before - len(features_df)
+    if dropped > 0:
+        print(f"[*] Dropped {dropped} games missing odds")
+
+    # Analyze nulls after dropping metadata
+    feature_cols = identify_feature_columns(features_df)
+    print(f"[*] Using {len(feature_cols)} numeric features (excluding metadata)")
+    print(f"[*] Expected features for model: 319\n")
+
+    # Check for nulls in actual feature columns
+    feature_subset = features_df.select(feature_cols)
+    null_counts = feature_subset.null_count().to_dicts()[0]
+    null_cols = {col: count for col, count in null_counts.items() if count > 0}
+
+    if null_cols:
+        print("[!] Columns with null values (after dropping metadata):")
+        null_pcts = [(col, count/len(features_df)*100) for col, count in null_cols.items()]
+        null_pcts.sort(key=lambda x: x[1], reverse=True)
+        print(f"    Total columns with nulls: {len(null_pcts)}\n")
+        for col, pct in null_pcts[:15]:
+            print(f"    {col:40} {pct:6.1f}%")
+        if len(null_pcts) > 15:
+            print(f"    ... and {len(null_pcts) - 15} more columns with nulls")
+        print()
+    else:
+        print("[+] No null values in feature columns\n")
+
     # Load ML model
-    print("STEP 3: Loading Moneyline Model")
+    print("STEP 2: Loading Moneyline Model")
     print("-"*80 + "\n")
     model = load_model()
     if model is None:
         return
 
-    # Step 4: Get ML predictions and filter for EV > 9%
-    print("STEP 4: Getting ML Predictions (EV > 9%)")
+    # Step 3: Get ML predictions
+    print("STEP 3: Getting ML Predictions")
     print("-"*80 + "\n")
-    ml_bets = get_ml_bets(features_df, model, allowed_bookmakers, ev_threshold=0.09)
-    print(f"[+] Found {len(ml_bets)} ML bets with EV > 9%\n")
 
-    # Step 5: Get OU predictions and filter for difference > 2.3
-    # print("STEP 5: Getting OU Predictions (Difference > 2.3)")
+    # Align features and make predictions
+    X, feature_cols = align_features_to_model(features_df, model)
+    if X is None:
+        print("[-] Could not align features\n")
+        return
+
+    pred_proba = model.predict_proba(X)
+    print(f"[+] Made predictions for {len(X)} games\n")
+
+    # Export predictions to Excel
+    print("Exporting predictions to Excel...")
+    export_data = []
+    for idx, game in enumerate(features_df.iter_rows(named=True)):
+        game_id = game.get('game_id')
+        team_1 = game.get('team_1')
+        team_2 = game.get('team_2')
+        date = game.get('date')
+
+        team_1_prob = float(pred_proba[idx, 1])
+        team_2_prob = float(pred_proba[idx, 0])
+
+        export_data.append({
+            'game_id': game_id,
+            'date': date,
+            'team_1': team_1,
+            'team_1_win_prob': round(team_1_prob, 4),
+            'team_2': team_2,
+            'team_2_win_prob': round(team_2_prob, 4)
+        })
+
+    # Write to Excel
+    output_df = pl.DataFrame(export_data)
+    output_file = Path(__file__).parent / "model_predictions.xlsx"
+    output_df.write_excel(str(output_file))
+    print(f"[+] Exported predictions to {output_file}\n")
+
+    ml_bets = []
+
+    # Step 4: Get OU predictions and filter for difference > 2.3
+    # print("STEP 4: Getting OU Predictions (Difference > 2.3)")
     # print("-"*80 + "\n")
     # ou_bets = get_ou_bets(ou_predictions_df, difference_threshold=2.3, allowed_bookmakers=allowed_bookmakers)
     # print(f"[+] Found {len(ou_bets)} OU bets with difference > 2.3\n")
     ou_bets = []
 
-    # Step 5: Print combined futures report
+    # Done - exported to Excel
     print("\n" + "="*80)
-    print("FUTURES REPORT - BETTING RECOMMENDATIONS")
+    print("DONE")
     print("="*80 + "\n")
 
-    if ml_bets or ou_bets:
+    if False:  # Disabled - using Excel export instead
         # Print ML bets
         if ml_bets:
             print(f"MONEYLINE BETS (EV > 9%, Bookmakers: {', '.join(sorted(allowed_bookmakers))})")
@@ -460,8 +652,8 @@ def main():
             for bet in ml_bets_sorted:
                 print(f"Date: {bet['date']}")
                 print(f"Game ID: {bet['game_id']}")
-                print(f"Matchup: {bet['team']} ({bet['position']}) vs {bet['opponent']}")
-                print(f"  Odds: {bet['odds']:+d}  |  Decimal: {bet['decimal']}")
+                print(f"BET ON: {bet['team']}")
+                print(f"  Odds: {bet['odds']:+d}  |  Decimal: {bet['decimal']:.3f}")
                 print(f"  Win Prob: {bet['win_prob']*100:.2f}%")
                 print(f"  EV: {bet['ev_percent']:.2f}%")
                 print(f"  Bookmaker: {bet['bookmaker']}")

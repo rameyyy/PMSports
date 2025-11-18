@@ -170,7 +170,7 @@ def main():
         difference = ensemble - over_point
 
         # Check if difference > 2.29
-        if difference > 1:
+        if difference > 2.3:
             qualifying_games.append({
                 'game_id': game_id,
                 'ensemble': ensemble,
