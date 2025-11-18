@@ -424,32 +424,26 @@ def main():
     X_train, y_train = prepare_data(train_df, feature_cols)
     print(f"Training data shape: X={X_train.shape}\n")
 
-    # Train model
-    print("STEP 2: Training Model")
+    # Load pre-trained model from saved folder
+    print("STEP 2: Loading Pre-trained Model")
     print("-"*80 + "\n")
-    print(f"Training on {len(X_train)} samples...")
-    # Optimized hyperparameters from Bayesian optimization
-    model = XGBClassifier(
-        n_estimators=100,
-        max_depth=4,
-        learning_rate=0.01,
-        subsample=0.9980723455609309,
-        colsample_bytree=1.0,
-        min_child_weight=10,
-        gamma=5,
-        reg_alpha=1,
-        reg_lambda=0,
-        random_state=42,
-        eval_metric='logloss',
-        verbosity=0
-    )
+    model_path = Path(__file__).parent / "models" / "moneyline" / "saved" / "xgboost_model.pkl"
 
-    model.fit(X_train, y_train)
-    print(f"[+] Model training complete\n")
+    if model_path.exists():
+        model = XGBClassifier()
+        model.load_model(str(model_path))
+        print(f"[+] Model loaded from {model_path}\n")
+    else:
+        print(f"[-] Model not found at {model_path}")
+        print(f"    Please run export_2025_predictions.py first to train and save the model\n")
+        return
 
     # Load test data (2025)
     print("STEP 3: Loading Test Data (2025)")
     print("-"*80 + "\n")
+
+    # Don't train model, just prepare training data for feature columns
+    # Training data is only used to extract feature columns, not for training
     test_df = load_features_by_year(['2025'])
 
     if test_df is None:

@@ -290,10 +290,10 @@ def main():
     print("2025 PREDICTIONS EXPORT - EXCEL FORMAT")
     print("="*80 + "\n")
 
-    # Load training data (2021-2024)
-    print("STEP 1: Loading Training Data (2021-2024)")
+    # Load training data (all available years)
+    print("STEP 1: Loading Training Data (All Available Years)")
     print("-"*80 + "\n")
-    train_df = load_features_by_year(['2021', '2022', '2023', '2024'])
+    train_df = load_features_by_year(['2020', '2021', '2022', '2023', '2024'])
 
     if train_df is None:
         print("Failed to load training features")
@@ -307,8 +307,8 @@ def main():
     X_train, y_train = prepare_data(train_df, feature_cols)
     print(f"Training data shape: X={X_train.shape}\n")
 
-    # Train model on 2021-2024
-    print("STEP 2: Training Model on 2021-2024")
+    # Train model on all available years
+    print("STEP 2: Training Model on All Available Years")
     print("-"*80 + "\n")
     print(f"Training on {len(X_train)} samples...")
     # Optimized hyperparameters from Bayesian optimization
@@ -330,8 +330,17 @@ def main():
     model.fit(X_train, y_train)
     print(f"[+] Model training complete\n")
 
+    # Save model to saved folder
+    print("STEP 3: Saving Model to Disk")
+    print("-"*80 + "\n")
+    model_dir = Path(__file__).parent / "models" / "moneyline" / "saved"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    model_path = model_dir / "xgboost_model.pkl"
+    model.save_model(str(model_path))
+    print(f"[+] Model saved to {model_path}\n")
+
     # Load test data (2025)
-    print("STEP 3: Loading Test Data (2025)")
+    print("STEP 4: Loading Test Data (2025)")
     print("-"*80 + "\n")
     test_df = load_features_by_year(['2025'])
 
@@ -346,19 +355,19 @@ def main():
     print(f"Test data shape: X={X_test.shape}\n")
 
     # Load odds from database
-    print("STEP 4: Loading Odds from Database for 2025 Games")
+    print("STEP 5: Loading Odds from Database for 2025 Games")
     print("-"*80 + "\n")
     game_ids = test_df['game_id'].to_list()
     odds_dict = load_odds_for_games(game_ids)
 
     # Make predictions on 2025 test data
-    print("STEP 5: Making Predictions on 2025 Data")
+    print("STEP 6: Making Predictions on 2025 Data")
     print("-"*80 + "\n")
     pred_proba = model.predict_proba(X_test)
     print(f"Made predictions for {len(X_test)} games\n")
 
     # Export to Excel
-    print("STEP 6: Exporting to Excel")
+    print("STEP 7: Exporting to Excel")
     print("-"*80 + "\n")
     output_file = Path(__file__).parent / "ncaamb_2025_predictions.xlsx"
     num_records = export_2025_predictions_excel(test_df, pred_proba, odds_dict, str(output_file))
