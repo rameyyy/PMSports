@@ -10,6 +10,7 @@ Only considers odds from: BetOnline.ag, Bovada, MyBookie.ag
 import os
 import sys
 from pathlib import Path
+from datetime import datetime
 import polars as pl
 import numpy as np
 from xgboost import XGBClassifier
@@ -20,6 +21,54 @@ sys.path.insert(0, ncaamb_dir)
 
 from ou_main import main as ou_main
 from scrapes import sqlconn
+from models.build_flat_df import build_flat_df
+from models.overunder.build_ou_features import build_ou_features
+
+
+def get_todays_date():
+    """Get today's date in YYYYMMDD format"""
+    return datetime.now().strftime('%Y%m%d')
+
+
+def rebuild_features_for_today(flat_df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Rebuild features for today's games using the same logic as OU features
+    This ensures the feature columns match what the ML model expects
+    """
+    print("Rebuilding features for today's games...")
+
+    # Filter for today's games
+    today = get_todays_date()
+    today_games = flat_df.filter(
+        pl.col('game_id').str.starts_with(today)
+    )
+
+    if len(today_games) == 0:
+        print(f"[-] No games found for today ({today})")
+        return None
+
+    print(f"[+] Found {len(today_games)} games for today\n")
+
+    # Build OU features (which includes all the numeric features needed)
+    try:
+        features_df = build_ou_features(today_games)
+        print(f"[+] Built features: {features_df.shape[0]} games x {features_df.shape[1]} features")
+
+        # Check for null values
+        null_counts = features_df.null_count().to_dicts()[0]
+        null_cols = {col: count for col, count in null_counts.items() if count > 0}
+
+        if null_cols:
+            print(f"\n[!] Warning: Found null values in {len(null_cols)} columns:")
+            for col, count in sorted(null_cols.items(), key=lambda x: x[1], reverse=True)[:10]:
+                print(f"    {col}: {count} nulls ({count/len(features_df)*100:.1f}%)")
+            print()
+
+        return features_df
+
+    except Exception as e:
+        print(f"[-] Error building features: {e}\n")
+        return None
 
 
 def load_model():
@@ -182,6 +231,13 @@ def get_ml_bets(features_df: pl.DataFrame, model: XGBClassifier, allowed_bookmak
 
     # Identify features and prepare data
     feature_cols = identify_feature_columns(features_df)
+
+    # Check if we have enough features
+    if len(feature_cols) < 319:
+        print(f"[-] Warning: Only {len(feature_cols)} features found, model expects 319")
+        print(f"[-] This likely means OU features are missing some ML-required columns")
+        print(f"[-] Proceeding anyway, but predictions may fail...\n")
+
     X = prepare_data(features_df, feature_cols)
 
     # Make predictions
@@ -346,32 +402,45 @@ def main():
     # Define allowed bookmakers
     allowed_bookmakers = {'BetOnline.ag', 'Bovada', 'MyBookie.ag', 'betonlineag'}
 
-    # Step 1: Get OU predictions
-    print("STEP 1: Loading OU Predictions")
+    # Step 1: Get OU predictions and flat df (commented out ou_main to avoid re-scraping)
+    print("STEP 1: Loading OU Predictions & Building Features")
     print("-"*80 + "\n")
+    # ou_features_df, ou_predictions_df = ou_main()
+    # For now, just get ou_main to scrape but don't rebuild features
+    print("[*] Calling ou_main to scrape/fetch today's games...\n")
     ou_features_df, ou_predictions_df = ou_main()
 
     if ou_features_df is None or ou_predictions_df is None:
         print("[-] Failed to get OU predictions")
         return
 
-    print(f"[+] Loaded {len(ou_predictions_df)} OU predictions\n")
+    print(f"[+] Loaded {len(ou_predictions_df)} OU predictions")
+    print(f"[+] OU features (raw) shape: {ou_features_df.shape}\n")
 
-    # Step 2: Load ML model
-    print("STEP 2: Loading Moneyline Model")
+    # Rebuild features for today to ensure proper column alignment
+    print("STEP 2: Rebuilding Features for ML Model")
+    print("-"*80 + "\n")
+    features_df = rebuild_features_for_today(ou_features_df)
+
+    if features_df is None or len(features_df) == 0:
+        print("[-] Failed to rebuild features")
+        return
+
+    # Load ML model
+    print("STEP 3: Loading Moneyline Model")
     print("-"*80 + "\n")
     model = load_model()
     if model is None:
         return
 
-    # Step 3: Get ML predictions and filter for EV > 9%
-    print("STEP 3: Getting ML Predictions (EV > 9%)")
+    # Step 4: Get ML predictions and filter for EV > 9%
+    print("STEP 4: Getting ML Predictions (EV > 9%)")
     print("-"*80 + "\n")
-    ml_bets = get_ml_bets(ou_features_df, model, allowed_bookmakers, ev_threshold=0.09)
+    ml_bets = get_ml_bets(features_df, model, allowed_bookmakers, ev_threshold=0.09)
     print(f"[+] Found {len(ml_bets)} ML bets with EV > 9%\n")
 
-    # Step 4: Get OU predictions and filter for difference > 2.3
-    print("STEP 4: Getting OU Predictions (Difference > 2.3)")
+    # Step 5: Get OU predictions and filter for difference > 2.3
+    print("STEP 5: Getting OU Predictions (Difference > 2.3)")
     print("-"*80 + "\n")
     ou_bets = get_ou_bets(ou_predictions_df, difference_threshold=2.3, allowed_bookmakers=allowed_bookmakers)
     print(f"[+] Found {len(ou_bets)} OU bets with difference > 2.3\n")
