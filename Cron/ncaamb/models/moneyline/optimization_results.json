@@ -1,0 +1,14 @@
+{
+  "best_overall_score": 0.7202588974917729,
+  "best_train_accuracy": 0.7165781853281853,
+  "best_test_accuracy": 0.7190319934372437,
+  "best_overfitting_gap": -0.002453808109058375,
+  "best_test_accuracy_overall": 0.7190319934372437,
+  "hyperparameters": {
+    "n_estimators": 100,
+    "max_depth": 4,
+    "learning_rate": 0.01,
+    "subsample": 0.9980723455609309,
+    "colsample_bytree": 1.0,
+    "min_child_weight": 10,
+    "gamma": 
