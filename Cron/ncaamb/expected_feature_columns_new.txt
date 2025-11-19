@@ -288,8 +288,6 @@ avg_spread
 spread_variance
 avg_spread_home_odds
 avg_spread_away_odds
-avg_ml_home
-avg_ml_away
 num_books_with_spread
 implied_fav_score
 implied_dog_score

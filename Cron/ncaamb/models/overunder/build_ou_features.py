@@ -4,7 +4,10 @@ Includes: rolling windows, rank-based features, leaderboard differentials, playe
           contextual features (rest/home/away), and interaction terms
 """
 import polars as pl
+import mysql.connector
 from typing import Optional, Dict, List
+from dotenv import load_dotenv
+import os
 from .ou_feature_build_utils import (
     get_rolling_windows,
     calculate_simple_average,
@@ -22,27 +25,79 @@ from .ou_advanced_features import (
 )
 
 
-def process_odds_data(odds_list: list) -> dict:
+def normalize_bookmaker_name(bookmaker: str) -> str:
+    """
+    Normalize bookmaker name to lowercase format
+
+    Args:
+        bookmaker: Bookmaker name from database
+
+    Returns:
+        Normalized bookmaker name (e.g., 'BetOnline.ag' -> 'betonline')
+    """
+    if not bookmaker:
+        return ''
+
+    # Mapping of database bookmaker names to normalized names
+    normalizations = {
+        'BetOnline.ag': 'betonline',
+        'MyBookie.ag': 'mybookie',
+        'LowVig.ag': 'lowvig',
+        'BetMGM': 'betmgm',
+        'Bovada': 'bovada',
+        'DraftKings': 'draftkings',
+        'FanDuel': 'fanduel'
+    }
+
+    return normalizations.get(bookmaker, bookmaker.lower().replace('.ag', '').replace(' ', ''))
+
+
+def process_odds_data(odds_list: list, team_1: str = None, team_2: str = None, team_mappings: dict = None) -> dict:
     """
     Process odds data from multiple sportsbooks for a game
     Creates individual columns for each sportsbook's O/U line + over/under odds
     Fills nulls with average for that metric
-    Also includes: spread points/odds, moneyline odds
+    Maps home_team/away_team from odds to team_1/team_2 using team_mappings
+
+    Args:
+        odds_list: List of odds dictionaries from database with home_team/away_team fields
+        team_1: Name of team_1 (internal team naming)
+        team_2: Name of team_2 (internal team naming)
+        team_mappings: Dict mapping from_odds_team_name -> my_team_name
+
+    Returns:
+        Dictionary with odds features including:
+        - Per-bookmaker columns: betonline_ml_team_1, betonline_ml_team_2, etc.
+        - Average columns: avg_ml_team_1, avg_ml_team_2, etc.
+        - O/U columns: betonline_ou_line, betonline_over_odds, etc.
+        - Spread columns: betonline_spread_pts_team_1, etc.
     """
-    # Standard sportsbooks
-    sportsbooks = ['BetMGM', 'BetOnline.ag', 'Bovada', 'DraftKings', 'FanDuel', 'LowVig.ag', 'MyBookie.ag']
+    # Standard sportsbooks (normalized names)
+    sportsbooks = ['betmgm', 'betonline', 'bovada', 'draftkings', 'fanduel', 'lowvig', 'mybookie']
 
     odds_features = {}
 
-    # Create columns for each sportsbook's O/U line and odds
+    # Create columns for each sportsbook
     ou_lines_by_book = {}
     over_odds_by_book = {}
     under_odds_by_book = {}
+    ml_team_1_by_book = {}
+    ml_team_2_by_book = {}
+    spread_pts_team_1_by_book = {}
+    spread_odds_team_1_by_book = {}
+    spread_pts_team_2_by_book = {}
+    spread_odds_team_2_by_book = {}
 
     for book in sportsbooks:
         odds_features[f'{book}_ou_line'] = None
         odds_features[f'{book}_over_odds'] = None
         odds_features[f'{book}_under_odds'] = None
+        odds_features[f'{book}_ml_team_1'] = None
+        odds_features[f'{book}_ml_team_2'] = None
+        odds_features[f'{book}_spread_pts_team_1'] = None
+        odds_features[f'{book}_spread_odds_team_1'] = None
+        odds_features[f'{book}_spread_pts_team_2'] = None
+        odds_features[f'{book}_spread_odds_team_2'] = None
 
     # Add average columns
     odds_features['avg_ou_line'] = None
@@ -51,13 +106,14 @@ def process_odds_data(odds_list: list) -> dict:
     odds_features['avg_under_odds'] = None
     odds_features['num_books_with_ou'] = 0
 
-    # Spread and ML features (averages only for now)
-    odds_features['avg_spread'] = None
+    # Spread and ML features (now mapped to team_1/team_2)
+    odds_features['avg_spread_pts_team_1'] = None
+    odds_features['avg_spread_pts_team_2'] = None
     odds_features['spread_variance'] = None
-    odds_features['avg_spread_home_odds'] = None
-    odds_features['avg_spread_away_odds'] = None
-    odds_features['avg_ml_home'] = None
-    odds_features['avg_ml_away'] = None
+    odds_features['avg_spread_odds_team_1'] = None
+    odds_features['avg_spread_odds_team_2'] = None
+    odds_features['avg_ml_team_1'] = None
+    odds_features['avg_ml_team_2'] = None
     odds_features['num_books_with_spread'] = 0
     odds_features['num_books_with_ml'] = 0
 
@@ -69,17 +125,19 @@ def process_odds_data(odds_list: list) -> dict:
     over_odds_all = []
     under_odds_all = []
 
-    spreads = []
-    spread_home_odds = []
-    spread_away_odds = []
-    ml_home = []
-    ml_away = []
+    spread_pts_team_1_all = []
+    spread_pts_team_2_all = []
+    spread_odds_team_1_all = []
+    spread_odds_team_2_all = []
+    ml_for_team_1 = []
+    ml_for_team_2 = []
 
     for odds in odds_list:
         if not isinstance(odds, dict):
             continue
 
-        bookmaker = odds.get('bookmaker')
+        bookmaker_raw = odds.get('bookmaker')
+        bookmaker = normalize_bookmaker_name(bookmaker_raw)
 
         # O/U line and odds
         ou_point = odds.get('over_point') or odds.get('under_point')
@@ -104,27 +162,109 @@ def process_odds_data(odds_list: list) -> dict:
             if bookmaker in sportsbooks:
                 under_odds_by_book[bookmaker] = under_odds_float
 
-        # Spread data
-        spread_pts = odds.get('spread_pts_home') or odds.get('spread_pts_away')
-        if spread_pts is not None:
-            spreads.append(abs(float(spread_pts)))
+        # Get home_team and away_team from odds data
+        home_team_odds = odds.get('home_team')
+        away_team_odds = odds.get('away_team')
 
+        # Map odds team names to internal team names using team_mappings
+        home_team_mapped = home_team_odds
+        away_team_mapped = away_team_odds
+
+        if team_mappings:
+            home_team_mapped = team_mappings.get(home_team_odds, home_team_odds)
+            away_team_mapped = team_mappings.get(away_team_odds, away_team_odds)
+
+        # Determine which team is team_1 and which is team_2
+        home_is_team_1 = (home_team_mapped == team_1)
+        away_is_team_1 = (away_team_mapped == team_1)
+
+        # Process spread data
+        spread_pts_home = odds.get('spread_pts_home')
         spread_home = odds.get('spread_home')
-        if spread_home is not None:
-            spread_home_odds.append(float(spread_home))
-
+        spread_pts_away = odds.get('spread_pts_away')
         spread_away = odds.get('spread_away')
-        if spread_away is not None:
-            spread_away_odds.append(float(spread_away))
 
-        # Moneyline data
-        ml_h = odds.get('ml_home')
-        if ml_h is not None:
-            ml_home.append(float(ml_h))
+        # Map spread to team_1 and team_2
+        if home_is_team_1:
+            # home is team_1, away is team_2
+            if spread_pts_home is not None:
+                spread_pts_team_1_val = float(spread_pts_home)
+                spread_pts_team_1_all.append(spread_pts_team_1_val)
+                if bookmaker in sportsbooks:
+                    spread_pts_team_1_by_book[bookmaker] = spread_pts_team_1_val
 
-        ml_a = odds.get('ml_away')
-        if ml_a is not None:
-            ml_away.append(float(ml_a))
+            if spread_pts_away is not None:
+                spread_pts_team_2_val = float(spread_pts_away)
+                spread_pts_team_2_all.append(spread_pts_team_2_val)
+                if bookmaker in sportsbooks:
+                    spread_pts_team_2_by_book[bookmaker] = spread_pts_team_2_val
+
+            if spread_home is not None:
+                spread_odds_team_1_val = float(spread_home)
+                spread_odds_team_1_all.append(spread_odds_team_1_val)
+                if bookmaker in sportsbooks:
+                    spread_odds_team_1_by_book[bookmaker] = spread_odds_team_1_val
+
+            if spread_away is not None:
+                spread_odds_team_2_val = float(spread_away)
+                spread_odds_team_2_all.append(spread_odds_team_2_val)
+                if bookmaker in sportsbooks:
+                    spread_odds_team_2_by_book[bookmaker] = spread_odds_team_2_val
+
+        elif away_is_team_1:
+            # away is team_1, home is team_2
+            if spread_pts_away is not None:
+                spread_pts_team_1_val = float(spread_pts_away)
+                spread_pts_team_1_all.append(spread_pts_team_1_val)
+                if bookmaker in sportsbooks:
+                    spread_pts_team_1_by_book[bookmaker] = spread_pts_team_1_val
+
+            if spread_pts_home is not None:
+                spread_pts_team_2_val = float(spread_pts_home)
+                spread_pts_team_2_all.append(spread_pts_team_2_val)
+                if bookmaker in sportsbooks:
+                    spread_pts_team_2_by_book[bookmaker] = spread_pts_team_2_val
+
+            if spread_away is not None:
+                spread_odds_team_1_val = float(spread_away)
+                spread_odds_team_1_all.append(spread_odds_team_1_val)
+                if bookmaker in sportsbooks:
+                    spread_odds_team_1_by_book[bookmaker] = spread_odds_team_1_val
+
+            if spread_home is not None:
+                spread_odds_team_2_val = float(spread_home)
+                spread_odds_team_2_all.append(spread_odds_team_2_val)
+                if bookmaker in sportsbooks:
+                    spread_odds_team_2_by_book[bookmaker] = spread_odds_team_2_val
+
+        # Process moneyline data
+        ml_home = odds.get('ml_home')
+        ml_away = odds.get('ml_away')
+
+        # Map moneyline to team_1 and team_2
+        if home_is_team_1 and ml_home is not None:
+            ml_team_1_val = float(ml_home)
+            ml_for_team_1.append(ml_team_1_val)
+            if bookmaker in sportsbooks:
+                ml_team_1_by_book[bookmaker] = ml_team_1_val
+
+        if home_is_team_1 and ml_away is not None:
+            ml_team_2_val = float(ml_away)
+            ml_for_team_2.append(ml_team_2_val)
+            if bookmaker in sportsbooks:
+                ml_team_2_by_book[bookmaker] = ml_team_2_val
+
+        if away_is_team_1 and ml_away is not None:
+            ml_team_1_val = float(ml_away)
+            ml_for_team_1.append(ml_team_1_val)
+            if bookmaker in sportsbooks:
+                ml_team_1_by_book[bookmaker] = ml_team_1_val
+
+        if away_is_team_1 and ml_home is not None:
+            ml_team_2_val = float(ml_home)
+            ml_for_team_2.append(ml_team_2_val)
+            if bookmaker in sportsbooks:
+                ml_team_2_by_book[bookmaker] = ml_team_2_val
 
     # Calculate averages for O/U
     if ou_lines_all:
@@ -142,7 +282,7 @@ def process_odds_data(odds_list: list) -> dict:
     if under_odds_all:
         odds_features['avg_under_odds'] = float(sum(under_odds_all) / len(under_odds_all))
 
-    # Fill individual sportsbook columns, use average for nulls
+    # Fill individual sportsbook columns, use average for nulls (O/U only)
     for book in sportsbooks:
         if book in ou_lines_by_book:
             odds_features[f'{book}_ou_line'] = ou_lines_by_book[book]
@@ -159,29 +299,48 @@ def process_odds_data(odds_list: list) -> dict:
         elif odds_features['avg_under_odds'] is not None:
             odds_features[f'{book}_under_odds'] = odds_features['avg_under_odds']
 
+        # Moneyline by book (not filled with average, leave as null if missing)
+        if book in ml_team_1_by_book:
+            odds_features[f'{book}_ml_team_1'] = ml_team_1_by_book[book]
+        if book in ml_team_2_by_book:
+            odds_features[f'{book}_ml_team_2'] = ml_team_2_by_book[book]
+
+        # Spread by book (not filled with average, leave as null if missing)
+        if book in spread_pts_team_1_by_book:
+            odds_features[f'{book}_spread_pts_team_1'] = spread_pts_team_1_by_book[book]
+        if book in spread_odds_team_1_by_book:
+            odds_features[f'{book}_spread_odds_team_1'] = spread_odds_team_1_by_book[book]
+        if book in spread_pts_team_2_by_book:
+            odds_features[f'{book}_spread_pts_team_2'] = spread_pts_team_2_by_book[book]
+        if book in spread_odds_team_2_by_book:
+            odds_features[f'{book}_spread_odds_team_2'] = spread_odds_team_2_by_book[book]
+
     # Calculate spread averages
-    if spreads:
-        odds_features['num_books_with_spread'] = len(spreads)
-        avg_spread = float(sum(spreads) / len(spreads))
-        odds_features['avg_spread'] = avg_spread
+    if spread_pts_team_1_all:
+        odds_features['num_books_with_spread'] = len(spread_pts_team_1_all)
+        odds_features['avg_spread_pts_team_1'] = float(sum(spread_pts_team_1_all) / len(spread_pts_team_1_all))
 
-        if len(spreads) > 1:
-            variance = sum((x - avg_spread) ** 2 for x in spreads) / len(spreads)
-            odds_features['spread_variance'] = float(variance ** 0.5)
+    if spread_pts_team_2_all:
+        odds_features['avg_spread_pts_team_2'] = float(sum(spread_pts_team_2_all) / len(spread_pts_team_2_all))
 
-    if spread_home_odds:
-        odds_features['avg_spread_home_odds'] = float(sum(spread_home_odds) / len(spread_home_odds))
+    if spread_pts_team_1_all and len(spread_pts_team_1_all) > 1:
+        avg_spread = odds_features['avg_spread_pts_team_1']
+        variance = sum((x - avg_spread) ** 2 for x in spread_pts_team_1_all) / len(spread_pts_team_1_all)
+        odds_features['spread_variance'] = float(variance ** 0.5)
 
-    if spread_away_odds:
-        odds_features['avg_spread_away_odds'] = float(sum(spread_away_odds) / len(spread_away_odds))
+    if spread_odds_team_1_all:
+        odds_features['avg_spread_odds_team_1'] = float(sum(spread_odds_team_1_all) / len(spread_odds_team_1_all))
 
-    # Moneyline averages
-    if ml_home:
-        odds_features['num_books_with_ml'] = len(ml_home)
-        odds_features['avg_ml_home'] = float(sum(ml_home) / len(ml_home))
+    if spread_odds_team_2_all:
+        odds_features['avg_spread_odds_team_2'] = float(sum(spread_odds_team_2_all) / len(spread_odds_team_2_all))
 
-    if ml_away:
-        odds_features['avg_ml_away'] = float(sum(ml_away) / len(ml_away))
+    # Moneyline averages - now correctly mapped to team_1/team_2
+    if ml_for_team_1:
+        odds_features['num_books_with_ml'] = len(ml_for_team_1)
+        odds_features['avg_ml_team_1'] = float(sum(ml_for_team_1) / len(ml_for_team_1))
+
+    if ml_for_team_2:
+        odds_features['avg_ml_team_2'] = float(sum(ml_for_team_2) / len(ml_for_team_2))
 
     return odds_features
 
@@ -634,6 +793,61 @@ def build_ou_features(df: pl.DataFrame) -> pl.DataFrame:
     features_list = []
     rolling_windows = get_rolling_windows()
 
+    # Load environment variables for database connection
+    load_dotenv()
+
+    # Batch load odds data for all games upfront (much faster than per-game queries)
+    db_connection = None
+    all_odds_by_game_id = {}
+    try:
+        db_connection = mysql.connector.connect(
+            host=os.getenv('DB_HOST'),
+            port=int(os.getenv('DB_PORT', 3306)),
+            user=os.getenv('DB_USER'),
+            password=os.getenv('DB_PASSWORD'),
+            database=os.getenv('NCAAMB_DB')
+        )
+        print("[+] Database connection established, loading odds data...")
+
+        # Load ALL odds records (much more efficient than per-game queries)
+        cursor = db_connection.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT game_id, home_team, away_team, bookmaker,
+                   ml_home, ml_away,
+                   spread_home, spread_pts_home, spread_away, spread_pts_away,
+                   over_odds, under_odds, over_point, under_point,
+                   start_time
+            FROM odds
+            ORDER BY game_id
+        """)
+
+        # Organize odds by game_id for fast lookup
+        for row in cursor.fetchall():
+            game_id = row['game_id']
+            if game_id not in all_odds_by_game_id:
+                all_odds_by_game_id[game_id] = []
+            all_odds_by_game_id[game_id].append(row)
+
+        cursor.close()
+        print(f"[+] Loaded odds data for {len(all_odds_by_game_id)} games")
+    except Exception as e:
+        print(f"[!] Warning: Could not load odds from database: {e}")
+        all_odds_by_game_id = {}
+
+    # Load team mappings for moneyline odds mapping
+    team_mappings = {}
+    try:
+        import csv
+        mappings_path = os.path.join(os.path.dirname(__file__), '..', '..', 'bookmaker', 'team_mappings.csv')
+        with open(mappings_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get('from_odds_team_name') and row.get('my_team_name'):
+                    team_mappings[row['from_odds_team_name']] = row['my_team_name']
+        print(f"[+] Loaded team mappings for {len(team_mappings)} teams")
+    except Exception as e:
+        print(f"[!] Warning: Could not load team_mappings: {e}")
+
     for row in df.iter_rows(named=True):
         features = {
             'game_id': row['game_id'],
@@ -770,20 +984,31 @@ def build_ou_features(df: pl.DataFrame) -> pl.DataFrame:
         # ============================================
         # ODDS DATA FEATURES
         # ============================================
-        game_odds = row.get('game_odds', [])
-        odds_features = process_odds_data(game_odds)
+        # Get pre-loaded odds for this game
+        game_id = row.get('game_id')
+        team_1 = row.get('team_1')
+        team_2 = row.get('team_2')
+        game_odds = all_odds_by_game_id.get(game_id, [])
+
+        odds_features = process_odds_data(game_odds, team_1=team_1, team_2=team_2, team_mappings=team_mappings)
         features.update(odds_features)
 
         # Implied scores from spread and O/U line
-        if odds_features['avg_ou_line'] and odds_features['avg_spread']:
-            implied_fav_score = (odds_features['avg_ou_line'] + odds_features['avg_spread']) / 2
-            implied_dog_score = (odds_features['avg_ou_line'] - odds_features['avg_spread']) / 2
-            features['implied_fav_score'] = implied_fav_score
-            features['implied_dog_score'] = implied_dog_score
-            features['spread_ou_agreement'] = abs(implied_fav_score - implied_dog_score)
+        # Use team_1 spread points for calculation
+        avg_spread_team_1 = odds_features.get('avg_spread_pts_team_1')
+        avg_ou_line = odds_features.get('avg_ou_line')
+
+        if avg_ou_line and avg_spread_team_1:
+            # If team_1 spread is negative, they're favored
+            # team_1 implied = (total + spread) / 2, team_2 implied = (total - spread) / 2
+            implied_team_1_score = (avg_ou_line + avg_spread_team_1) / 2
+            implied_team_2_score = (avg_ou_line - avg_spread_team_1) / 2
+            features['implied_team_1_score'] = implied_team_1_score
+            features['implied_team_2_score'] = implied_team_2_score
+            features['spread_ou_agreement'] = abs(implied_team_1_score - implied_team_2_score)
         else:
-            features['implied_fav_score'] = None
-            features['implied_dog_score'] = None
+            features['implied_team_1_score'] = None
+            features['implied_team_2_score'] = None
             features['spread_ou_agreement'] = None
 
         # ============================================
@@ -942,8 +1167,17 @@ def build_ou_features(df: pl.DataFrame) -> pl.DataFrame:
 
         features_list.append(features)
 
-    # Convert to DataFrame
-    df = pl.DataFrame(features_list)
+    # Close database connection
+    if db_connection:
+        try:
+            db_connection.close()
+            print("Database connection closed")
+        except Exception as e:
+            print(f"Warning: Error closing database connection: {e}")
+
+    # Convert to DataFrame with proper type inference
+    # Use infer_schema_length to check more rows for consistent schema
+    df = pl.DataFrame(features_list, infer_schema_length=5000)
 
     # Ensure key columns are string type and not null
     # Fill any nulls in identifiers with empty strings, then convert to string

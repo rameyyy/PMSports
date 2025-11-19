@@ -93,6 +93,8 @@ def identify_feature_columns(df: pl.DataFrame) -> list:
 def prepare_data(df: pl.DataFrame, feature_cols: list) -> np.ndarray:
     """Prepare X features"""
     X = df.select(feature_cols).fill_null(0).to_numpy()
+    # Replace any NaN values that might remain (e.g., from None values in training)
+    X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
     return X
 
 
@@ -154,6 +156,8 @@ def align_features_to_model(df: pl.DataFrame, model: XGBClassifier) -> tuple:
     # This is critical - the order must match training order
     try:
         X = df.select(expected_features).fill_null(0).to_numpy()
+        # Replace any NaN values that might remain (e.g., from None values in training)
+        X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
     except Exception as e:
         print(f"[-] Error selecting features in order: {e}\n")
         return None, None
@@ -522,29 +526,48 @@ def main():
     print("FUTURES REPORT - ML & OU BETTING RECOMMENDATIONS")
     print("="*80 + "\n")
 
+    # Import ou_main to run data scraping first
+    import ou_main as ou_module
+
+    # Step 0: Run ou_main.main() to scrape all data and get predictions
+    print("STEP 0: Running OU pipeline to scrape data and make predictions")
+    print("-"*80 + "\n")
+
+    features_df, predictions_df = ou_module.main()
+
+    if features_df is None or predictions_df is None:
+        print("[-] OU pipeline failed")
+        return
+
+    print("\n[+] OU pipeline complete - data has been scraped and prepared\n")
+
     # Define allowed bookmakers
     allowed_bookmakers = {'BetOnline.ag', 'Bovada', 'MyBookie.ag', 'betonlineag'}
 
-    # Step 1: Build today's games dataframe and generate features
-    print("STEP 1: Building Today's Games & Generating Features")
+    # We already have todays_games_df and features_df from the OU pipeline above
+    # Step 1: Prepare ML features from the OU features_df
+    print("STEP 1: Preparing ML Features for Moneyline Model")
     print("-"*80 + "\n")
 
-    # Build today's games for 2026 season
-    todays_games_df = build_todays_games_df(season='2026')
+    # Use the features_df generated during OU pipeline for ML predictions
+    # (it has all the game data and generated features already)
+    print(f"[+] Using {features_df.shape[0]} games with {features_df.shape[1]} feature columns")
 
-    if todays_games_df is None or len(todays_games_df) == 0:
-        print("[-] No games found for today")
-        return
+    # DEBUG: Print all columns to check for moneyline features
+    print(f"\n[DEBUG] All columns in features_df:")
+    all_cols = features_df.columns
+    print(f"Total columns: {len(all_cols)}")
+    for i, col in enumerate(all_cols, 1):
+        print(f"  {i:3}. {col}")
 
-    print(f"[+] Built flat dataframe: {todays_games_df.shape[0]} games x {todays_games_df.shape[1]} columns")
-
-    features_df = generate_features(todays_games_df)
-
-    if features_df is None or len(features_df) == 0:
-        print("[-] Failed to generate features")
-        return
-
-    print(f"[+] Generated features: {features_df.shape[0]} games x {features_df.shape[1]} columns")
+    # Check if any moneyline-related columns exist
+    ml_cols = [col for col in all_cols if 'ml_' in col.lower() or 'moneyline' in col.lower()]
+    if ml_cols:
+        print(f"\n[!] Found {len(ml_cols)} moneyline-related columns:")
+        for col in ml_cols:
+            print(f"    - {col}")
+    else:
+        print(f"\n[+] No moneyline-related columns found in features_df")
 
     # Drop rows with missing odds
     before = len(features_df)
@@ -599,48 +622,131 @@ def main():
     pred_proba = model.predict_proba(X)
     print(f"[+] Made predictions for {len(X)} games\n")
 
-    # Export predictions to Excel
-    print("Exporting predictions to Excel...")
-    export_data = []
-    for idx, game in enumerate(features_df.iter_rows(named=True)):
-        game_id = game.get('game_id')
-        team_1 = game.get('team_1')
-        team_2 = game.get('team_2')
-        date = game.get('date')
+    # Step 3b: Extract OU bets from predictions_df (ensemble - over_point > 2.3)
+    print("STEP 3b: Extracting OU Valid Bets (Difference > 2.3)")
+    print("-"*80 + "\n")
 
-        team_1_prob = float(pred_proba[idx, 1])
-        team_2_prob = float(pred_proba[idx, 0])
+    # Use the predictions_df generated in Step 0 to find valid OU bets
+    ou_bets = []
 
-        export_data.append({
-            'game_id': game_id,
-            'date': date,
-            'team_1': team_1,
-            'team_1_win_prob': round(team_1_prob, 4),
-            'team_2': team_2,
-            'team_2_win_prob': round(team_2_prob, 4)
+    try:
+        conn = ou_module.sqlconn.create_connection()
+        if not conn:
+            print("[-] Failed to connect to database for OU odds")
+        else:
+            for row in predictions_df.iter_rows(named=True):
+                game_id = row.get('game_id')
+                ensemble = row.get('ensemble_pred')
+                date = row.get('date')
+
+                if game_id is None or ensemble is None:
+                    continue
+
+                # Get O/U line from database
+                query = """
+                    SELECT over_point, bookmaker
+                    FROM odds
+                    WHERE game_id = %s
+                    AND bookmaker IN (%s, %s, %s, %s)
+                    ORDER BY bookmaker
+                    LIMIT 1
+                """
+
+                results = ou_module.sqlconn.fetch(conn, query, (
+                    game_id,
+                    'BetOnline.ag',
+                    'Bovada',
+                    'MyBookie.ag',
+                    'betonlineag'
+                ))
+
+                if results:
+                    over_point = results[0].get('over_point')
+                    bookmaker = results[0].get('bookmaker')
+
+                    if over_point is not None:
+                        difference = float(ensemble) - float(over_point)
+                        if difference > 2.3:
+                            ou_bets.append({
+                                'type': 'OU',
+                                'game_id': game_id,
+                                'date': date,
+                                'ensemble': round(float(ensemble), 2),
+                                'over_point': round(float(over_point), 2),
+                                'difference': round(difference, 2),
+                                'bookmaker': bookmaker,
+                                'bet': 'OVER'
+                            })
+
+            conn.close()
+
+    except Exception as e:
+        print(f"[-] Error extracting OU bets: {e}")
+
+    print(f"[+] Found {len(ou_bets)} OU bets with difference > 2.3\n")
+
+    # Step 3c: Get ML bets with EV > 9%
+    print("STEP 3c: Extracting ML Valid Bets (EV > 9%)")
+    print("-"*80 + "\n")
+
+    team_mappings = load_team_mappings()
+    ml_bets = get_ml_bets(features_df, model, allowed_bookmakers, ev_threshold=0.09, team_mappings=team_mappings)
+    print(f"\n[+] Found {len(ml_bets)} ML bets with EV > 9%\n")
+
+    # Export valid bets to Excel with date in filename
+    print("\nExporting valid bets to Excel...")
+
+    todays_date = get_todays_date_yyyymmdd()
+    output_file = Path(__file__).parent / f"bets_{todays_date}.xlsx"
+
+    # Combine ML and OU bets
+    all_bets = []
+
+    # Add ML bets
+    for bet in ml_bets:
+        all_bets.append({
+            'type': 'ML',
+            'date': bet['date'],
+            'game_id': bet['game_id'],
+            'team': bet['team'],
+            'opponent': bet['opponent'],
+            'odds': bet['odds'],
+            'decimal': round(bet['decimal'], 3),
+            'win_prob': round(bet['win_prob'], 4),
+            'ev_percent': round(bet['ev_percent'], 2),
+            'bookmaker': bet['bookmaker']
         })
 
-    # Write to Excel
-    output_df = pl.DataFrame(export_data)
-    output_file = Path(__file__).parent / "model_predictions.xlsx"
-    output_df.write_excel(str(output_file))
-    print(f"[+] Exported predictions to {output_file}\n")
+    # Add OU bets
+    for bet in ou_bets:
+        all_bets.append({
+            'type': 'OU',
+            'date': bet['date'],
+            'game_id': bet['game_id'],
+            'team': bet.get('bet', 'OVER'),
+            'opponent': '',
+            'odds': '',
+            'decimal': '',
+            'win_prob': '',
+            'ev_percent': round(bet['difference'], 2),
+            'bookmaker': bet['bookmaker'],
+            'ensemble': round(bet['ensemble'], 2),
+            'over_point': round(bet['over_point'], 2)
+        })
 
-    ml_bets = []
-
-    # Step 4: Get OU predictions and filter for difference > 2.3
-    # print("STEP 4: Getting OU Predictions (Difference > 2.3)")
-    # print("-"*80 + "\n")
-    # ou_bets = get_ou_bets(ou_predictions_df, difference_threshold=2.3, allowed_bookmakers=allowed_bookmakers)
-    # print(f"[+] Found {len(ou_bets)} OU bets with difference > 2.3\n")
-    ou_bets = []
+    if all_bets:
+        output_df = pl.DataFrame(all_bets)
+        output_df.write_excel(str(output_file))
+        print(f"[+] Exported {len(all_bets)} bets to {output_file}\n")
+    else:
+        print(f"[*] No valid bets found to export\n")
 
     # Done - exported to Excel
     print("\n" + "="*80)
     print("DONE")
     print("="*80 + "\n")
 
-    if False:  # Disabled - using Excel export instead
+    if True:  # Print results
         # Print ML bets
         if ml_bets:
             print(f"MONEYLINE BETS (EV > 9%, Bookmakers: {', '.join(sorted(allowed_bookmakers))})")
