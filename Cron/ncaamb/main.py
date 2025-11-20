@@ -100,7 +100,7 @@ def prepare_data(df: pl.DataFrame, feature_cols: list) -> np.ndarray:
 
 def load_expected_feature_columns() -> list:
     """Load the list of expected feature columns from file"""
-    expected_file = Path(__file__).parent / "expected_feature_columns.txt"
+    expected_file = Path(__file__).parent / "models" / "moneyline" / "saved" / "feature_columns.txt"
 
     if expected_file.exists():
         with open(expected_file, 'r') as f:
@@ -129,8 +129,7 @@ def align_features_to_model(df: pl.DataFrame, model: XGBClassifier) -> tuple:
         'team_1_conference', 'team_2_conference', 'team_1_is_home', 'team_2_is_home',
         'location', 'team_1_score', 'team_2_score', 'total_score_outcome', 'team_1_winloss',
         'team_1_leaderboard', 'team_2_leaderboard', 'team_1_match_hist', 'team_2_match_hist',
-        'team_1_hist_count', 'team_2_hist_count', 'start_time', 'game_odds',
-        'avg_ml_home', 'avg_ml_away'
+        'team_1_hist_count', 'team_2_hist_count', 'start_time', 'game_odds'
     }]
 
     # Report feature alignment status
@@ -572,8 +571,8 @@ def main():
     # Drop rows with missing odds
     before = len(features_df)
     features_df = features_df.filter(
-        pl.col('avg_ml_home').is_not_null() &
-        pl.col('avg_ml_away').is_not_null()
+        pl.col('avg_ml_team_1').is_not_null() &
+        pl.col('avg_ml_team_2').is_not_null()
     )
     dropped = before - len(features_df)
     if dropped > 0:
@@ -708,7 +707,7 @@ def main():
             'type': 'ML',
             'date': bet['date'],
             'game_id': bet['game_id'],
-            'team': bet['team'],
+            'bet_on': bet['team'],
             'opponent': bet['opponent'],
             'odds': bet['odds'],
             'decimal': round(bet['decimal'], 3),
@@ -723,7 +722,7 @@ def main():
             'type': 'OU',
             'date': bet['date'],
             'game_id': bet['game_id'],
-            'team': bet.get('bet', 'OVER'),
+            'bet_on': bet.get('bet', 'OVER'),
             'opponent': '',
             'odds': '',
             'decimal': '',

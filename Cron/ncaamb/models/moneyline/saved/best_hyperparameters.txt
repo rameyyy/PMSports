@@ -1,0 +1,18 @@
+Final Production Model Hyperparameters
+=====================================
+
+Training Data: 2021-2025 (21448 games)
+Purpose: Predict 2026 season
+
+Performance on Training Data (2021-2025):
+  Accuracy: 0.7209
+  AUC: 0.8009
+
+Hyperparameters (from Bayesian Optimization - Model 2: Best Generalization):
+  n_estimators: 128
+  max_depth: 3
+  learning_rate: 0.01
+  subsample: 0.8214041970901668
+  colsample_bytree: 1.0
+  min_child_weight: 7
+  gamma: 1.3035520618205187

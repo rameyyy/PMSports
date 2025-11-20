@@ -41,12 +41,17 @@ def normalize_bookmaker_name(bookmaker: str) -> str:
     # Mapping of database bookmaker names to normalized names
     normalizations = {
         'BetOnline.ag': 'betonline',
+        'betonlineag': 'betonline',  # Handle variant without dot
         'MyBookie.ag': 'mybookie',
+        'mybookieag': 'mybookie',  # Handle variant without dot
         'LowVig.ag': 'lowvig',
+        'lowvig': 'lowvig',  # Handle lowercase variant
         'BetMGM': 'betmgm',
         'Bovada': 'bovada',
         'DraftKings': 'draftkings',
-        'FanDuel': 'fanduel'
+        'FanDuel': 'fanduel',
+        'Caesars': 'caesars',  # Add Caesars/Caesars
+        'Bookmaker': 'bookmaker'  # Add Bookmaker
     }
 
     return normalizations.get(bookmaker, bookmaker.lower().replace('.ag', '').replace(' ', ''))

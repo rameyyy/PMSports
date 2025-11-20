@@ -58,6 +58,16 @@ def load_features():
         filename = f"features{year}.csv"
         try:
             df = pl.read_csv(filename)
+
+            # Normalize schema: convert odds columns to Float64
+            # This handles inconsistency where some years have String and others have Float64
+            for col in df.columns:
+                if any(x in col for x in ['_ml_team_', '_spread_pts_', '_spread_odds_']):
+                    try:
+                        df = df.with_columns(pl.col(col).cast(pl.Float64, strict=False))
+                    except:
+                        pass
+
             dfs.append(df)
             print(f"   Loaded {filename}: {len(df)} games")
         except FileNotFoundError:
@@ -65,6 +75,15 @@ def load_features():
 
     try:
         df = pl.read_csv("features.csv")
+
+        # Normalize schema for main features.csv too
+        for col in df.columns:
+            if any(x in col for x in ['_ml_team_', '_spread_pts_', '_spread_odds_']):
+                try:
+                    df = df.with_columns(pl.col(col).cast(pl.Float64, strict=False))
+                except:
+                    pass
+
         dfs.append(df)
         print(f"   Loaded features.csv: {len(df)} games")
     except FileNotFoundError:
@@ -105,8 +124,9 @@ def main():
 
     # SAVE the betting odds data NOW (before any filtering)
     print("\n2. Extracting betting odds and lines data...")
-    # Only use MyBookie.ag and Bovada
-    bookmakers = ['MyBookie.ag', 'Bovada']
+    # Only use MyBookie.ag and Bovada (use lowercase names as they appear in CSV)
+    bookmakers = ['mybookie', 'bovada']
+    bookmakers_display = ['MyBookie.ag', 'Bovada']
     betting_cols = ['game_id', 'avg_ou_line']
 
     for bookie in bookmakers:
@@ -206,19 +226,20 @@ def main():
     pred_df = pred_df.join(betting_odds_df, on='game_id', how='left')
     print(f"   Joined {len(pred_df)} predictions with odds")
 
-    # Define betting thresholds (OVER BETS ONLY: +2.0 to +3.5 in 0.1 increments)
-    thresholds = [round(x, 1) for x in np.arange(2.0, 3.6, 0.1)]
+    # Define betting thresholds from -8.0 to +8.0 in 0.1 increments
+    # Positive thresholds: bet OVER when prediction > line + threshold
+    # Negative thresholds: bet UNDER when prediction < line + threshold (i.e., prediction is below the line by threshold amount)
+    all_thresholds = [round(x, 1) for x in np.arange(-8.0, 8.1, 0.1)]
 
-    print(f"\n7. Simulating bets at different OVER thresholds...")
-    print("   Thresholds (+2.0 to +3.5): OVER bets only when prediction > line + threshold")
+    print(f"\n7. Simulating bets at different thresholds...")
+    print("   Positive threshold: bet OVER when prediction > line + threshold")
+    print("   Negative threshold: bet UNDER when prediction < line + threshold")
+    print("   Range: -8.0 to +8.0 in 0.1 increments")
     print("   Bet amount: $10 per bet\n")
 
     results = []
 
-    # For threshold +2.3, we'll collect detailed bet data
-    threshold_2_3_bets = []
-
-    for threshold in thresholds:
+    for threshold in all_thresholds:
         bets_placed = 0
         wins = 0
         losses = 0
@@ -257,42 +278,47 @@ def main():
 
             diff_from_line = predicted - best_line
 
-            # BET OVER if prediction > line + threshold
-            if diff_from_line >= threshold:
-                bets_placed += 1
+            # Determine if this is an OVER or UNDER threshold
+            if threshold > 0:
+                # OVER bet: place bet when prediction > line + threshold
+                if diff_from_line >= threshold:
+                    bets_placed += 1
 
-                # Use best over odds from data (American odds format)
-                american_odds = float(best_over_odds)
-                decimal_odds = american_to_decimal(american_odds)
+                    # Use best over odds from data (American odds format)
+                    american_odds = float(best_over_odds)
+                    decimal_odds = american_to_decimal(american_odds)
 
-                # Bet WINS if actual total is GREATER than the line
-                won = actual > best_line
+                    # Bet WINS if actual total is GREATER than the line
+                    won = actual > best_line
 
-                profit = calculate_profit(decimal_odds, won)
-                total_profit += profit
+                    profit = calculate_profit(decimal_odds, won)
+                    total_profit += profit
 
-                if won:
-                    wins += 1
-                else:
-                    losses += 1
+                    if won:
+                        wins += 1
+                    else:
+                        losses += 1
 
-                # Save detailed data for threshold +2.3
-                if threshold == 2.3:
-                    threshold_2_3_bets.append({
-                        'game_id': row['game_id'],
-                        'date': row['date'],
-                        'team_1': row['team_1'],
-                        'team_2': row['team_2'],
-                        'prediction': predicted,
-                        'actual_total': actual,
-                        'sportsbook': best_bookie,
-                        'bet_type': 'OVER',
-                        'line': best_line,
-                        'over_odds': best_over_odds,
-                        'under_odds': best_under_odds if best_under_odds else -110,
-                        'won': won,
-                        'profit': profit,
-                    })
+            else:
+                # UNDER bet: place bet when prediction < line + threshold (i.e., prediction is below line by abs(threshold))
+                if diff_from_line <= threshold:
+                    bets_placed += 1
+
+                    # Use best under odds from data (American odds format)
+                    american_odds = float(best_under_odds) if best_under_odds else -110
+                    decimal_odds = american_to_decimal(american_odds)
+
+                    # Bet WINS if actual total is LESS than the line
+                    won = actual < best_line
+
+                    profit = calculate_profit(decimal_odds, won)
+                    total_profit += profit
+
+                    if won:
+                        wins += 1
+                    else:
+                        losses += 1
+
 
 
         # Calculate results
@@ -315,28 +341,20 @@ def main():
     print("BETTING SIMULATION RESULTS - 3-MODEL ENSEMBLE")
     print("="*80)
 
-    print("\n" + "OVER BETS (prediction > line + threshold)")
+    # Filter for positive ROI only
+    positive_results = sorted([r for r in results if r['roi'] > 0], key=lambda x: x['threshold'])
+
+    print("\nThresholds with Positive ROI (sorted by threshold):")
     print(" "*5 + f"{'Threshold':<12} {'Bets':<8} {'Wins':<8} {'Win %':<10} {'Total $':<12} {'Avg/Bet':<12} {'ROI %':<10}")
     print("="*95)
 
-    for result in results:
-        marker = " <- SELECTED" if result['threshold'] == 2.3 else ""
-        print(f"   +{result['threshold']:<10} {result['bets_placed']:<8} {result['wins']:<8} {result['win_rate']:<10.1f} ${result['total_profit']:<11.2f} ${result['avg_profit_per_bet']:<11.2f} {result['roi']:<10.1f}{marker}")
+    if positive_results:
+        for result in positive_results:
+            threshold_str = f"{result['threshold']:+.1f}"
+            print(f"   {threshold_str:<12} {result['bets_placed']:<8} {result['wins']:<8} {result['win_rate']:<10.1f} ${result['total_profit']:<11.2f} ${result['avg_profit_per_bet']:<11.2f} {result['roi']:<10.1f}")
+    else:
+        print("   (No positive ROI thresholds found)")
 
-    # Save threshold +2.3 detailed results to CSV
-    if threshold_2_3_bets:
-        import pandas as pd
-        import os
-        df_threshold_2_3 = pd.DataFrame(threshold_2_3_bets)
-        csv_path = "ensemble3_threshold_2_3_detailed_bets.csv"
-        # Remove if exists to avoid permission issues
-        if os.path.exists(csv_path):
-            try:
-                os.remove(csv_path)
-            except:
-                pass
-        df_threshold_2_3.to_csv(csv_path, index=False)
-        print(f"\nSaved {len(threshold_2_3_bets)} threshold +2.3 bets to ensemble3_threshold_2_3_detailed_bets.csv")
 
     # Analysis
     print(f"\n" + "="*80)
@@ -358,9 +376,9 @@ def main():
 
         print(f"\n" + "="*80)
         if total_profit_all > 0:
-            print(f"✅ 3-Model Ensemble betting strategy is PROFITABLE: +${total_profit_all:.2f}")
+            print(f"[SUCCESS] 3-Model Ensemble betting strategy is PROFITABLE: +${total_profit_all:.2f}")
         else:
-            print(f"❌ 3-Model Ensemble betting strategy is NOT PROFITABLE: -${abs(total_profit_all):.2f}")
+            print(f"[FAILURE] 3-Model Ensemble betting strategy is NOT PROFITABLE: -${abs(total_profit_all):.2f}")
     else:
         print("\n❌ No bets placed at any threshold")
 

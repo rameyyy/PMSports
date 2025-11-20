@@ -1,0 +1,46 @@
+Feature Importance Ranking
+==========================
+
+Total Features: 364
+Features Used in Model: 38
+
+Rank | Feature Name | Importance Score
+--------------------------------------------------------------------------------
+   1 | avg_ml_team_2                                      |     251.00
+   2 | avg_ml_team_1                                      |     158.00
+   3 | avg_spread_pts_team_2                              |     119.00
+   4 | avg_spread_pts_team_1                              |      96.00
+   5 | spread_ou_agreement                                |      86.00
+   6 | draftkings_spread_pts_team_1                       |      77.00
+   7 | bovada_spread_pts_team_1                           |      25.00
+   8 | fanduel_ml_team_2                                  |      21.00
+   9 | draftkings_ml_team_1                               |      11.00
+  10 | fanduel_ml_team_1                                  |      11.00
+  11 | adjoe_differential_closest7rank                    |       3.00
+  12 | betmgm_ml_team_2                                   |       3.00
+  13 | team_2_adjoe                                       |       2.00
+  14 | team_2_adjde                                       |       2.00
+  15 | team_1_efg_pct_last5                               |       2.00
+  16 | team_2_efg_pct_trend_last5                         |       2.00
+  17 | team_2_adj_t_variance_last9                        |       2.00
+  18 | orb_rate_differential                              |       2.00
+  19 | tor_rate_differential                              |       2.00
+  20 | bovada_ml_team_1                                   |       2.00
+  21 | draftkings_ml_team_2                               |       2.00
+  22 | team_1_score_variance_last11                       |       1.00
+  23 | team_1_efg_pct_variance_last5                      |       1.00
+  24 | team_2_efg_pct_last15                              |       1.00
+  25 | team_1_adjoe_variance_last3                        |       1.00
+  26 | team_1_adjoe_variance_last9                        |       1.00
+  27 | team_2_adjoe_last5                                 |       1.00
+  28 | team_2_adjoe_last9                                 |       1.00
+  29 | team_1_adjde_variance_last15                       |       1.00
+  30 | team_2_adjde_variance_last2                        |       1.00
+  31 | team_2_adjde_last3                                 |       1.00
+  32 | team_2_adj_t_variance_last13                       |       1.00
+  33 | adjoe_differential_closest3rank                    |       1.00
+  34 | adjoe_differential_closest5rank                    |       1.00
+  35 | bovada_ml_team_2                                   |       1.00
+  36 | lowvig_spread_pts_team_1                           |       1.00
+  37 | mybookie_ml_team_2                                 |       1.00
+  38 | mybookie_spread_pts_team_1                         |       1.00

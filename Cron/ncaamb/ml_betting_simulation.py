@@ -34,6 +34,16 @@ def load_features_by_year(years: list) -> pl.DataFrame:
             print(f"  Loading features{year}.csv...")
             try:
                 df = pl.read_csv(features_file)
+
+                # Normalize schema: convert odds columns to Float64
+                # This handles inconsistency where some years have String and others have Float64
+                for col in df.columns:
+                    if any(x in col for x in ['_ml_team_', '_spread_pts_', '_spread_odds_']):
+                        try:
+                            df = df.with_columns(pl.col(col).cast(pl.Float64, strict=False))
+                        except:
+                            pass
+
                 print(f"    [+] Loaded {len(df)} games")
                 all_features.append(df)
             except Exception as e:
@@ -130,8 +140,8 @@ def filter_missing_moneyline_data(df: pl.DataFrame) -> pl.DataFrame:
     before = len(df)
 
     df = df.filter(
-        pl.col('avg_ml_home').is_not_null() &
-        pl.col('avg_ml_away').is_not_null()
+        pl.col('avg_ml_team_1').is_not_null() &
+        pl.col('avg_ml_team_2').is_not_null()
     )
 
     after = len(df)
@@ -172,8 +182,7 @@ def identify_feature_columns(df: pl.DataFrame) -> list:
         'team_1_leaderboard', 'team_2_leaderboard',
         'team_1_match_hist', 'team_2_match_hist',
         'team_1_hist_count', 'team_2_hist_count',
-        'start_time', 'game_odds', 'ml_target',
-        'avg_ml_home', 'avg_ml_away'
+        'start_time', 'game_odds', 'ml_target'
     }
 
     feature_cols = []
@@ -424,19 +433,33 @@ def main():
     X_train, y_train = prepare_data(train_df, feature_cols)
     print(f"Training data shape: X={X_train.shape}\n")
 
-    # Load pre-trained model from saved folder
-    print("STEP 2: Loading Pre-trained Model")
+    # Train model on 2021-2024 data
+    print("STEP 2: Training Moneyline Model")
     print("-"*80 + "\n")
-    model_path = Path(__file__).parent / "models" / "moneyline" / "saved" / "xgboost_model.pkl"
 
-    if model_path.exists():
-        model = XGBClassifier()
-        model.load_model(str(model_path))
-        print(f"[+] Model loaded from {model_path}\n")
-    else:
-        print(f"[-] Model not found at {model_path}")
-        print(f"    Please run export_2025_predictions.py first to train and save the model\n")
-        return
+    print(f"Training on {len(X_train)} samples with {X_train.shape[1]} features...")
+
+    # Use optimized hyperparameters from Bayesian optimization
+    model = XGBClassifier(
+        n_estimators=128,
+        max_depth=3,
+        learning_rate=0.01,
+        subsample=0.8214041970901668,
+        colsample_bytree=1.0,
+        min_child_weight=7,
+        gamma=1.3035520618205187,
+        random_state=42,
+        eval_metric='logloss',
+        verbosity=0
+    )
+
+    model.fit(X_train, y_train)
+    print(f"[+] Model training complete\n")
+
+    # Evaluate on training data
+    y_train_pred = model.predict(X_train)
+    train_accuracy = accuracy_score(y_train, y_train_pred)
+    print(f"Training Accuracy: {train_accuracy:.3f}\n")
 
     # Load test data (2025)
     print("STEP 3: Loading Test Data (2025)")
@@ -533,31 +556,160 @@ def main():
         for range_name, count in ev_ranges.items():
             print(f"    {range_name:25} {count:5d} games ({count/len(results['games'])*100:5.1f}%)")
 
-    print("ROI by EV Threshold ($10 per bet):\n")
-    print(f"{'EV Threshold':>15} {'Bets':>8} {'Wins':>8} {'ROI':>10} {'Win Rate':>12}")
-    print("-"*60)
+    # Calculate total possible bets (2 per game - team_1 or team_2)
+    total_games_2025 = len(test_df_with_target)
+    total_possible_bets = total_games_2025 * 2
 
-    # Only show thresholds from -5 to 10 to avoid spam
-    for threshold in sorted([t for t in results['roi_by_threshold'].keys() if t <= 10]):
-        stats = results['roi_by_threshold'][threshold]
-        print(f"{threshold:>14}% {stats['num_bets']:>8} {stats['wins']:>8} "
-              f"{stats['roi_percent']:>9.2f}% {stats['win_rate']:>11.1f}%")
+    print("POSITIVE ROI EV Thresholds ($10 per bet):\n")
+    print(f"{'EV Threshold':<15} {'Bets':<8} {'Bet %':<10} {'Wins':<8} {'Win %':<10} {'Net Profit':<15} {'ROI':<10}")
+    print("-"*90)
+
+    # Get only positive ROI thresholds, filtering to -25% to +25%
+    positive_roi_thresholds = sorted(
+        [t for t, s in results['roi_by_threshold'].items() if s['roi_percent'] > 0 and -25 <= t <= 25]
+    )
+
+    if positive_roi_thresholds:
+        for threshold in positive_roi_thresholds:
+            stats = results['roi_by_threshold'][threshold]
+            bet_pct = (stats['num_bets'] / total_possible_bets) * 100 if total_possible_bets > 0 else 0
+            print(f"{threshold:>14}% {stats['num_bets']:<8} {bet_pct:<10.2f}% {stats['wins']:<8} "
+                  f"{stats['win_rate']:<10.1f}% ${stats['total_pnl']:<14.2f} {stats['roi_percent']:<9.2f}%")
+    else:
+        print("No thresholds with positive ROI found")
 
     # Find best threshold
-    if results['roi_by_threshold']:
-        best_threshold = max(results['roi_by_threshold'].items(),
-                             key=lambda x: x[1]['roi_percent'])
-        threshold, stats = best_threshold
+    if positive_roi_thresholds:
+        best_threshold = max(positive_roi_thresholds,
+                             key=lambda t: results['roi_by_threshold'][t]['roi_percent'])
+        stats = results['roi_by_threshold'][best_threshold]
+        bet_pct = (stats['num_bets'] / total_possible_bets) * 100 if total_possible_bets > 0 else 0
 
-        print("\n" + "-"*60)
-        print(f"\nBest EV Threshold: {threshold}%")
-        print(f"  Number of Bets: {stats['num_bets']}")
+        print("\n" + "-"*90)
+        print(f"\nBest Performing Threshold: {best_threshold}%")
+        print(f"  Total Games in 2025: {total_games_2025}")
+        print(f"  Total Possible Bets (2 per game): {total_possible_bets}")
+        print(f"  Number of Bets Placed: {stats['num_bets']}")
+        print(f"  Bet %: {bet_pct:.2f}%")
         print(f"  Wins: {stats['wins']}")
         print(f"  Losses: {stats['losses']}")
-        print(f"  Total Stake: ${stats['total_stake']:.2f}")
-        print(f"  Total P&L: ${stats['total_pnl']:.2f}")
-        print(f"  ROI: {stats['roi_percent']:.2f}%")
-        print(f"  Win Rate: {stats['win_rate']:.1f}%\n")
+        print(f"  Win Rate: {stats['win_rate']:.1f}%")
+        print(f"  Net Profit: ${stats['total_pnl']:.2f}")
+        print(f"  ROI: {stats['roi_percent']:.2f}%\n")
+
+        # Export ALL possible bets to Excel (both team_1 and team_2 for every game)
+        print("\nExporting all possible bets to Excel...")
+        from datetime import datetime
+        today = datetime.now().strftime("%Y%m%d")
+
+        # Generate ALL possible bets (team_1 and team_2 for each game)
+        all_bets = []
+
+        for idx, row in enumerate(test_df_with_target.iter_rows(named=True)):
+            game_id = row.get('game_id')
+
+            # Get all odds for this game from database
+            all_odds = odds_dict.get(game_id, [])
+
+            if not all_odds:
+                continue
+
+            team_1_win_prob = pred_proba[idx, 1]
+            team_2_win_prob = pred_proba[idx, 0]
+
+            team_1_is_home = row.get('team_1_is_home_game')
+
+            # Determine home/away for team_1 and team_2
+            if team_1_is_home == 1:
+                team_1_odds, team_1_decimal, team_1_bookmaker = get_best_odds(all_odds, 'home')
+                team_2_odds, team_2_decimal, team_2_bookmaker = get_best_odds(all_odds, 'away')
+            elif team_1_is_home == 0:
+                team_1_odds, team_1_decimal, team_1_bookmaker = get_best_odds(all_odds, 'away')
+                team_2_odds, team_2_decimal, team_2_bookmaker = get_best_odds(all_odds, 'home')
+            else:
+                team_1_odds_h, team_1_decimal_h, team_1_bm_h = get_best_odds(all_odds, 'home')
+                team_1_odds_a, team_1_decimal_a, team_1_bm_a = get_best_odds(all_odds, 'away')
+                if team_1_decimal_h and team_1_decimal_a:
+                    if team_1_decimal_h > team_1_decimal_a:
+                        team_1_odds, team_1_decimal, team_1_bookmaker = team_1_odds_h, team_1_decimal_h, team_1_bm_h
+                        team_2_odds, team_2_decimal, team_2_bookmaker = get_best_odds(all_odds, 'away')
+                    else:
+                        team_1_odds, team_1_decimal, team_1_bookmaker = team_1_odds_a, team_1_decimal_a, team_1_bm_a
+                        team_2_odds, team_2_decimal, team_2_bookmaker = get_best_odds(all_odds, 'home')
+                else:
+                    team_1_odds, team_1_decimal, team_1_bookmaker = get_best_odds(all_odds, 'home')
+                    team_2_odds, team_2_decimal, team_2_bookmaker = get_best_odds(all_odds, 'away')
+
+            if team_1_odds is None or team_2_odds is None:
+                continue
+
+            # Calculate EV for both sides
+            team_1_ev = calculate_ev(team_1_win_prob, team_1_decimal)
+            team_2_ev = calculate_ev(team_2_win_prob, team_2_decimal)
+
+            # Get actual result
+            actual_winner = 1 if row.get('team_1_score', 0) > row.get('team_2_score', 0) else 0
+
+            # Bet on team_1
+            team_1_correct = (actual_winner == 1)
+            team_1_pnl = (10.0 * (team_1_decimal - 1)) if team_1_correct else -10.0
+            all_bets.append({
+                'game_id': game_id,
+                'date': row.get('date'),
+                'team_1': row.get('team_1'),
+                'team_2': row.get('team_2'),
+                'bet_on': row.get('team_1'),
+                'win_prob': team_1_win_prob,
+                'odds': team_1_odds,
+                'bookmaker': team_1_bookmaker,
+                'ev_percent': team_1_ev * 100,
+                'stake': 10.0,
+                'correct': team_1_correct,
+                'pnl': team_1_pnl
+            })
+
+            # Bet on team_2
+            team_2_correct = (actual_winner == 0)
+            team_2_pnl = (10.0 * (team_2_decimal - 1)) if team_2_correct else -10.0
+            all_bets.append({
+                'game_id': game_id,
+                'date': row.get('date'),
+                'team_1': row.get('team_1'),
+                'team_2': row.get('team_2'),
+                'bet_on': row.get('team_2'),
+                'win_prob': team_2_win_prob,
+                'odds': team_2_odds,
+                'bookmaker': team_2_bookmaker,
+                'ev_percent': team_2_ev * 100,
+                'stake': 10.0,
+                'correct': team_2_correct,
+                'pnl': team_2_pnl
+            })
+
+        if all_bets:
+            bets_df = pl.DataFrame(all_bets)
+
+            output_file = Path(__file__).parent / f"all_bets_{today}.xlsx"
+            bets_df.write_excel(str(output_file))
+
+            # Calculate stats
+            positive_ev = len([b for b in all_bets if b['ev_percent'] > 0])
+            negative_ev = len([b for b in all_bets if b['ev_percent'] <= 0])
+            wins = len([b for b in all_bets if b['correct']])
+            losses = len(all_bets) - wins
+            total_pnl = sum(b['pnl'] for b in all_bets)
+            total_stake = len(all_bets) * 10
+
+            print(f"[+] Exported ALL {len(all_bets)} MONEYLINE bets to {output_file}\n")
+            print(f"    Positive EV: {positive_ev} bets")
+            print(f"    Negative EV: {negative_ev} bets")
+            print(f"    Wins: {wins}")
+            print(f"    Losses: {losses}")
+            print(f"    Total P&L: ${total_pnl:.2f}")
+            print(f"    Total wagered: ${total_stake:.2f}")
+            print(f"    Overall ROI: {(total_pnl / total_stake * 100):.2f}%\n")
+        else:
+            print("[*] No bets to export\n")
 
     # Sample positive EV bets
     print("-"*60)
