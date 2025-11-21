@@ -1,0 +1,24 @@
+Final LightGBM Model Statistics
+==============================
+
+Training Data: 2021-2025 (22885 games after filtering)
+Priority: 2025 data maximized in training set
+
+Performance on Full Dataset:
+  Accuracy:  0.7227
+  Precision: 0.7190
+  Recall:    0.7148
+  F1 Score:  0.7169
+  AUC:       0.8025
+
+Confusion Matrix:
+  TN: 8507, FP: 3140, FN: 3205, TP: 8033
+
+Hyperparameters:
+  num_leaves: 10
+  learning_rate: 0.011906
+  feature_fraction: 0.5
+  bagging_fraction: 0.6902
+  min_data_in_leaf: 100
+  lambda_l1: 5
+  lambda_l2: 5

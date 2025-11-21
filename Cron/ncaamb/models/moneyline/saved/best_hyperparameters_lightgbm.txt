@@ -1,0 +1,33 @@
+Final Production Model Hyperparameters - LightGBM
+================================================
+
+Training Data: 2021-2024 (16,576 games after filtering)
+Test Data: 2025 (4,872 games after filtering)
+Purpose: Predict moneyline outcomes with minimal overfitting
+
+Hyperparameters (from Bayesian Optimization - 300 trials):
+  num_leaves: 10
+  learning_rate: 0.011905546738777037
+  feature_fraction: 0.5
+  bagging_fraction: 0.6902301680678105
+  min_data_in_leaf: 100
+  lambda_l1: 5
+  lambda_l2: 5
+  bagging_freq: 5
+  objective: binary
+  metric: binary_logloss
+
+Performance:
+  Training Accuracy: 0.7250
+  Test Accuracy: 0.7229
+  Overfitting Gap: 0.0021 (excellent generalization)
+
+  Best Test Accuracy Found: 0.7241
+  Overall Score: 0.7218
+
+Key Notes:
+- Minimal overfitting (0.21% train-test gap)
+- Balanced feature_fraction (0.5) prevents high-dimensional overfitting
+- High regularization (lambda_l1=5, lambda_l2=5) improves generalization
+- min_data_in_leaf=100 reduces spurious patterns from rare cases
+- Low learning_rate (0.012) ensures steady, stable learning

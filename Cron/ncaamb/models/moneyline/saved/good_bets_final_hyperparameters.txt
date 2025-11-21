@@ -1,0 +1,38 @@
+Good Bets Final Model Hyperparameters
+====================================
+
+Random Forest:
+  n_estimators:      190
+  max_depth:         3
+  min_samples_split: 99
+  min_samples_leaf:  49
+
+Base XGBoost:
+  n_estimators:     128
+  max_depth:        3
+  learning_rate:    0.01
+  subsample:        0.82
+  colsample_bytree: 1.0
+
+Base LightGBM:
+  num_leaves:       10
+  learning_rate:    0.0119
+  feature_fraction: 0.5
+  bagging_fraction: 0.6902
+  min_data_in_leaf: 100
+  lambda_l1:        5
+  lambda_l2:        5
+
+Features Used (12 total):
+  lgb_prob                       (importance: 0.2887)
+  xgb_prob                       (importance: 0.2155)
+  spread_pts_opp                 (importance: 0.1303)
+  spread_pts_self                (importance: 0.1099)
+  implied_prob                   (importance: 0.0738)
+  moneyline_odds                 (importance: 0.0724)
+  model_disagreement             (importance: 0.0657)
+  ev                             (importance: 0.0423)
+  spread_odds_opp                (importance: 0.0006)
+  strength_differential          (importance: 0.0004)
+  spread_odds_self               (importance: 0.0003)
+  month                          (importance: 0.0000)

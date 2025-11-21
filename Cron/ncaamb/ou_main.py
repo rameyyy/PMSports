@@ -796,6 +796,7 @@ def main():
         print("-"*80 + "\n")
         success = push_todays_games_to_db(todays_games)
         game_data = get_game_data_for_games(todays_games, season='2026')
+        # success=True
 
         if success:
             # Step 1.3: Fetch and push leaderboard
@@ -809,7 +810,7 @@ def main():
 
             # # Step 1.5b: Fetch and push odds data
             odds_success = fetch_and_push_odds_data()
-            odds_success = True
+            # odds_success = True
             if odds_success:
                 # Step 3: Build flat DataFrame for today's games
                 todays_games_df = build_todays_games_df(season='2026')

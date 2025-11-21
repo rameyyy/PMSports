@@ -1,0 +1,18 @@
+{
+  "best_overall_score": 0.7250176176981659,
+  "best_train_accuracy": 0.7206696104186463,
+  "best_test_accuracy": 0.723568281938326,
+  "best_overfitting_gap": -0.0028986715196797075,
+  "best_test_accuracy_overall": 0.723668402082499,
+  "hyperparameters": {
+    "n_estimators": 190,
+    "max_depth": 3,
+    "min_samples_split": 99,
+    "min_samples_leaf": 49
+  },
+  "final_model_stats": {
+    "train_accuracy": 0.7206696104186463,
+    "test_accuracy": 0.723568281938326,
+    "overfitting_gap": -0.0028986715196797075
+  }
+}

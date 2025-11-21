@@ -1,0 +1,25 @@
+Final Good Bets Model Statistics
+================================
+
+Training Data: 2021-2025 (45770 betting rows from 22885 games)
+Priority: 2025 data maximized in training set
+
+Performance on Full Dataset:
+  Accuracy:  0.7199
+  Precision: 0.7184
+  Recall:    0.7234
+  F1 Score:  0.7209
+  AUC:       0.8036
+
+Confusion Matrix:
+  TN: 16396, FP: 6489, FN: 6331, TP: 16554
+
+Hyperparameters:
+  n_estimators:     190
+  max_depth:        3
+  min_samples_split: 99
+  min_samples_leaf:  49
+
+Base Models:
+  XGBoost:  128 trees, depth=3, learning_rate=0.01
+  LightGBM: 200 rounds, optimized hyperparameters

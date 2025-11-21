@@ -1,0 +1,32 @@
+Feature Importance Ranking - LightGBM
+==================================
+
+Total Features: 364
+Features Used in Model: All (with regularization to reduce noise)
+
+Top 15 Most Important Features (by Gain):
+
+Rank | Feature Name | Importance Score
+--------------------------------------------------------------------------------
+   1 | avg_ml_team_2                              |      42204.63
+   2 | avg_spread_pts_team_1                      |      36568.25
+   3 | avg_ml_team_1                              |      31496.67
+   4 | avg_spread_pts_team_2                      |      19792.03
+   5 | spread_ou_agreement                        |       5333.33
+   6 | draftkings_spread_pts_team_1                |       3137.10
+   7 | draftkings_ml_team_1                        |       1293.63
+   8 | fanduel_ml_team_1                           |        783.43
+   9 | draftkings_spread_pts_team_2                |        782.47
+  10 | fanduel_ml_team_2                           |        415.88
+  11 | bovada_spread_pts_team_1                    |        265.00
+  12 | barthag_differential                        |        252.15
+  13 | tor_rate_differential                       |        201.67
+  14 | team_1_margin_closest5rank                  |        200.62
+  15 | draftkings_ml_team_2                        |        195.87
+
+Key Insights:
+- Betting market odds dominate (top 4 features are market data)
+- Spread points matter more than individual moneyline odds
+- Model learns to weight consensus (avg_ml) heavily
+- Team strength differentials still important (#12, #13, #14)
+- High regularization (L1=5, L2=5) suppresses low-value features from causing overfitting

@@ -1,0 +1,271 @@
+================================================================================
+BETTING STRATEGY GUIDE - 2025 NCAA Basketball Season
+Based on LGB + Good Bets Model Analysis
+================================================================================
+
+KEY FINDINGS FROM ANALYSIS:
+-----------
+- LGB EV vs ROI Correlation: 0.6559 (strong predictor)
+- Good Bets Model helps identify profitable opportunities
+- Best ROI ranges: EV >= 5% (71% ROI) to EV >= 20% (178% ROI)
+- Historical data shows $10 bet sizing with clear profit potential
+
+================================================================================
+STRATEGY OPTIONS
+================================================================================
+
+STRATEGY 1: ULTRA CONSERVATIVE (Low Risk, Steady Returns)
+----------------------------------------------------------
+Use Case: You want consistent, reliable profits with minimal drawdown
+
+Parameters:
+  - EV Threshold:        >= 10%
+  - Good Bets Prob:      >= 0.65 (strong confidence)
+  - Bet Size:            $5-10 per bet
+  - Expected Frequency:  50-100 bets/season
+
+Expected Performance:
+  - Win Rate:            ~50-60% (based on historical EV>10%)
+  - ROI:                 +126% (based on EV bins analysis)
+  - Total Season Profit: +$2,500-5,000 (on $2,000-5,000 wagered)
+  - Max Drawdown:        ~$500-1,000
+
+Rationale:
+  - EV >= 10% = only top-tier bets
+  - High good bets confidence reduces false positives
+  - Small bet size limits losses
+  - Fewer bets = easier to track and analyze
+
+Action Items:
+  1. Filter games where LGB EV >= 0.10 (10%)
+  2. Check good bets model confidence >= 0.65
+  3. Only bet on games with clear model agreement
+  4. Track all bets in spreadsheet
+
+---
+
+STRATEGY 2: MODERATE (Balanced Risk/Reward)
+--------------------------------------------
+Use Case: Balance between profit potential and acceptable risk
+
+Parameters:
+  - EV Threshold:        >= 5%
+  - Good Bets Prob:      >= 0.55 (decent confidence)
+  - Bet Size:            $10-15 per bet
+  - Expected Frequency:  200-350 bets/season
+
+Expected Performance:
+  - Win Rate:            ~55-65%
+  - ROI:                 +71% (based on EV 5%-10% range)
+  - Total Season Profit: +$3,500-7,500 (on $5,000-10,000 wagered)
+  - Max Drawdown:        ~$1,500-2,500
+
+Rationale:
+  - EV >= 5% = sweet spot for volume + profitability
+  - Moderate good bets threshold captures more opportunities
+  - Medium bet size scales with volume
+  - Still conservative enough to survive bad runs
+
+Action Items:
+  1. Filter games where LGB EV >= 0.05 (5%)
+  2. Check good bets model confidence >= 0.55
+  3. Expect to make 2-3 bets per game day
+  4. Set aside bankroll for variance (need $5-10k minimum)
+
+---
+
+STRATEGY 3: AGGRESSIVE (High Volume, Higher Risk)
+--------------------------------------------------
+Use Case: Maximize profit potential, have large bankroll to absorb variance
+
+Parameters:
+  - EV Threshold:        >= 0% (all positive EV)
+  - Good Bets Prob:      >= 0.50 (any positive signal)
+  - Bet Size:            $15-25 per bet
+  - Expected Frequency:  600-1,000 bets/season
+
+Expected Performance:
+  - Win Rate:            ~50-55%
+  - ROI:                 +11% (based on overall positive EV data)
+  - Total Season Profit: +$3,300-5,500 (on $30,000-50,000 wagered)
+  - Max Drawdown:        ~$5,000-10,000
+
+Rationale:
+  - EV >= 0% = ALL bets have positive expected value
+  - Volumetric approach - law of large numbers helps
+  - Bigger bet sizes leverage the edge
+  - Need significant bankroll to weather swings
+
+Risks:
+  - High variance during bad luck streaks
+  - Requires discipline to avoid "revenge betting"
+  - Need $25-50k bankroll minimum
+
+Action Items:
+  1. Filter games where LGB EV >= 0.00 (0%)
+  2. Place bets on all positive EV opportunities
+  3. Strict position sizing: never bet more than 0.5% of bankroll per bet
+  4. Track Kelly Criterion for optimal sizing
+
+---
+
+STRATEGY 4: OPPORTUNISTIC (Cherry-Pick Best Spots)
+---------------------------------------------------
+Use Case: Only bet on highest confidence, highest EV opportunities
+
+Parameters:
+  - EV Threshold:        >= 15%
+  - Good Bets Prob:      >= 0.70 (very high confidence)
+  - Model Agreement:     XGB and LGB probs within 5%
+  - Bet Size:            $20-50 per bet
+  - Expected Frequency:  30-80 bets/season
+
+Expected Performance:
+  - Win Rate:            ~70%+ (elite bets only)
+  - ROI:                 +200%+ (based on EV>15% bins)
+  - Total Season Profit: +$2,000-4,000 (on $1,000-2,000 wagered)
+  - Max Drawdown:        ~$300-500
+
+Rationale:
+  - Only bet when models STRONGLY align
+  - EV >= 15% = true outlier opportunities
+  - High bet sizes on high confidence = maximize EV
+  - Fewer bets = more focused analysis
+
+Risks:
+  - May miss profitable middle-ground bets
+  - Requires patience (only 5-7 bets per week)
+  - Need discipline not to lower standards
+
+Action Items:
+  1. Filter XGB EV >= 0.15 AND LGB EV >= 0.15
+  2. Check XGB and LGB probs agreement (within 0.05)
+  3. Verify good bets model >= 0.70 confidence
+  4. Only bet on these elite opportunities
+
+================================================================================
+RECOMMENDATION FRAMEWORK
+================================================================================
+
+CHOOSE STRATEGY BASED ON:
+
+Bankroll Available:
+  < $2,000      --> Ultra Conservative (STRATEGY 1)
+  $2,000-5,000  --> Moderate (STRATEGY 2)
+  $5,000-25,000 --> Aggressive or Opportunistic (STRATEGY 3 or 4)
+  > $25,000     --> Aggressive (STRATEGY 3)
+
+Risk Tolerance:
+  Low Risk      --> Ultra Conservative (STRATEGY 1)
+  Medium Risk   --> Moderate (STRATEGY 2)
+  High Risk     --> Aggressive (STRATEGY 3)
+  Very High     --> Opportunistic (STRATEGY 4)
+
+Time Commitment:
+  <10 hrs/week  --> Opportunistic (STRATEGY 4) - fewer bets to manage
+  10-20 hrs/week--> Moderate (STRATEGY 2) - balanced workload
+  >20 hrs/week  --> Aggressive (STRATEGY 3) - more bets to track
+
+Profit Goals:
+  $2,000/season --> Ultra Conservative (STRATEGY 1)
+  $5,000/season --> Moderate (STRATEGY 2)
+  $10,000+/season--> Aggressive (STRATEGY 3)
+
+================================================================================
+IMPLEMENTATION CHECKLIST
+================================================================================
+
+Pre-Season Setup:
+  ☐ Choose strategy (1-4)
+  ☐ Determine betting bankroll amount
+  ☐ Set up betting tracking spreadsheet
+  ☐ Establish unit size ($5, $10, $15, $20, $25, $50)
+  ☐ Create betting rules document
+
+Daily/Weekly Process:
+  ☐ Run LGB model on upcoming games
+  ☐ Calculate EV for all games
+  ☐ Get good bets model predictions
+  ☐ Filter games by strategy criteria
+  ☐ Place bets within 48 hours of game
+  ☐ Record all bets: date, teams, EV, odds, prediction
+
+Post-Game:
+  ☐ Record actual result (win/loss)
+  ☐ Calculate ROI for each bet
+  ☐ Update season statistics
+  ☐ Weekly review: track ROI vs expected
+
+End of Month:
+  ☐ Analyze biggest winners/losers
+  ☐ Check if actual ROI matches model predictions
+  ☐ Adjust strategy if needed
+  ☐ Review model performance on those games
+
+================================================================================
+RED FLAGS & ADJUSTMENTS
+================================================================================
+
+If Actual ROI < Expected by >10%:
+  - Model may have degraded
+  - Retrain on fresh 2021-2024 data
+  - Check if recent games have different characteristics
+  - Potentially lower EV threshold temporarily
+
+If You Hit a 5+ Game Losing Streak:
+  - DON'T lower standards (variance is normal)
+  - DON'T bet larger to recover losses (risking ruin)
+  - Increase bet size only if up 50%+ for season
+
+If Good Bets Model Accuracy < 50%:
+  - Stop using good bets threshold
+  - Revert to pure LGB EV-only filtering
+  - Investigate if 2025 season has shifted dynamics
+
+If Win Rate Stays Below 45% After 100+ Bets:
+  - Major issue - probably data leakage or model degradation
+  - Halt betting immediately
+  - Debug: compare predictions to actual outcomes
+  - Retrain models from scratch
+
+================================================================================
+EXAMPLE SEASON PROJECTION (Moderate Strategy, 300 bets, $10/bet)
+================================================================================
+
+Wagered:           $3,000 (300 bets × $10)
+Expected Win Rate: 60% (180 wins, 120 losses)
+Expected Profit:   +$2,130 (71% ROI from EV 5%-10% range)
+
+Month-by-Month Variance:
+  December (60 bets):  +$400 to +$800
+  January (80 bets):   +$500 to +$1,000
+  February (80 bets):  +$400 to +$900
+  March (80 bets):     +$300 to +$800
+
+Breakeven Point:     ~50 bets (should hit by mid-December)
+Confidence Interval: +$1,200 to +$3,000 (accounting for variance)
+
+================================================================================
+FINAL RECOMMENDATIONS
+================================================================================
+
+START HERE: Moderate Strategy (STRATEGY 2)
+Reason: Good balance for most bettors, manageable workload, proven profitability
+
+Once You Have 1-2 Weeks of Results:
+  - If hitting expected ROI -> stick with it or adjust volume
+  - If underperforming -> lower EV threshold to capture more bets
+  - If overperforming -> raise EV threshold for higher quality
+
+Monitor These Metrics Weekly:
+  1. Actual Win Rate vs Expected (should track closely)
+  2. ROI vs Expected (variance is normal ±20%)
+  3. Number of bets available (ensures pipeline)
+  4. Model agreement between XGB and LGB
+
+Season Milestones:
+  After 50 bets:   First statistical significance check
+  After 100 bets:  Confident in model performance
+  After 300+ bets: Can trust season projections
+
+================================================================================

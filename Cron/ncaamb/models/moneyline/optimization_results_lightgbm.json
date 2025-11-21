@@ -1,0 +1,13 @@
+{
+  "best_overall_score": 0.7218475402742643,
+  "best_train_accuracy": 0.7250241312741312,
+  "best_test_accuracy": 0.7229064039408867,
+  "best_overfitting_gap": 0.0021177273332445568,
+  "best_test_accuracy_overall": 0.7241379310344828,
+  "hyperparameters": {
+    "num_leaves": 10,
+    "learning_rate": 0.011905546738777037,
+    "feature_fraction": 0.5,
+    "bagging_fraction": 0.6902301680678105,
+    "min_data_in_leaf": 100,
+    "lambda_l1": 
