@@ -4,6 +4,6 @@ config*.json
 **/*.env
 /Cron/temp/
 *.parquet
-*.pkl
-*.csv
+# *.pkl
+# *.csv
 /react-site/src/Captcha.tsx

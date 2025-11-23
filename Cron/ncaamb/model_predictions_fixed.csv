@@ -1,0 +1,54 @@
+game_id,date,team_1,team_1_win_prob,team_2,team_2_win_prob
+20251118_Abilene Christian_Texas St.,2025-11-18,Abilene Christian,0.5563,Texas St.,0.4437
+20251118_Alcorn St._LSU,2025-11-18,Alcorn St.,0.5485,LSU,0.4515
+20251118_American_Rutgers,2025-11-18,American,0.5569,Rutgers,0.4431
+20251118_Arkansas Pine Bluff_SMU,2025-11-18,Arkansas Pine Bluff,0.5563,SMU,0.4437
+20251118_Arkansas_Winthrop,2025-11-18,Arkansas,0.5607,Winthrop,0.4393
+20251118_Army_Cornell,2025-11-18,Army,0.5386,Cornell,0.4614
+20251118_Austin Peay_Mississippi,2025-11-18,Austin Peay,0.5569,Mississippi,0.4431
+20251118_Boise St._Wichita St.,2025-11-18,Boise St.,0.5523,Wichita St.,0.4477
+20251118_Boston College_Hampton,2025-11-18,Boston College,0.5401,Hampton,0.4599
+20251118_Boston University_Columbia,2025-11-18,Boston University,0.5627,Columbia,0.4373
+20251118_Brown_Holy Cross,2025-11-18,Brown,0.5316,Holy Cross,0.4684
+20251118_Buffalo_Vermont,2025-11-18,Buffalo,0.4646,Vermont,0.5354
+20251118_Cal Baptist_UC Riverside,2025-11-18,Cal Baptist,0.5401,UC Riverside,0.4599
+20251118_California_Presbyterian,2025-11-18,California,0.5607,Presbyterian,0.4393
+20251118_Chicago St._Minnesota,2025-11-18,Chicago St.,0.5401,Minnesota,0.4599
+20251118_Delaware_Saint Peter's,2025-11-18,Delaware,0.5563,Saint Peter's,0.4437
+20251118_DePaul_Gardner Webb,2025-11-18,DePaul,0.5401,Gardner Webb,0.4599
+20251118_Detroit Mercy_Eastern Michigan,2025-11-18,Detroit Mercy,0.5569,Eastern Michigan,0.4431
+20251118_Drexel_NJIT,2025-11-18,Drexel,0.5478,NJIT,0.4522
+20251118_Duke_Kansas,2025-11-18,Duke,0.5386,Kansas,0.4614
+20251118_East Carolina_UNC Wilmington,2025-11-18,East Carolina,0.4646,UNC Wilmington,0.5354
+20251118_Eastern Kentucky_Kent St.,2025-11-18,Eastern Kentucky,0.5386,Kent St.,0.4614
+20251118_Evansville_UT Arlington,2025-11-18,Evansville,0.5569,UT Arlington,0.4431
+20251118_Florida St._Tennessee Martin,2025-11-18,Florida St.,0.4646,Tennessee Martin,0.5354
+20251118_Fresno St._Stephen F. Austin,2025-11-18,Fresno St.,0.5401,Stephen F. Austin,0.4599
+20251118_George Mason_Jacksonville,2025-11-18,George Mason,0.5401,Jacksonville,0.4599
+20251118_Georgia Southern_Georgia Tech,2025-11-18,Georgia Southern,0.5607,Georgia Tech,0.4393
+20251118_Grambling St._San Diego,2025-11-18,Grambling St.,0.5536,San Diego,0.4464
+20251118_Idaho St._Santa Clara,2025-11-18,Idaho St.,0.5613,Santa Clara,0.4387
+20251118_Iona_Princeton,2025-11-18,Iona,0.5401,Princeton,0.4599
+20251118_Iowa_Southeast Missouri St.,2025-11-18,Iowa,0.5607,Southeast Missouri St.,0.4393
+20251118_James Madison_Towson,2025-11-18,James Madison,0.5401,Towson,0.4599
+20251118_Kentucky_Michigan St.,2025-11-18,Kentucky,0.4646,Michigan St.,0.5354
+20251118_Lehigh_Saint Francis,2025-11-18,Lehigh,0.5386,Saint Francis,0.4614
+20251118_Little Rock_Murray St.,2025-11-18,Little Rock,0.5401,Murray St.,0.4599
+20251118_Longwood_Maryland Eastern Shore,2025-11-18,Longwood,0.5316,Maryland Eastern Shore,0.4684
+20251118_Louisiana_Stanford,2025-11-18,Louisiana,0.5401,Stanford,0.4599
+20251118_Monmouth_Syracuse,2025-11-18,Monmouth,0.5401,Syracuse,0.4599
+20251118_Montana_Texas A&M,2025-11-18,Montana,0.5386,Texas A&M,0.4614
+20251118_Morgan St._North Carolina A&T,2025-11-18,Morgan St.,0.5345,North Carolina A&T,0.4655
+20251118_Navy_North Carolina,2025-11-18,Navy,0.5386,North Carolina,0.4614
+20251118_Nevada_UC Davis,2025-11-18,Nevada,0.5386,UC Davis,0.4614
+20251118_New Hampshire_Providence,2025-11-18,New Hampshire,0.5401,Providence,0.4599
+20251118_Northern Illinois_Northern Iowa,2025-11-18,Northern Illinois,0.5401,Northern Iowa,0.4599
+20251118_Northwestern St._San Francisco,2025-11-18,Northwestern St.,0.5478,San Francisco,0.4522
+20251118_Old Dominion_Xavier,2025-11-18,Old Dominion,0.5401,Xavier,0.4599
+20251118_Purdue Fort Wayne_Utah,2025-11-18,Purdue Fort Wayne,0.5316,Utah,0.4684
+20251118_Radford_South Carolina,2025-11-18,Radford,0.5401,South Carolina,0.4599
+20251118_Rhode Island_Yale,2025-11-18,Rhode Island,0.5401,Yale,0.4599
+20251118_Rider_Texas,2025-11-18,Rider,0.5401,Texas,0.4599
+20251118_Sacramento St._UCLA,2025-11-18,Sacramento St.,0.5401,UCLA,0.4599
+20251118_San Diego St._Troy,2025-11-18,San Diego St.,0.5386,Troy,0.4614
+20251118_Southern_Washington,2025-11-18,Southern,0.5401,Washington,0.4599

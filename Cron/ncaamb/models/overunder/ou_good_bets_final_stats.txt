@@ -1,0 +1,58 @@
+     Final O/U Good Bets Model Statistics
+================================
+
+Training Data: 2021-2024 (17185 betting rows from 17185 games)
+Priority: Full historical data with balanced over/under distribution
+
+Performance on Training Data (2021-2024):
+  Accuracy:  0.6684
+  Precision: 0.6675
+  Recall:    0.6907
+  F1 Score:  0.6789
+  AUC:       0.7471
+
+Confusion Matrix (Training):
+  TN: 5463, FP: 3001, FN: 2697, TP: 6024
+
+Performance on Test Data (2025):
+  Accuracy:  0.5401
+  Precision: 0.5442
+  Recall:    0.4779
+  F1 Score:  0.5089
+  AUC:       0.5480
+
+Confusion Matrix (Test):
+  TN: 1490, FP: 985, FN: 1285, TP: 1176
+
+Hyperparameters:
+  n_estimators:     100
+  max_depth:        10
+  min_samples_split: 50
+  min_samples_leaf:  20
+
+Ensemble Models:
+  XGBoost:  Weighted 0.441
+  LightGBM: Weighted 0.466
+  CatBoost: Weighted 0.093
+
+Feature Importance (Top Features):
+  1. lgb_confidence_over            0.3238
+  2. ensemble_confidence_over       0.1648
+  3. cat_confidence_over            0.1171
+  4. xgb_confidence_over            0.0803
+  5. model_std_dev                  0.0637
+  6. avg_ou_line                    0.0548
+  7. betonline_ou_line              0.0465
+  8. avg_under_odds                 0.0370
+  9. avg_over_odds                  0.0357
+  10. ou_line_variance              0.0334
+
+Data Summary:
+  Training samples:  17185 games
+  Test samples:      4936 games
+  Training over:     8721 (50.7%)
+  Training under:    8464 (49.3%)
+  Test over:         2461 (49.8%)
+  Test under:        2475 (50.2%)
+
+Model Location: C:\Users\crame\Documents\Sport-Website\PMSports\Cron\ncaamb\models\overunder\saved\ou_good_bets_rf_model.pkl
