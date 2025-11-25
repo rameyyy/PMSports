@@ -331,14 +331,15 @@ def create_good_bets_features(df: pl.DataFrame, lgb_proba: np.ndarray,
     ])
 
     # Calculate EV using LGB probabilities (strategy 2 uses LGB EV)
+    # EV = (probability * decimal_odds) - 1
     df = df.with_columns([
-        (pl.col('lgb_prob_team_1') * pl.when(pl.col('avg_ml_team_1') == 0).then(1.0)
+        ((pl.col('lgb_prob_team_1') * pl.when(pl.col('avg_ml_team_1') == 0).then(1.0)
             .when(pl.col('avg_ml_team_1') > 0).then(1 + (pl.col('avg_ml_team_1') / 100))
-            .otherwise(1 + (100 / pl.col('avg_ml_team_1').abs())) - 1)
+            .otherwise(1 + (100 / pl.col('avg_ml_team_1').abs()))) - 1)
         .alias('ev_team_1'),
-        ((1 - pl.col('lgb_prob_team_1')) * pl.when(pl.col('avg_ml_team_2') == 0).then(1.0)
+        (((1 - pl.col('lgb_prob_team_1')) * pl.when(pl.col('avg_ml_team_2') == 0).then(1.0)
             .when(pl.col('avg_ml_team_2') > 0).then(1 + (pl.col('avg_ml_team_2') / 100))
-            .otherwise(1 + (100 / pl.col('avg_ml_team_2').abs())) - 1)
+            .otherwise(1 + (100 / pl.col('avg_ml_team_2').abs()))) - 1)
         .alias('ev_team_2'),
     ])
 

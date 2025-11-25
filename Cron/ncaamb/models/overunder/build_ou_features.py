@@ -339,13 +339,17 @@ def process_odds_data(odds_list: list, team_1: str = None, team_2: str = None, t
     if spread_odds_team_2_all:
         odds_features['avg_spread_odds_team_2'] = float(sum(spread_odds_team_2_all) / len(spread_odds_team_2_all))
 
-    # Moneyline averages - now correctly mapped to team_1/team_2
+    # Moneyline - use BEST ODDS (not average, since averaging American odds is mathematically incorrect)
+    # Best odds = highest decimal value (most favorable for bettor)
     if ml_for_team_1:
         odds_features['num_books_with_ml'] = len(ml_for_team_1)
-        odds_features['avg_ml_team_1'] = float(sum(ml_for_team_1) / len(ml_for_team_1))
+        # Best odds = max by decimal conversion: positive odds are better, less negative is better for negative odds
+        best_ml_1 = max(ml_for_team_1, key=lambda x: (1 + x/100) if x > 0 else (1 + 100/abs(x)))
+        odds_features['avg_ml_team_1'] = float(best_ml_1)
 
     if ml_for_team_2:
-        odds_features['avg_ml_team_2'] = float(sum(ml_for_team_2) / len(ml_for_team_2))
+        best_ml_2 = max(ml_for_team_2, key=lambda x: (1 + x/100) if x > 0 else (1 + 100/abs(x)))
+        odds_features['avg_ml_team_2'] = float(best_ml_2)
 
     return odds_features
 

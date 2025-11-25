@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Strategy 2 Threshold Analysis
-Explores different Good Bets confidence thresholds to find optimal balance
-between bet quantity and ROI
+Comprehensive Threshold Analysis
+Tests extensive EV and Good Bets threshold combinations
+Uses LGB EV for all calculations
 """
 
 import pickle
@@ -71,7 +71,7 @@ for col in ['avg_ml_team_1', 'avg_ml_team_2', 'month', 'team_1_adjoe', 'team_1_a
     else:
         test_df = test_df.with_columns(pl.lit(0).alias(col))
 
-# Calculate implied probs and EV
+# Calculate implied probabilities
 test_df = test_df.with_columns([
     pl.col('avg_ml_team_1').map_elements(
         lambda x: 0.5 if x == 0 else (100/(x+100) if x > 0 else abs(x)/(abs(x)+100)),
@@ -164,14 +164,21 @@ all_bets = all_bets.with_columns(
     pl.col('date').str.strptime(pl.Date, "%Y-%m-%d").dt.month().alias('month_from_date')
 )
 
-# Test different thresholds
-print("=" * 100)
-print("STRATEGY 2 THRESHOLD ANALYSIS - Finding Optimal Balance")
-print("=" * 100 + "\n")
+# Test extensive threshold combinations
+print("=" * 120)
+print("COMPREHENSIVE THRESHOLD ANALYSIS - LGB EV BASED")
+print("=" * 120 + "\n")
 
-# EV thresholds to test
-ev_thresholds = [0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
-gb_thresholds = [0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70]
+# More granular EV thresholds
+ev_thresholds = [
+    0.00, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10,
+    0.12, 0.15, 0.20, 0.25, 0.30
+]
+
+# More granular GB thresholds
+gb_thresholds = [
+    0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80
+]
 
 # Store results
 results = []
@@ -207,82 +214,157 @@ for ev_thresh in ev_thresholds:
             'win_rate': win_rate,
             'roi': roi,
             'profit': total_profit,
-            'wagered': total_wagered
+            'wagered': total_wagered,
+            'avg_ev': np.mean(total_ev_profit) if len(total_ev_profit) > 0 else 0
         })
 
 # Sort by ROI descending
 results_sorted = sorted(results, key=lambda x: x['roi'], reverse=True)
 
-print("\nTOP 20 CONFIGURATIONS BY ROI:")
-print("-" * 100)
-print(f"{'EV%':<8} {'GB Conf':<10} {'Bets':<8} {'Wins':<8} {'Win%':<10} {'Wagered':<12} {'ROI':<10} {'Profit':<12}")
-print("-" * 100)
+print("\n" + "="*120)
+print("TOP 30 CONFIGURATIONS BY ROI (ALL VOLUME):")
+print("-" * 120)
+print(f"{'EV%':<8} {'GB Conf':<10} {'Bets':<8} {'Wins':<8} {'Win%':<10} {'Avg EV%':<10} {'Wagered':<12} {'ROI':<10} {'Profit':<12}")
+print("-" * 120)
 
-for i, r in enumerate(results_sorted[:20]):
+for i, r in enumerate(results_sorted[:30]):
     print(f"{r['ev_thresh']*100:>6.0f}% {r['gb_thresh']:>8.2f} {r['bets']:<8} {r['wins']:<8} "
-          f"{r['win_rate']:>8.1f}% ${r['wagered']:>10.2f} {r['roi']:>8.1f}% ${r['profit']:>10.2f}")
+          f"{r['win_rate']:>8.1f}% {r['avg_ev']*100:>8.1f}% ${r['wagered']:>10.2f} {r['roi']:>8.1f}% ${r['profit']:>10.2f}")
 
-print("\n" + "=" * 100)
-print("TOP 20 CONFIGURATIONS BY BET COUNT (>= 100 bets):")
-print("-" * 100)
-print(f"{'EV%':<8} {'GB Conf':<10} {'Bets':<8} {'Wins':<8} {'Win%':<10} {'Wagered':<12} {'ROI':<10} {'Profit':<12}")
-print("-" * 100)
+print("\n" + "="*120)
+print("TOP 30 CONFIGURATIONS BY ROI (>= 200 bets - HIGH VOLUME):")
+print("-" * 120)
+print(f"{'EV%':<8} {'GB Conf':<10} {'Bets':<8} {'Wins':<8} {'Win%':<10} {'Avg EV%':<10} {'Wagered':<12} {'ROI':<10} {'Profit':<12}")
+print("-" * 120)
 
-high_volume = [r for r in results if r['bets'] >= 100]
+high_volume = [r for r in results if r['bets'] >= 200]
 high_volume_sorted = sorted(high_volume, key=lambda x: x['roi'], reverse=True)
 
-for i, r in enumerate(high_volume_sorted[:20]):
+for i, r in enumerate(high_volume_sorted[:30]):
     print(f"{r['ev_thresh']*100:>6.0f}% {r['gb_thresh']:>8.2f} {r['bets']:<8} {r['wins']:<8} "
-          f"{r['win_rate']:>8.1f}% ${r['wagered']:>10.2f} {r['roi']:>8.1f}% ${r['profit']:>10.2f}")
+          f"{r['win_rate']:>8.1f}% {r['avg_ev']*100:>8.1f}% ${r['wagered']:>10.2f} {r['roi']:>8.1f}% ${r['profit']:>10.2f}")
 
-print("\n" + "=" * 100)
-print("TOP 20 CONFIGURATIONS BY BET COUNT (>= 50 bets):")
-print("-" * 100)
-print(f"{'EV%':<8} {'GB Conf':<10} {'Bets':<8} {'Wins':<8} {'Win%':<10} {'Wagered':<12} {'ROI':<10} {'Profit':<12}")
-print("-" * 100)
+print("\n" + "="*120)
+print("TOP 30 CONFIGURATIONS BY ROI (>= 100 bets - MEDIUM VOLUME):")
+print("-" * 120)
+print(f"{'EV%':<8} {'GB Conf':<10} {'Bets':<8} {'Wins':<8} {'Win%':<10} {'Avg EV%':<10} {'Wagered':<12} {'ROI':<10} {'Profit':<12}")
+print("-" * 120)
 
-medium_volume = [r for r in results if r['bets'] >= 50]
+medium_volume = [r for r in results if r['bets'] >= 100]
 medium_volume_sorted = sorted(medium_volume, key=lambda x: x['roi'], reverse=True)
 
-for i, r in enumerate(medium_volume_sorted[:20]):
+for i, r in enumerate(medium_volume_sorted[:30]):
     print(f"{r['ev_thresh']*100:>6.0f}% {r['gb_thresh']:>8.2f} {r['bets']:<8} {r['wins']:<8} "
-          f"{r['win_rate']:>8.1f}% ${r['wagered']:>10.2f} {r['roi']:>8.1f}% ${r['profit']:>10.2f}")
+          f"{r['win_rate']:>8.1f}% {r['avg_ev']*100:>8.1f}% ${r['wagered']:>10.2f} {r['roi']:>8.1f}% ${r['profit']:>10.2f}")
 
-print("\n" + "=" * 100)
+print("\n" + "="*120)
+print("TOP 30 CONFIGURATIONS BY ROI (>= 50 bets - LOW VOLUME):")
+print("-" * 120)
+print(f"{'EV%':<8} {'GB Conf':<10} {'Bets':<8} {'Wins':<8} {'Win%':<10} {'Avg EV%':<10} {'Wagered':<12} {'ROI':<10} {'Profit':<12}")
+print("-" * 120)
+
+low_volume = [r for r in results if r['bets'] >= 50]
+low_volume_sorted = sorted(low_volume, key=lambda x: x['roi'], reverse=True)
+
+for i, r in enumerate(low_volume_sorted[:30]):
+    print(f"{r['ev_thresh']*100:>6.0f}% {r['gb_thresh']:>8.2f} {r['bets']:<8} {r['wins']:<8} "
+          f"{r['win_rate']:>8.1f}% {r['avg_ev']*100:>8.1f}% ${r['wagered']:>10.2f} {r['roi']:>8.1f}% ${r['profit']:>10.2f}")
+
+print("\n" + "="*120)
+print("TOP 30 CONFIGURATIONS BY TOTAL PROFIT:")
+print("-" * 120)
+print(f"{'EV%':<8} {'GB Conf':<10} {'Bets':<8} {'Wins':<8} {'Win%':<10} {'Avg EV%':<10} {'Wagered':<12} {'ROI':<10} {'Profit':<12}")
+print("-" * 120)
+
+profit_sorted = sorted(results, key=lambda x: x['profit'], reverse=True)
+
+for i, r in enumerate(profit_sorted[:30]):
+    print(f"{r['ev_thresh']*100:>6.0f}% {r['gb_thresh']:>8.2f} {r['bets']:<8} {r['wins']:<8} "
+          f"{r['win_rate']:>8.1f}% {r['avg_ev']*100:>8.1f}% ${r['wagered']:>10.2f} {r['roi']:>8.1f}% ${r['profit']:>10.2f}")
+
+print("\n" + "="*120)
+print("CURRENT STRATEGY ANALYSIS (EV >= 3%, GB >= 0.40):")
+print("=" * 120)
+
+current_strategy = [r for r in results if r['ev_thresh'] == 0.03 and r['gb_thresh'] == 0.40]
+if current_strategy:
+    r = current_strategy[0]
+    print(f"\nEV Threshold:     {r['ev_thresh']*100:.0f}%")
+    print(f"GB Threshold:     {r['gb_thresh']:.2f}")
+    print(f"Total Bets:       {r['bets']}")
+    print(f"Wins:             {r['wins']} ({r['win_rate']:.1f}%)")
+    print(f"Losses:           {r['losses']}")
+    print(f"Average EV:       {r['avg_ev']*100:.1f}%")
+    print(f"Total Wagered:    ${r['wagered']:.2f}")
+    print(f"Total Profit:     ${r['profit']:.2f}")
+    print(f"ROI:              {r['roi']:.1f}%")
+
+    # Rank among all configs
+    rank = results_sorted.index(r) + 1
+    print(f"\nRank by ROI:      #{rank} out of {len(results)} configurations")
+
+    # Find alternatives with similar bet count
+    similar_volume = [x for x in results if abs(x['bets'] - r['bets']) <= 30]
+    similar_sorted = sorted(similar_volume, key=lambda x: x['roi'], reverse=True)
+    rank_similar = similar_sorted.index(r) + 1 if r in similar_sorted else None
+    if rank_similar:
+        print(f"Rank (similar volume): #{rank_similar} out of {len(similar_volume)} configurations")
+
+print("\n" + "="*120)
 print("RECOMMENDATIONS:")
-print("=" * 100 + "\n")
+print("=" * 120 + "\n")
 
-# Find recommendations based on different criteria
+# Best overall ROI
 best_roi = results_sorted[0]
-print(f"BEST ROI: EV >= {best_roi['ev_thresh']*100:.0f}%, GB >= {best_roi['gb_thresh']:.2f}")
-print(f"  Result: {best_roi['bets']} bets, {best_roi['win_rate']:.1f}% win rate, {best_roi['roi']:.1f}% ROI\n")
+print(f"BEST OVERALL ROI: EV >= {best_roi['ev_thresh']*100:.0f}%, GB >= {best_roi['gb_thresh']:.2f}")
+print(f"  {best_roi['bets']} bets, {best_roi['win_rate']:.1f}% win rate, {best_roi['roi']:.1f}% ROI, ${best_roi['profit']:.2f} profit\n")
 
+# Best high volume
+if high_volume_sorted:
+    best_hv = high_volume_sorted[0]
+    print(f"BEST HIGH VOLUME (200+ bets): EV >= {best_hv['ev_thresh']*100:.0f}%, GB >= {best_hv['gb_thresh']:.2f}")
+    print(f"  {best_hv['bets']} bets, {best_hv['win_rate']:.1f}% win rate, {best_hv['roi']:.1f}% ROI, ${best_hv['profit']:.2f} profit\n")
+
+# Best profit
+best_profit = profit_sorted[0]
+print(f"BEST TOTAL PROFIT: EV >= {best_profit['ev_thresh']*100:.0f}%, GB >= {best_profit['gb_thresh']:.2f}")
+print(f"  {best_profit['bets']} bets, {best_profit['win_rate']:.1f}% win rate, {best_profit['roi']:.1f}% ROI, ${best_profit['profit']:.2f} profit\n")
+
+# Best balanced (50+ bets, optimize for ROI + volume)
 best_balanced = None
 best_score = -999
 for r in results:
-    if r['bets'] >= 50:  # Minimum bet count
-        # Score: balance ROI and bet count
-        score = (r['roi'] * 0.6) + (min(r['bets'], 300) / 300 * 40)
+    if r['bets'] >= 50:
+        # Score: 70% ROI, 30% volume (normalized to max 300 bets)
+        score = (r['roi'] * 0.7) + (min(r['bets'], 300) / 300 * r['roi'] * 0.3)
         if score > best_score:
             best_score = score
             best_balanced = r
 
 if best_balanced:
     print(f"BEST BALANCED (50+ bets): EV >= {best_balanced['ev_thresh']*100:.0f}%, GB >= {best_balanced['gb_thresh']:.2f}")
-    print(f"  Result: {best_balanced['bets']} bets, {best_balanced['win_rate']:.1f}% win rate, {best_balanced['roi']:.1f}% ROI\n")
+    print(f"  {best_balanced['bets']} bets, {best_balanced['win_rate']:.1f}% win rate, {best_balanced['roi']:.1f}% ROI, ${best_balanced['profit']:.2f} profit\n")
 
-best_volume = None
-best_volume_score = -999
-for r in results:
-    if r['bets'] >= 100:  # High volume
-        # Prefer high volume with decent ROI
-        score = (r['roi'] * 0.4) + (min(r['bets'], 500) / 500 * 60)
-        if score > best_volume_score:
-            best_volume_score = score
-            best_volume = r
+print("=" * 120)
 
-if best_volume:
-    print(f"BEST HIGH VOLUME (100+ bets): EV >= {best_volume['ev_thresh']*100:.0f}%, GB >= {best_volume['gb_thresh']:.2f}")
-    print(f"  Result: {best_volume['bets']} bets, {best_volume['win_rate']:.1f}% win rate, {best_volume['roi']:.1f}% ROI\n")
+# Save results to file
+output_file = Path("saved/comprehensive_threshold_results.txt")
+with open(output_file, 'w') as f:
+    f.write("COMPREHENSIVE THRESHOLD ANALYSIS RESULTS\n")
+    f.write("=" * 120 + "\n\n")
 
-print("=" * 100)
+    f.write(f"Total configurations tested: {len(results)}\n")
+    f.write(f"EV thresholds tested: {len(ev_thresholds)}\n")
+    f.write(f"GB thresholds tested: {len(gb_thresholds)}\n\n")
+
+    f.write("TOP 50 BY ROI:\n")
+    f.write("-" * 120 + "\n")
+    f.write(f"{'Rank':<6} {'EV%':<8} {'GB':<8} {'Bets':<8} {'Wins':<8} {'Win%':<10} {'AvgEV%':<10} {'Wagered':<12} {'ROI%':<10} {'Profit':<12}\n")
+    f.write("-" * 120 + "\n")
+
+    for i, r in enumerate(results_sorted[:50], 1):
+        f.write(f"{i:<6} {r['ev_thresh']*100:>6.0f}% {r['gb_thresh']:>6.2f} {r['bets']:<8} {r['wins']:<8} "
+                f"{r['win_rate']:>8.1f}% {r['avg_ev']*100:>8.1f}% ${r['wagered']:>10.2f} {r['roi']:>8.1f}% ${r['profit']:>10.2f}\n")
+
+print(f"\n[+] Results saved to {output_file}")
+print("=" * 120)

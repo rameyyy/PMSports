@@ -83,14 +83,15 @@ test_df = test_df.with_columns([
 ])
 
 # EV from LGB
+# EV = (probability * decimal_odds) - 1
 test_df = test_df.with_columns([
-    (pl.col('lgb_prob') * pl.when(pl.col('avg_ml_team_1') == 0).then(1.0)
+    ((pl.col('lgb_prob') * pl.when(pl.col('avg_ml_team_1') == 0).then(1.0)
         .when(pl.col('avg_ml_team_1') > 0).then(1 + (pl.col('avg_ml_team_1') / 100))
-        .otherwise(1 + (100 / pl.col('avg_ml_team_1').abs())) - 1)
+        .otherwise(1 + (100 / pl.col('avg_ml_team_1').abs()))) - 1)
     .alias('ev_team_1'),
-    ((1 - pl.col('lgb_prob')) * pl.when(pl.col('avg_ml_team_2') == 0).then(1.0)
+    (((1 - pl.col('lgb_prob')) * pl.when(pl.col('avg_ml_team_2') == 0).then(1.0)
         .when(pl.col('avg_ml_team_2') > 0).then(1 + (pl.col('avg_ml_team_2') / 100))
-        .otherwise(1 + (100 / pl.col('avg_ml_team_2').abs())) - 1)
+        .otherwise(1 + (100 / pl.col('avg_ml_team_2').abs()))) - 1)
     .alias('ev_team_2'),
 ])
 
