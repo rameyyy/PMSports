@@ -407,7 +407,9 @@ def main():
     under_mask = ensemble_confidence <= 0.5
 
     if over_mask.sum() > 0:
-        over_wins = np.sum((y_pred_test == 1) & over_mask)
+        # FIXED: Check actual outcomes (y_bets_test), not model predictions (y_pred_test)
+        # y_bets_test == 1 means the actual game went OVER
+        over_wins = np.sum((y_bets_test == 1) & over_mask)
         over_total = over_mask.sum()
         over_pct = over_wins / over_total
         over_profit = over_wins * 9.09 - (over_total - over_wins) * 10.0
@@ -420,7 +422,9 @@ def main():
         print()
 
     if under_mask.sum() > 0:
-        under_wins = np.sum((y_pred_test == 0) & under_mask)
+        # FIXED: Check actual outcomes (y_bets_test), not model predictions (y_pred_test)
+        # y_bets_test == 0 means the actual game went UNDER
+        under_wins = np.sum((y_bets_test == 0) & under_mask)
         under_total = under_mask.sum()
         under_pct = under_wins / under_total
         under_profit = under_wins * 9.09 - (under_total - under_wins) * 10.0
