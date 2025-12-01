@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import polars as pl
+import pandas as pd
 import numpy as np
 import lightgbm as lgb
 from xgboost import XGBClassifier
@@ -88,16 +89,25 @@ def load_ml_models() -> tuple:
     return lgb_model, xgb_model
 
 
-def identify_feature_columns(df: pl.DataFrame) -> list:
-    """Identify numeric feature columns (same as make_ou_predictions)"""
-    metadata_cols = {
-        'game_id', 'date', 'season', 'team_1', 'team_2', 'actual_total',
-        'team_1_conference', 'team_2_conference', 'team_1_is_home', 'team_2_is_home',
-        'location', 'team_1_score', 'team_2_score', 'total_score_outcome', 'team_1_winloss',
-        'team_1_leaderboard', 'team_2_leaderboard', 'team_1_match_hist', 'team_2_match_hist',
-        'team_1_hist_count', 'team_2_hist_count', 'start_time', 'game_odds',
-        'avg_ml_home', 'avg_ml_away'  # Exclude odds from features
+def get_metadata_cols() -> set:
+    """Get metadata columns (same as train_final_ensemble_new_odds.py)"""
+    return {
+        'game_id', 'date', 'season', 'team_1', 'team_2',
+        'team_1_score', 'team_2_score', 'actual_total',
+        'team_1_conference', 'team_2_conference',
+        'team_1_is_home', 'team_2_is_home', 'location',
+        'total_score_outcome', 'team_1_winloss',
+        'team_1_leaderboard', 'team_2_leaderboard',
+        'team_1_match_hist', 'team_2_match_hist',
+        'team_1_hist_count', 'team_2_hist_count',
+        'start_time', 'game_odds', 'ml_target',
+        'team_1_data_quality', 'team_2_data_quality'
     }
+
+
+def identify_feature_columns(df: pl.DataFrame) -> list:
+    """Identify numeric feature columns (same as in ou_main.py)"""
+    metadata_cols = get_metadata_cols()
 
     feature_cols = []
     for col in df.columns:
@@ -130,62 +140,94 @@ def load_expected_feature_columns() -> list:
 
 def align_features_to_model(df: pl.DataFrame, model: XGBClassifier) -> tuple:
     """
-    Ensure dataframe has exactly the features the model expects.
+    Get numeric features (same as training) by excluding metadata columns.
+    Converts object columns to numeric first (same as ou_main.py).
     Returns (X array, feature_cols list) or (None, None) if alignment fails.
     """
-    # Get expected feature list
-    expected_features = load_expected_feature_columns()
+    # Convert polars to pandas for compatibility with numeric conversion
+    df_pd = df.to_pandas()
 
-    if expected_features is None:
-        print("[-] Could not load expected feature columns")
+    # Get metadata columns
+    metadata_cols = get_metadata_cols()
+
+    # Step 1: Convert all non-metadata object columns to numeric (same as ou_main.py line 551)
+    # Many columns will be null early in season - convert them to numeric so they're recognized as features
+    print("[*] Converting object columns to numeric...")
+    object_cols_converted = 0
+
+    # First check what dtypes we have
+    non_numeric_cols = [col for col in df_pd.columns if col not in metadata_cols and not np.issubdtype(df_pd[col].dtype, np.number)]
+
+    # Find which types these are
+    non_numeric_types = {}
+    for col in non_numeric_cols:
+        dtype_str = str(df_pd[col].dtype)
+        if dtype_str not in non_numeric_types:
+            non_numeric_types[dtype_str] = 0
+        non_numeric_types[dtype_str] += 1
+
+    print(f"    [DEBUG] Non-numeric columns: {len(non_numeric_cols)}")
+    for dtype, count in non_numeric_types.items():
+        print(f"             {dtype}: {count}")
+
+    # Convert all non-numeric columns (object or anything else, even if all NaN)
+    for col in df_pd.columns:
+        if col not in metadata_cols and not np.issubdtype(df_pd[col].dtype, np.number):
+            try:
+                before_dtype = df_pd[col].dtype
+                df_pd[col] = pd.to_numeric(df_pd[col], errors='coerce')
+                after_dtype = df_pd[col].dtype
+                object_cols_converted += 1
+                if object_cols_converted <= 3:  # Show first 3
+                    print(f"             Converted {col}: {before_dtype} -> {after_dtype}")
+            except Exception as e:
+                print(f"             Failed to convert {col}: {e}")
+
+    print(f"\n    Total converted: {object_cols_converted} non-numeric columns to numeric\n")
+
+    # Step 2: Get all numeric feature columns (same as ou_main.py line 557-559)
+    feature_cols = [col for col in df_pd.columns
+                   if col not in metadata_cols
+                   and np.issubdtype(df_pd[col].dtype, np.number)]
+
+    if not feature_cols:
+        print("[-] No numeric feature columns found")
         return None, None
 
-    # Check which expected features are present in df
-    df_cols = set(df.columns)
-    missing_features = [f for f in expected_features if f not in df_cols]
-    extra_features = [c for c in df.columns if c not in set(expected_features) and c not in {
-        'game_id', 'date', 'season', 'team_1', 'team_2', 'actual_total',
-        'team_1_conference', 'team_2_conference', 'team_1_is_home', 'team_2_is_home',
-        'location', 'team_1_score', 'team_2_score', 'total_score_outcome', 'team_1_winloss',
-        'team_1_leaderboard', 'team_2_leaderboard', 'team_1_match_hist', 'team_2_match_hist',
-        'team_1_hist_count', 'team_2_hist_count', 'start_time', 'game_odds'
-    }]
+    print(f"[+] Feature alignment complete:")
+    print(f"    Numeric feature columns: {len(feature_cols)}")
+    print(f"    Expected by model: 361")
 
-    # Report feature alignment status
-    print(f"[*] Feature alignment check:")
-    print(f"    Expected features: {len(expected_features)}")
-    print(f"    Features present in data: {len([f for f in expected_features if f in df_cols])}")
-    print(f"    Missing features: {len(missing_features)}")
-    print(f"    Extra features (will be dropped): {len(extra_features)}\n")
+    # Trim to exactly 361 features if needed
+    if len(feature_cols) > 361:
+        extra = len(feature_cols) - 361
+        print(f"    Trimming {extra} extra features - using first 361")
+        feature_cols = feature_cols[:361]
+    elif len(feature_cols) < 361:
+        print(f"    WARNING: Missing {361 - len(feature_cols)} features")
 
-    if missing_features:
-        print(f"[!] Missing {len(missing_features)} expected features:")
-        for f in missing_features[:5]:
-            print(f"    - {f}")
-        if len(missing_features) > 5:
-            print(f"    ... and {len(missing_features) - 5} more")
-        print(f"    These will be filled with 0s\n")
+    print()
 
-        # Add missing features with 0 values
-        for feature in missing_features:
-            df = df.with_columns(pl.lit(0.0).alias(feature))
-
-    # Select features in EXACT order expected by model
-    # This is critical - the order must match training order
+    # Step 3: Prepare feature matrix and fill nulls
     try:
-        X = df.select(expected_features).fill_null(0).to_numpy()
-        # Replace any NaN values that might remain (e.g., from None values in training)
+        X = df_pd[feature_cols].copy()
+
+        # Fill NaN values with 0 (same as ou_main.py line 571)
+        null_cols = X.columns[X.isnull().any()].tolist()
+        if null_cols:
+            print(f"    Filling {len(null_cols)} columns with NaN values")
+            X = X.fillna(0)
+
+        X = X.to_numpy()
+        # Replace any remaining NaN/inf values
         X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
     except Exception as e:
-        print(f"[-] Error selecting features in order: {e}\n")
+        print(f"[-] Error preparing feature matrix: {e}\n")
         return None, None
 
-    print(f"[+] Feature matrix prepared:")
-    print(f"    Shape: {X.shape}")
-    print(f"    Columns in order: {len(expected_features)} (matching model training)")
-    print(f"    Nulls filled with 0.0\n")
+    print(f"[+] Feature matrix shape: {X.shape}\n")
 
-    return X, expected_features
+    return X, feature_cols
 
 
 def american_to_decimal(american_odds: float) -> float:
@@ -537,7 +579,86 @@ def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2
     return ou_bets
 
 
-def export_all_games_with_odds(features_df: pl.DataFrame, lgb_model, xgb_model) -> None:
+def export_features_to_excel(features_df: pl.DataFrame, target_date_yyyymmdd: str) -> None:
+    """Export all generated features to Excel file"""
+    try:
+        output_file = Path(__file__).parent / f"features_{target_date_yyyymmdd}.xlsx"
+        features_df.write_excel(str(output_file))
+        print(f"[+] Exported {len(features_df)} games with {len(features_df.columns)} features to {output_file}\n")
+    except Exception as e:
+        print(f"[-] Error exporting features: {e}\n")
+
+
+def export_all_predictions(features_df: pl.DataFrame, lgb_model, xgb_model, ou_predictions_df: pl.DataFrame, target_date_yyyymmdd: str) -> None:
+    """Export all predictions (ML and OU) regardless of EV/probability thresholds"""
+    try:
+        all_predictions = []
+
+        # Get ML predictions for all games
+        try:
+            X, feature_cols = align_features_to_model(features_df, lgb_model)
+            if X is not None:
+                lgb_proba = lgb_model.predict(X)
+                xgb_proba = xgb_model.predict_proba(X)[:, 1]
+                ensemble_proba = 0.18 * lgb_proba + 0.82 * xgb_proba
+
+                # Add all ML predictions
+                for i, row in enumerate(features_df.iter_rows(named=True)):
+                    game_id = row.get('game_id')
+                    team_1 = row.get('team_1')
+                    team_2 = row.get('team_2')
+                    date = row.get('date')
+
+                    prob_team_1 = ensemble_proba[i]
+                    prob_team_2 = 1 - prob_team_1
+
+                    all_predictions.append({
+                        'type': 'ML',
+                        'date': date,
+                        'game_id': game_id,
+                        'team_1': team_1,
+                        'team_2': team_2,
+                        'prob_team_1': round(prob_team_1, 4),
+                        'prob_team_2': round(prob_team_2, 4),
+                        'lgb_prob_team_1': round(lgb_proba[i], 4),
+                        'xgb_prob_team_1': round(xgb_proba[i], 4),
+                    })
+        except Exception as e:
+            print(f"[-] Error getting ML predictions: {e}")
+
+        # Add all OU predictions
+        if ou_predictions_df is not None:
+            for row in ou_predictions_df.iter_rows(named=True):
+                game_id = row.get('game_id')
+                date = row.get('date')
+                ensemble = row.get('ensemble_pred')
+
+                all_predictions.append({
+                    'type': 'OU',
+                    'date': date,
+                    'game_id': game_id,
+                    'team_1': '',
+                    'team_2': '',
+                    'prob_team_1': '',
+                    'prob_team_2': '',
+                    'lgb_prob_team_1': '',
+                    'xgb_prob_team_1': '',
+                    'ensemble_pred': round(ensemble, 2) if ensemble else '',
+                })
+
+        if all_predictions:
+            output_df = pl.DataFrame(all_predictions)
+            output_file = Path(__file__).parent / f"all_predictions_{target_date_yyyymmdd}.xlsx"
+            output_df.write_excel(str(output_file))
+            print(f"[+] Exported {len(all_predictions)} all predictions (ML and OU) to {output_file}\n")
+        else:
+            print("[*] No predictions to export\n")
+
+    except Exception as e:
+        print(f"[-] Error exporting all predictions: {e}\n")
+
+
+def export_all_games_with_odds(features_df: pl.DataFrame, lgb_model, xgb_model, target_date_yyyymmdd: str = None) -> None:
     """Export all games with probabilities and moneyline averages"""
     all_games = []
 
@@ -592,15 +713,16 @@ def export_all_games_with_odds(features_df: pl.DataFrame, lgb_model, xgb_model) 
         # Sort by date and game_id
         output_df = output_df.sort(['date', 'game_id'])
 
-        todays_date = get_todays_date_yyyymmdd()
-        output_file = Path(__file__).parent / f"all_games_{todays_date}.xlsx"
+        if target_date_yyyymmdd is None:
+            target_date_yyyymmdd = get_todays_date_yyyymmdd()
+        output_file = Path(__file__).parent / f"all_games_{target_date_yyyymmdd}.xlsx"
         output_df.write_excel(str(output_file))
         print(f"[+] Exported {len(all_games)} games with probabilities and ML averages to {output_file}\n")
     else:
         print("[*] No games to export\n")
 
 
-def main():
+def main(manual_date: str = None):
     print("\n")
     print("="*80)
     print("FUTURES REPORT - ML & OU BETTING RECOMMENDATIONS")
@@ -609,17 +731,59 @@ def main():
     # Import ou_main to run data scraping first
     import ou_main as ou_module
 
+    # Set the date to use (manual_date overrides today's date)
+    if manual_date:
+        # Validate date format (YYYY-MM-DD)
+        try:
+            datetime.strptime(manual_date, '%Y-%m-%d')
+            target_date = manual_date
+            target_date_yyyymmdd = manual_date.replace('-', '')
+            print(f"[*] Running for manual date: {target_date}\n")
+        except ValueError:
+            print(f"[-] Invalid date format: {manual_date}. Expected YYYY-MM-DD")
+            return
+    else:
+        target_date = get_todays_date()
+        target_date_yyyymmdd = get_todays_date_yyyymmdd()
+
     # Step 0: Run ou_main.main() to scrape all data and get predictions
     print("STEP 0: Running OU pipeline to scrape data and make predictions")
     print("-"*80 + "\n")
 
-    features_df, predictions_df = ou_module.main()
+    features_df, predictions_df = ou_module.main(target_date=target_date)
 
     if features_df is None or predictions_df is None:
         print("[-] OU pipeline failed")
         return
 
-    print("\n[+] OU pipeline complete - data has been scraped and prepared\n")
+    print("\n[+] OU pipeline complete - data has been scraped and prepared")
+    print(f"[DEBUG] features_df shape: {features_df.shape}")
+
+    # Convert odds columns from American to decimal format (model was trained on decimal odds)
+    print("[*] Converting American odds to decimal format...")
+    odds_cols_to_convert = [
+        'betonline_ml_team_1', 'betonline_ml_team_2',
+        'bovada_ml_team_1', 'bovada_ml_team_2',
+        'draftkings_ml_team_1', 'draftkings_ml_team_2',
+        'fanduel_ml_team_1', 'fanduel_ml_team_2',
+        'lowvig_ml_team_1', 'lowvig_ml_team_2',
+        'mybookie_ml_team_1', 'mybookie_ml_team_2',
+        'betmgm_ml_team_1', 'betmgm_ml_team_2',
+        'avg_ml_team_1', 'avg_ml_team_2',
+        'avg_ml_home', 'avg_ml_away'
+    ]
+
+    for col in odds_cols_to_convert:
+        if col in features_df.columns:
+            # Convert American odds to decimal:
+            # positive: 1 + (x/100), negative: 1 + (100/|x|)
+            features_df = features_df.with_columns(
+                pl.col(col).map_elements(
+                    lambda x: 1 + (x / 100) if x >= 0 else 1 + (100 / abs(x)) if x is not None else None,
+                    return_dtype=pl.Float64
+                ).alias(col)
+            )
+    print(f"    Converted {len([c for c in odds_cols_to_convert if c in features_df.columns])} odds columns to decimal\n")
 
     # Define allowed bookmakers
     allowed_bookmakers = {'BetOnline.ag', 'Bovada', 'MyBookie.ag', 'betonlineag'}
@@ -664,8 +828,7 @@ def main():
 
     # Analyze nulls after dropping metadata
     feature_cols = identify_feature_columns(features_df)
-    print(f"[*] Using {len(feature_cols)} numeric features (excluding metadata)")
-    print(f"[*] Expected features for model: 319\n")
+    print(f"[*] Identified {len(feature_cols)} numeric features (excluding metadata)\n")
 
     # Check for nulls in actual feature columns
     feature_subset = features_df.select(feature_cols)
@@ -684,6 +847,11 @@ def main():
         print()
     else:
         print("[+] No null values in feature columns\n")
+
+    # Export features to Excel
+    print("STEP 1.5: Exporting All Generated Features to Excel")
+    print("-"*80 + "\n")
+    export_features_to_excel(features_df, target_date_yyyymmdd)
 
     # Load ML models (Ensemble: 18% LGB + 82% XGB)
     print("STEP 2: Loading Moneyline Models (Ensemble: 18% LGB + 82% XGB)")
@@ -766,11 +934,15 @@ def main():
     team_mappings = load_team_mappings()
     ml_bets = get_ml_bets(features_df, lgb_model, xgb_model, allowed_bookmakers, team_mappings=team_mappings)
 
-    # Export valid bets to Excel with date in filename
-    print("\nExporting valid bets to Excel...")
+    # Export ALL predictions (before filtering by EV/probability thresholds)
+    print("\nSTEP 3d: Exporting All Predictions (ML and OU)")
+    print("-"*80 + "\n")
+    export_all_predictions(features_df, lgb_model, xgb_model, predictions_df, target_date_yyyymmdd)
 
-    todays_date = get_todays_date_yyyymmdd()
-    output_file = Path(__file__).parent / f"bets_{todays_date}.xlsx"
+    # Export valid bets to Excel with date in filename
+    print("Exporting valid bets to Excel...")
+
+    output_file = Path(__file__).parent / f"bets_{target_date_yyyymmdd}.xlsx"
 
     # Combine ML and OU bets
     all_bets = []
@@ -872,8 +1044,14 @@ def main():
     # Export all games with their probabilities and moneyline averages
     print("\nSTEP 4: Exporting All Games with Probabilities and ML Averages")
     print("-"*80 + "\n")
-    export_all_games_with_odds(features_df_original, lgb_model, xgb_model)
+    export_all_games_with_odds(features_df_original, lgb_model, xgb_model, target_date_yyyymmdd)
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Run betting recommendations for a specific date')
+    parser.add_argument('--date', type=str, default=None, help='Date to run for in YYYY-MM-DD format (default: today)')
+    args = parser.parse_args()
+
+    main(manual_date=args.date)

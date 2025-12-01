@@ -37,24 +37,40 @@ from models.overunder.build_ou_features import build_ou_features
 import polars as pl
 
 
-def get_todays_date_mmddyy():
-    """Get today's date in M/D/YY format (matching Barttorvik super_sked)"""
-    today = datetime.now()
-    month = str(today.month)
-    day = str(today.day)
-    year = today.strftime('%y')
+def get_todays_date_mmddyy(target_date: str = None):
+    """Get date in M/D/YY format (matching Barttorvik super_sked)
+
+    Args:
+        target_date: Date string in YYYY-MM-DD format. If None, uses today's date.
+
+    Returns:
+        Date in M/D/YY format
+    """
+    if target_date:
+        try:
+            date_obj = datetime.strptime(target_date, '%Y-%m-%d')
+        except ValueError:
+            print(f"[-] Invalid date format: {target_date}. Using today's date instead.")
+            date_obj = datetime.now()
+    else:
+        date_obj = datetime.now()
+
+    month = str(date_obj.month)
+    day = str(date_obj.day)
+    year = date_obj.strftime('%y')
     return f"{month}/{day}/{year}"
 
 
-def get_todays_games(season: str = None):
+def get_todays_games(season: str = None, target_date: str = None):
     """
-    Scrape Barttorvik super_sked schedule and filter for games happening today.
+    Scrape Barttorvik super_sked schedule and filter for games happening on target date.
 
     Args:
         season: Season year (e.g., '2026'). If None, uses 2026.
+        target_date: Date string in YYYY-MM-DD format. If None, uses today's date.
 
     Returns:
-        DataFrame with today's games or None if none found
+        DataFrame with games for the specified date or None if none found
     """
     if season is None:
         season = '2026'
@@ -63,9 +79,9 @@ def get_todays_games(season: str = None):
     print(f"OU MODEL - SCRAPING SCHEDULE FOR SEASON {season}")
     print("="*80)
 
-    # Get today's date in M/D/YY format (what Barttorvik super_sked uses)
-    today_mmddyy = get_todays_date_mmddyy()
-    print(f"\nLooking for games on: {today_mmddyy}\n")
+    # Get the date in M/D/YY format (what Barttorvik super_sked uses)
+    target_mmddyy = get_todays_date_mmddyy(target_date)
+    print(f"\nLooking for games on: {target_mmddyy}\n")
 
     # Scrape the schedule
     df = scrape_barttorvik_schedule(season)
@@ -74,17 +90,17 @@ def get_todays_games(season: str = None):
         print("Failed to fetch schedule")
         return None
 
-    # Filter for today's games (convert to string to handle potential type issues)
-    todays_games = df[df['date'].astype(str) == today_mmddyy].copy()
+    # Filter for target date games (convert to string to handle potential type issues)
+    target_games = df[df['date'].astype(str) == target_mmddyy].copy()
 
-    if len(todays_games) == 0:
-        print(f"No games found for today")
+    if len(target_games) == 0:
+        print(f"No games found for {target_mmddyy}")
         return None
 
-    print(f"Found {len(todays_games)} games:\n")
+    print(f"Found {len(target_games)} games:\n")
 
-    # Display today's games
-    for idx, row in todays_games.iterrows():
+    # Display target date games
+    for idx, row in target_games.iterrows():
         t1_name = str(row['team1'])
         t2_name = str(row['team2'])
         t1_oe = row['t1oe'] if pd.notna(row['t1oe']) else 'N/A'
@@ -94,7 +110,7 @@ def get_todays_games(season: str = None):
         print(f"  {t1_name:30} vs {t2_name:30}")
         print(f"    Prediction: {prediction} | T1 OE: {t1_oe} | T2 OE: {t2_oe}")
 
-    return todays_games
+    return target_games
 
 
 def fetch_and_push_odds_data():
@@ -617,26 +633,34 @@ def make_ou_predictions(features_df: pl.DataFrame):
         return None
 
 
-def build_todays_games_df(season: str = '2026'):
+def build_todays_games_df(season: str = '2026', target_date: str = None):
     """
-    Build flat DataFrame with today's games and all their data.
-    Queries games table for today, fetches odds, and builds flat dataset.
+    Build flat DataFrame with games for target date and all their data.
+    Queries games table for target date, fetches odds, and builds flat dataset.
 
     Args:
         season: Season year (e.g., '2026')
+        target_date: Date string in YYYY-MM-DD format. If None, uses today's date.
 
     Returns:
-        Polars DataFrame with today's games data or None if failed
+        Polars DataFrame with target date's games data or None if failed
     """
     print("\n" + "-"*80)
-    print("STEP 3: Building flat DataFrame for today's games")
+    print("STEP 3: Building flat DataFrame for games")
     print("-"*80 + "\n")
 
-    # Get today's date in YYYY-MM-DD format
-    today = datetime.now()
-    today_date = today.strftime('%Y-%m-%d')
+    # Get target date in YYYY-MM-DD format
+    if target_date:
+        try:
+            datetime.strptime(target_date, '%Y-%m-%d')
+            target_date_str = target_date
+        except ValueError:
+            print(f"[-] Invalid date format: {target_date}. Using today's date instead.")
+            target_date_str = datetime.now().strftime('%Y-%m-%d')
+    else:
+        target_date_str = datetime.now().strftime('%Y-%m-%d')
 
-    print(f"Building flat DataFrame for games on {today_date}...\n")
+    print(f"Building flat DataFrame for games on {target_date_str}...\n")
 
     try:
         # Load data
@@ -678,11 +702,11 @@ def build_todays_games_df(season: str = '2026'):
         else:
             print("  [*] No games found for today, skipping odds fetch\n")
 
-        # Build flat dataset for today only
-        print(f"Building flat DataFrame for {today_date}...")
+        # Build flat dataset for target date
+        print(f"Building flat DataFrame for {target_date_str}...")
         flat_df = build_flat_df(
             season=int(season),
-            target_date=today_date,
+            target_date=target_date_str,
             games_df=games_df,
             teams_df=teams_df,
             leaderboard_df=leaderboard_df,
@@ -694,7 +718,7 @@ def build_todays_games_df(season: str = '2026'):
         )
 
         if flat_df.is_empty():
-            print(f"  [-] No games found for today")
+            print(f"  [-] No games found for {target_date_str}")
             return None
 
         print(f"  [+] Built flat dataset with {len(flat_df)} games\n")
@@ -785,12 +809,12 @@ def get_game_data_for_games(games_df: pd.DataFrame, season: str):
     return game_data
 
 
-def main():
+def main(target_date: str = None):
     print("\n")
     features_df = None
     predictions_df = None
 
-    todays_games = get_todays_games()
+    todays_games = get_todays_games(target_date=target_date)
 
     if todays_games is not None:
         print(f"\n{len(todays_games)} games to process")
@@ -822,8 +846,8 @@ def main():
             else:
                 odds_success = True
             if odds_success:
-                # Step 3: Build flat DataFrame for today's games
-                todays_games_df = build_todays_games_df(season='2026')
+                # Step 3: Build flat DataFrame for target date
+                todays_games_df = build_todays_games_df(season='2026', target_date=target_date)
 
                 if todays_games_df is not None:
                     # Step 4: Generate features

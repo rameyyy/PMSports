@@ -475,3 +475,108 @@ def build_player_aggregated_features(match_hist: List[dict], team_prefix: str, t
         features[f'{team_prefix}_top{top_n_players}_min_per_{window_label}'] = sum(min_per_vals) / len(min_per_vals) if min_per_vals else None
 
     return features
+
+
+def american_to_decimal(american_odds: float) -> Optional[float]:
+    """
+    Convert American odds to decimal odds format
+
+    American odds format:
+    - Positive (e.g., +100): underdog odds
+    - Negative (e.g., -110): favorite odds
+
+    Decimal conversion:
+    - Positive: Decimal = 1 + (American / 100)
+    - Negative: Decimal = (100 / |American|) + 1
+
+    Examples:
+    - +100 → 2.0 (bet $100, win $100, total return $200)
+    - -110 → 1.909 (bet $110, win $100, total return $210)
+    - +105 → 2.05
+    - -120 → 1.833
+
+    Args:
+        american_odds: American odds value (e.g., 100, -110)
+
+    Returns:
+        Decimal odds or None if invalid
+    """
+    if american_odds is None:
+        return None
+
+    try:
+        odds = float(american_odds)
+
+        if odds > 0:
+            # Positive odds: +100 → 2.0
+            return 1.0 + (odds / 100.0)
+        else:
+            # Negative odds: -110 → 1.909...
+            return 1.0 + (100.0 / abs(odds))
+    except (ValueError, TypeError, ZeroDivisionError):
+        return None
+
+
+def decimal_to_american(decimal_odds: float) -> Optional[float]:
+    """
+    Convert decimal odds back to American odds format
+
+    Args:
+        decimal_odds: Decimal odds (e.g., 2.0, 1.909)
+
+    Returns:
+        American odds or None if invalid
+    """
+    if decimal_odds is None:
+        return None
+
+    try:
+        decimal = float(decimal_odds)
+
+        if decimal >= 2.0:
+            # Decimal >= 2.0: 2.0 → +100 (positive odds)
+            return (decimal - 1.0) * 100.0
+        elif decimal > 1.0:
+            # 1.0 < Decimal < 2.0: 1.909 → -110 (negative odds)
+            # decimal = 1 + (100 / |american|)
+            # decimal - 1 = 100 / |american|
+            # |american| = 100 / (decimal - 1)
+            # american = -(100 / (decimal - 1))
+            return -(100.0 / (decimal - 1.0))
+        else:
+            return None
+    except (ValueError, TypeError, ZeroDivisionError):
+        return None
+
+
+def average_american_odds(odds_list: List[float]) -> Optional[float]:
+    """
+    Calculate average of American odds by converting to decimal, averaging, then converting back
+
+    This handles the problem where simple arithmetic average of mixed +/- odds doesn't work.
+    For example: [+100, -110, +105, -120] cannot be simply averaged.
+
+    Args:
+        odds_list: List of American odds values
+
+    Returns:
+        Average odds in American format, or None if no valid odds
+    """
+    if not odds_list:
+        return None
+
+    # Convert all to decimal
+    decimal_odds = []
+    for odds in odds_list:
+        dec = american_to_decimal(odds)
+        if dec is not None:
+            decimal_odds.append(dec)
+
+    if not decimal_odds:
+        return None
+
+    # Average in decimal format
+    avg_decimal = sum(decimal_odds) / len(decimal_odds)
+
+    # Convert back to American
+    return decimal_to_american(avg_decimal)
