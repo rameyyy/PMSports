@@ -1,364 +1,361 @@
-team_1_adjoe
-team_1_adjde
-team_2_adjoe
-team_2_adjde
-team_1_score_last2
-team_1_score_variance_last2
-team_1_score_trend_last2
-team_1_score_last3
-team_1_score_variance_last3
-team_1_score_trend_last3
-team_1_score_last4
-team_1_score_variance_last4
-team_1_score_trend_last4
-team_1_score_last5
-team_1_score_variance_last5
-team_1_score_trend_last5
-team_1_score_last9
-team_1_score_variance_last9
-team_1_score_trend_last9
-team_1_score_last11
-team_1_score_variance_last11
-team_1_score_trend_last11
-team_1_score_last13
-team_1_score_variance_last13
-team_1_score_trend_last13
-team_1_score_last15
-team_1_score_variance_last15
-team_1_score_trend_last15
-team_2_score_last2
-team_2_score_variance_last2
-team_2_score_trend_last2
-team_2_score_last3
-team_2_score_variance_last3
-team_2_score_trend_last3
-team_2_score_last4
-team_2_score_variance_last4
-team_2_score_trend_last4
-team_2_score_last5
-team_2_score_variance_last5
-team_2_score_trend_last5
-team_2_score_last9
-team_2_score_variance_last9
-team_2_score_trend_last9
-team_2_score_last11
-team_2_score_variance_last11
-team_2_score_trend_last11
-team_2_score_last13
-team_2_score_variance_last13
-team_2_score_trend_last13
-team_2_score_last15
-team_2_score_variance_last15
-team_2_score_trend_last15
-team_1_efg_pct_last2
-team_1_efg_pct_variance_last2
-team_1_efg_pct_trend_last2
-team_1_efg_pct_last3
-team_1_efg_pct_variance_last3
-team_1_efg_pct_trend_last3
-team_1_efg_pct_last4
-team_1_efg_pct_variance_last4
-team_1_efg_pct_trend_last4
-team_1_efg_pct_last5
-team_1_efg_pct_variance_last5
-team_1_efg_pct_trend_last5
-team_1_efg_pct_last9
-team_1_efg_pct_variance_last9
-team_1_efg_pct_trend_last9
-team_1_efg_pct_last11
-team_1_efg_pct_variance_last11
-team_1_efg_pct_trend_last11
-team_1_efg_pct_last13
-team_1_efg_pct_variance_last13
-team_1_efg_pct_trend_last13
-team_1_efg_pct_last15
-team_1_efg_pct_variance_last15
-team_1_efg_pct_trend_last15
-team_2_efg_pct_last2
-team_2_efg_pct_variance_last2
-team_2_efg_pct_trend_last2
-team_2_efg_pct_last3
-team_2_efg_pct_variance_last3
-team_2_efg_pct_trend_last3
-team_2_efg_pct_last4
-team_2_efg_pct_variance_last4
-team_2_efg_pct_trend_last4
-team_2_efg_pct_last5
-team_2_efg_pct_variance_last5
-team_2_efg_pct_trend_last5
-team_2_efg_pct_last9
-team_2_efg_pct_variance_last9
-team_2_efg_pct_trend_last9
-team_2_efg_pct_last11
-team_2_efg_pct_variance_last11
-team_2_efg_pct_trend_last11
-team_2_efg_pct_last13
-team_2_efg_pct_variance_last13
-team_2_efg_pct_trend_last13
-team_2_efg_pct_last15
-team_2_efg_pct_variance_last15
-team_2_efg_pct_trend_last15
-team_1_adjoe_last2
-team_1_adjoe_variance_last2
-team_1_adjoe_last3
-team_1_adjoe_variance_last3
-team_1_adjoe_last4
-team_1_adjoe_variance_last4
-team_1_adjoe_last5
-team_1_adjoe_variance_last5
-team_1_adjoe_last9
-team_1_adjoe_variance_last9
-team_1_adjoe_last11
-team_1_adjoe_variance_last11
-team_1_adjoe_last13
-team_1_adjoe_variance_last13
-team_1_adjoe_last15
-team_1_adjoe_variance_last15
-team_2_adjoe_last2
-team_2_adjoe_variance_last2
-team_2_adjoe_last3
-team_2_adjoe_variance_last3
-team_2_adjoe_last4
-team_2_adjoe_variance_last4
-team_2_adjoe_last5
-team_2_adjoe_variance_last5
-team_2_adjoe_last9
-team_2_adjoe_variance_last9
-team_2_adjoe_last11
-team_2_adjoe_variance_last11
-team_2_adjoe_last13
-team_2_adjoe_variance_last13
-team_2_adjoe_last15
-team_2_adjoe_variance_last15
-team_1_adjde_last2
-team_1_adjde_variance_last2
-team_1_adjde_last3
-team_1_adjde_variance_last3
-team_1_adjde_last4
-team_1_adjde_variance_last4
-team_1_adjde_last5
-team_1_adjde_variance_last5
-team_1_adjde_last9
-team_1_adjde_variance_last9
-team_1_adjde_last11
-team_1_adjde_variance_last11
-team_1_adjde_last13
-team_1_adjde_variance_last13
-team_1_adjde_last15
-team_1_adjde_variance_last15
-team_2_adjde_last2
-team_2_adjde_variance_last2
-team_2_adjde_last3
-team_2_adjde_variance_last3
-team_2_adjde_last4
-team_2_adjde_variance_last4
-team_2_adjde_last5
-team_2_adjde_variance_last5
-team_2_adjde_last9
-team_2_adjde_variance_last9
-team_2_adjde_last11
-team_2_adjde_variance_last11
-team_2_adjde_last13
-team_2_adjde_variance_last13
-team_2_adjde_last15
-team_2_adjde_variance_last15
-team_1_adj_t_last2
-team_1_adj_t_variance_last2
-team_1_adj_t_last3
-team_1_adj_t_variance_last3
-team_1_adj_t_last4
-team_1_adj_t_variance_last4
-team_1_adj_t_last5
-team_1_adj_t_variance_last5
-team_1_adj_t_last9
-team_1_adj_t_variance_last9
-team_1_adj_t_last11
-team_1_adj_t_variance_last11
-team_1_adj_t_last13
-team_1_adj_t_variance_last13
-team_1_adj_t_last15
-team_1_adj_t_variance_last15
-team_2_adj_t_last2
-team_2_adj_t_variance_last2
-team_2_adj_t_last3
-team_2_adj_t_variance_last3
-team_2_adj_t_last4
-team_2_adj_t_variance_last4
-team_2_adj_t_last5
-team_2_adj_t_variance_last5
-team_2_adj_t_last9
-team_2_adj_t_variance_last9
-team_2_adj_t_last11
-team_2_adj_t_variance_last11
-team_2_adj_t_last13
-team_2_adj_t_variance_last13
-team_2_adj_t_last15
-team_2_adj_t_variance_last15
-team_1_score_closest3rank
-team_1_score_allowed_closest3rank
-team_1_total_closest3rank
-team_1_margin_closest3rank
-team_1_adjoe_closest3rank
-team_1_adjde_closest3rank
-team_1_score_closest5rank
-team_1_score_allowed_closest5rank
-team_1_total_closest5rank
-team_1_margin_closest5rank
-team_1_adjoe_closest5rank
-team_1_adjde_closest5rank
-team_1_score_closest7rank
-team_1_score_allowed_closest7rank
-team_1_total_closest7rank
-team_1_margin_closest7rank
-team_1_adjoe_closest7rank
-team_1_adjde_closest7rank
-team_2_score_closest3rank
-team_2_score_allowed_closest3rank
-team_2_total_closest3rank
-team_2_margin_closest3rank
-team_2_adjoe_closest3rank
-team_2_adjde_closest3rank
-team_2_score_closest5rank
-team_2_score_allowed_closest5rank
-team_2_total_closest5rank
-team_2_margin_closest5rank
-team_2_adjoe_closest5rank
-team_2_adjde_closest5rank
-team_2_score_closest7rank
-team_2_score_allowed_closest7rank
-team_2_total_closest7rank
-team_2_margin_closest7rank
-team_2_adjoe_closest7rank
-team_2_adjde_closest7rank
-combined_expected_total_closest3rank
-combined_adjoe_closest3rank
-adjoe_differential_closest3rank
-combined_adjde_closest3rank
-adjde_differential_closest3rank
-combined_expected_total_closest5rank
-combined_adjoe_closest5rank
-adjoe_differential_closest5rank
-combined_adjde_closest5rank
-adjde_differential_closest5rank
-combined_expected_total_closest7rank
-combined_adjoe_closest7rank
-adjoe_differential_closest7rank
-combined_adjde_closest7rank
-adjde_differential_closest7rank
-rank_differential
-barthag_differential
-adj_tempo_differential
-adjoe_differential
-adjde_differential
-efg_off_differential
-efg_def_differential
-orb_rate_differential
-tor_rate_differential
-3p_rate_differential
-ftr_differential
-combined_adjoe
-combined_adjde
-betmgm_ou_line
-betmgm_over_odds
-betmgm_under_odds
-betmgm_ml_team_1
-betmgm_ml_team_2
-betmgm_spread_pts_team_1
-betmgm_spread_odds_team_1
-betmgm_spread_pts_team_2
-betmgm_spread_odds_team_2
-betonline_ou_line
-betonline_over_odds
-betonline_under_odds
-betonline_ml_team_1
-betonline_ml_team_2
-betonline_spread_pts_team_1
-betonline_spread_odds_team_1
-betonline_spread_pts_team_2
-betonline_spread_odds_team_2
-bovada_ou_line
-bovada_over_odds
-bovada_under_odds
-bovada_ml_team_1
-bovada_ml_team_2
-bovada_spread_pts_team_1
-bovada_spread_odds_team_1
-bovada_spread_pts_team_2
-bovada_spread_odds_team_2
-draftkings_ou_line
-draftkings_over_odds
-draftkings_under_odds
-draftkings_ml_team_1
-draftkings_ml_team_2
-draftkings_spread_pts_team_1
-draftkings_spread_odds_team_1
-draftkings_spread_pts_team_2
-draftkings_spread_odds_team_2
-fanduel_ou_line
-fanduel_over_odds
-fanduel_under_odds
-fanduel_ml_team_1
-fanduel_ml_team_2
-fanduel_spread_pts_team_1
-fanduel_spread_odds_team_1
-fanduel_spread_pts_team_2
-fanduel_spread_odds_team_2
-lowvig_ou_line
-lowvig_over_odds
-lowvig_under_odds
-lowvig_ml_team_1
-lowvig_ml_team_2
-lowvig_spread_pts_team_1
-lowvig_spread_odds_team_1
-lowvig_spread_pts_team_2
-lowvig_spread_odds_team_2
-mybookie_ou_line
-mybookie_over_odds
-mybookie_under_odds
-mybookie_ml_team_1
-mybookie_ml_team_2
-mybookie_spread_pts_team_1
-mybookie_spread_odds_team_1
-mybookie_spread_pts_team_2
-mybookie_spread_odds_team_2
-avg_ou_line
-ou_line_variance
-avg_over_odds
-avg_under_odds
-num_books_with_ou
-avg_spread_pts_team_1
-avg_spread_pts_team_2
-spread_variance
-avg_spread_odds_team_1
-avg_spread_odds_team_2
-avg_ml_team_1
-avg_ml_team_2
-num_books_with_spread
-num_books_with_ml
-implied_team_1_score
-implied_team_2_score
-spread_ou_agreement
-team_1_games_available
-team_2_games_available
-team_1_data_quality
-team_2_data_quality
-team_1_days_rest
-team_1_back_to_back_flag
-team_1_games_in_last_5_days
-team_2_days_rest
-team_2_back_to_back_flag
-team_2_games_in_last_5_days
-team_1_is_home_game
-team_1_home_court_advantage
-team_1_is_neutral_site
-team_2_is_home_game
-team_2_home_court_advantage
-team_2_is_neutral_site
-is_conference_game
-is_conference_rematch
-is_early_game
-is_afternoon_game
-is_evening_game
-is_late_game
-hour_of_day
-hours_until_game_from_odds
+    1	team_1_adjoe
+    2	team_1_adjde
+    3	team_2_adjoe
+    4	team_2_adjde
+    5	team_1_score_last2
+    6	team_1_score_variance_last2
+    7	team_1_score_trend_last2
+    8	team_1_score_last3
+    9	team_1_score_variance_last3
+   10	team_1_score_trend_last3
+   11	team_1_score_last4
+   12	team_1_score_variance_last4
+   13	team_1_score_trend_last4
+   14	team_1_score_last5
+   15	team_1_score_variance_last5
+   16	team_1_score_trend_last5
+   17	team_1_score_last9
+   18	team_1_score_variance_last9
+   19	team_1_score_trend_last9
+   20	team_1_score_last11
+   21	team_1_score_variance_last11
+   22	team_1_score_trend_last11
+   23	team_1_score_last13
+   24	team_1_score_variance_last13
+   25	team_1_score_trend_last13
+   26	team_1_score_last15
+   27	team_1_score_variance_last15
+   28	team_1_score_trend_last15
+   29	team_2_score_last2
+   30	team_2_score_variance_last2
+   31	team_2_score_trend_last2
+   32	team_2_score_last3
+   33	team_2_score_variance_last3
+   34	team_2_score_trend_last3
+   35	team_2_score_last4
+   36	team_2_score_variance_last4
+   37	team_2_score_trend_last4
+   38	team_2_score_last5
+   39	team_2_score_variance_last5
+   40	team_2_score_trend_last5
+   41	team_2_score_last9
+   42	team_2_score_variance_last9
+   43	team_2_score_trend_last9
+   44	team_2_score_last11
+   45	team_2_score_variance_last11
+   46	team_2_score_trend_last11
+   47	team_2_score_last13
+   48	team_2_score_variance_last13
+   49	team_2_score_trend_last13
+   50	team_2_score_last15
+   51	team_2_score_variance_last15
+   52	team_2_score_trend_last15
+   53	team_1_efg_pct_last2
+   54	team_1_efg_pct_variance_last2
+   55	team_1_efg_pct_trend_last2
+   56	team_1_efg_pct_last3
+   57	team_1_efg_pct_variance_last3
+   58	team_1_efg_pct_trend_last3
+   59	team_1_efg_pct_last4
+   60	team_1_efg_pct_variance_last4
+   61	team_1_efg_pct_trend_last4
+   62	team_1_efg_pct_last5
+   63	team_1_efg_pct_variance_last5
+   64	team_1_efg_pct_trend_last5
+   65	team_1_efg_pct_last9
+   66	team_1_efg_pct_variance_last9
+   67	team_1_efg_pct_trend_last9
+   68	team_1_efg_pct_last11
+   69	team_1_efg_pct_variance_last11
+   70	team_1_efg_pct_trend_last11
+   71	team_1_efg_pct_last13
+   72	team_1_efg_pct_variance_last13
+   73	team_1_efg_pct_trend_last13
+   74	team_1_efg_pct_last15
+   75	team_1_efg_pct_variance_last15
+   76	team_1_efg_pct_trend_last15
+   77	team_2_efg_pct_last2
+   78	team_2_efg_pct_variance_last2
+   79	team_2_efg_pct_trend_last2
+   80	team_2_efg_pct_last3
+   81	team_2_efg_pct_variance_last3
+   82	team_2_efg_pct_trend_last3
+   83	team_2_efg_pct_last4
+   84	team_2_efg_pct_variance_last4
+   85	team_2_efg_pct_trend_last4
+   86	team_2_efg_pct_last5
+   87	team_2_efg_pct_variance_last5
+   88	team_2_efg_pct_trend_last5
+   89	team_2_efg_pct_last9
+   90	team_2_efg_pct_variance_last9
+   91	team_2_efg_pct_trend_last9
+   92	team_2_efg_pct_last11
+   93	team_2_efg_pct_variance_last11
+   94	team_2_efg_pct_trend_last11
+   95	team_2_efg_pct_last13
+   96	team_2_efg_pct_variance_last13
+   97	team_2_efg_pct_trend_last13
+   98	team_2_efg_pct_last15
+   99	team_2_efg_pct_variance_last15
+  100	team_2_efg_pct_trend_last15
+  101	team_1_adjoe_last2
+  102	team_1_adjoe_variance_last2
+  103	team_1_adjoe_last3
+  104	team_1_adjoe_variance_last3
+  105	team_1_adjoe_last4
+  106	team_1_adjoe_variance_last4
+  107	team_1_adjoe_last5
+  108	team_1_adjoe_variance_last5
+  109	team_1_adjoe_last9
+  110	team_1_adjoe_variance_last9
+  111	team_1_adjoe_last11
+  112	team_1_adjoe_variance_last11
+  113	team_1_adjoe_last13
+  114	team_1_adjoe_variance_last13
+  115	team_1_adjoe_last15
+  116	team_1_adjoe_variance_last15
+  117	team_2_adjoe_last2
+  118	team_2_adjoe_variance_last2
+  119	team_2_adjoe_last3
+  120	team_2_adjoe_variance_last3
+  121	team_2_adjoe_last4
+  122	team_2_adjoe_variance_last4
+  123	team_2_adjoe_last5
+  124	team_2_adjoe_variance_last5
+  125	team_2_adjoe_last9
+  126	team_2_adjoe_variance_last9
+  127	team_2_adjoe_last11
+  128	team_2_adjoe_variance_last11
+  129	team_2_adjoe_last13
+  130	team_2_adjoe_variance_last13
+  131	team_2_adjoe_last15
+  132	team_2_adjoe_variance_last15
+  133	team_1_adjde_last2
+  134	team_1_adjde_variance_last2
+  135	team_1_adjde_last3
+  136	team_1_adjde_variance_last3
+  137	team_1_adjde_last4
+  138	team_1_adjde_variance_last4
+  139	team_1_adjde_last5
+  140	team_1_adjde_variance_last5
+  141	team_1_adjde_last9
+  142	team_1_adjde_variance_last9
+  143	team_1_adjde_last11
+  144	team_1_adjde_variance_last11
+  145	team_1_adjde_last13
+  146	team_1_adjde_variance_last13
+  147	team_1_adjde_last15
+  148	team_1_adjde_variance_last15
+  149	team_2_adjde_last2
+  150	team_2_adjde_variance_last2
+  151	team_2_adjde_last3
+  152	team_2_adjde_variance_last3
+  153	team_2_adjde_last4
+  154	team_2_adjde_variance_last4
+  155	team_2_adjde_last5
+  156	team_2_adjde_variance_last5
+  157	team_2_adjde_last9
+  158	team_2_adjde_variance_last9
+  159	team_2_adjde_last11
+  160	team_2_adjde_variance_last11
+  161	team_2_adjde_last13
+  162	team_2_adjde_variance_last13
+  163	team_2_adjde_last15
+  164	team_2_adjde_variance_last15
+  165	team_1_adj_t_last2
+  166	team_1_adj_t_variance_last2
+  167	team_1_adj_t_last3
+  168	team_1_adj_t_variance_last3
+  169	team_1_adj_t_last4
+  170	team_1_adj_t_variance_last4
+  171	team_1_adj_t_last5
+  172	team_1_adj_t_variance_last5
+  173	team_1_adj_t_last9
+  174	team_1_adj_t_variance_last9
+  175	team_1_adj_t_last11
+  176	team_1_adj_t_variance_last11
+  177	team_1_adj_t_last13
+  178	team_1_adj_t_variance_last13
+  179	team_1_adj_t_last15
+  180	team_1_adj_t_variance_last15
+  181	team_2_adj_t_last2
+  182	team_2_adj_t_variance_last2
+  183	team_2_adj_t_last3
+  184	team_2_adj_t_variance_last3
+  185	team_2_adj_t_last4
+  186	team_2_adj_t_variance_last4
+  187	team_2_adj_t_last5
+  188	team_2_adj_t_variance_last5
+  189	team_2_adj_t_last9
+  190	team_2_adj_t_variance_last9
+  191	team_2_adj_t_last11
+  192	team_2_adj_t_variance_last11
+  193	team_2_adj_t_last13
+  194	team_2_adj_t_variance_last13
+  195	team_2_adj_t_last15
+  196	team_2_adj_t_variance_last15
+  197	team_1_score_closest3rank
+  198	team_1_score_allowed_closest3rank
+  199	team_1_total_closest3rank
+  200	team_1_margin_closest3rank
+  201	team_1_adjoe_closest3rank
+  202	team_1_adjde_closest3rank
+  203	team_1_score_closest5rank
+  204	team_1_score_allowed_closest5rank
+  205	team_1_total_closest5rank
+  206	team_1_margin_closest5rank
+  207	team_1_adjoe_closest5rank
+  208	team_1_adjde_closest5rank
+  209	team_1_score_closest7rank
+  210	team_1_score_allowed_closest7rank
+  211	team_1_total_closest7rank
+  212	team_1_margin_closest7rank
+  213	team_1_adjoe_closest7rank
+  214	team_1_adjde_closest7rank
+  215	team_2_score_closest3rank
+  216	team_2_score_allowed_closest3rank
+  217	team_2_total_closest3rank
+  218	team_2_margin_closest3rank
+  219	team_2_adjoe_closest3rank
+  220	team_2_adjde_closest3rank
+  221	team_2_score_closest5rank
+  222	team_2_score_allowed_closest5rank
+  223	team_2_total_closest5rank
+  224	team_2_margin_closest5rank
+  225	team_2_adjoe_closest5rank
+  226	team_2_adjde_closest5rank
+  227	team_2_score_closest7rank
+  228	team_2_score_allowed_closest7rank
+  229	team_2_total_closest7rank
+  230	team_2_margin_closest7rank
+  231	team_2_adjoe_closest7rank
+  232	team_2_adjde_closest7rank
+  233	combined_expected_total_closest3rank
+  234	combined_adjoe_closest3rank
+  235	adjoe_differential_closest3rank
+  236	combined_adjde_closest3rank
+  237	adjde_differential_closest3rank
+  238	combined_expected_total_closest5rank
+  239	combined_adjoe_closest5rank
+  240	adjoe_differential_closest5rank
+  241	combined_adjde_closest5rank
+  242	adjde_differential_closest5rank
+  243	combined_expected_total_closest7rank
+  244	combined_adjoe_closest7rank
+  245	adjoe_differential_closest7rank
+  246	combined_adjde_closest7rank
+  247	adjde_differential_closest7rank
+  248	rank_differential
+  249	barthag_differential
+  250	adj_tempo_differential
+  251	adjoe_differential
+  252	adjde_differential
+  253	efg_off_differential
+  254	efg_def_differential
+  255	orb_rate_differential
+  256	tor_rate_differential
+  257	3p_rate_differential
+  258	ftr_differential
+  259	combined_adjoe
+  260	combined_adjde
+  261	betmgm_ou_line
+  262	betmgm_over_odds
+  263	betmgm_under_odds
+  264	betmgm_ml_team_1
+  265	betmgm_ml_team_2
+  266	betmgm_spread_pts_team_1
+  267	betmgm_spread_odds_team_1
+  268	betmgm_spread_pts_team_2
+  269	betmgm_spread_odds_team_2
+  270	betonline_ou_line
+  271	betonline_over_odds
+  272	betonline_under_odds
+  273	betonline_ml_team_1
+  274	betonline_ml_team_2
+  275	betonline_spread_pts_team_1
+  276	betonline_spread_odds_team_1
+  277	betonline_spread_pts_team_2
+  278	betonline_spread_odds_team_2
+  279	bovada_ou_line
+  280	bovada_over_odds
+  281	bovada_under_odds
+  282	bovada_ml_team_1
+  283	bovada_ml_team_2
+  284	bovada_spread_pts_team_1
+  285	bovada_spread_odds_team_1
+  286	bovada_spread_pts_team_2
+  287	bovada_spread_odds_team_2
+  288	draftkings_ou_line
+  289	draftkings_over_odds
+  290	draftkings_under_odds
+  291	draftkings_ml_team_1
+  292	draftkings_ml_team_2
+  293	draftkings_spread_pts_team_1
+  294	draftkings_spread_odds_team_1
+  295	draftkings_spread_pts_team_2
+  296	draftkings_spread_odds_team_2
+  297	fanduel_ou_line
+  298	fanduel_over_odds
+  299	fanduel_under_odds
+  300	fanduel_ml_team_1
+  301	fanduel_ml_team_2
+  302	fanduel_spread_pts_team_1
+  303	fanduel_spread_odds_team_1
+  304	fanduel_spread_pts_team_2
+  305	fanduel_spread_odds_team_2
+  306	lowvig_ou_line
+  307	lowvig_over_odds
+  308	lowvig_under_odds
+  309	lowvig_ml_team_1
+  310	lowvig_ml_team_2
+  311	lowvig_spread_pts_team_1
+  312	lowvig_spread_pts_team_2
+  313	lowvig_spread_odds_team_2
+  314	mybookie_ou_line
+  315	mybookie_over_odds
+  316	mybookie_under_odds
+  317	mybookie_ml_team_1
+  318	mybookie_ml_team_2
+  319	mybookie_spread_pts_team_1
+  320	mybookie_spread_odds_team_1
+  321	mybookie_spread_pts_team_2
+  322	mybookie_spread_odds_team_2
+  323	avg_ou_line
+  324	ou_line_variance
+  325	avg_over_odds
+  326	avg_under_odds
+  327	num_books_with_ou
+  328	avg_spread_pts_team_1
+  329	avg_spread_pts_team_2
+  330	spread_variance
+  331	avg_spread_odds_team_1
+  332	avg_spread_odds_team_2
+  333	avg_ml_team_1
+  334	avg_ml_team_2
+  335	num_books_with_spread
+  336	num_books_with_ml
+  337	implied_team_1_score
+  338	implied_team_2_score
+  339	spread_ou_agreement
+  340	team_1_games_available
+  341	team_2_games_available
+  342	team_1_days_rest
+  343	team_1_back_to_back_flag
+  344	team_1_games_in_last_5_days
+  345	team_2_days_rest
+  346	team_2_back_to_back_flag
+  347	team_2_games_in_last_5_days
+  348	team_1_is_home_game
+  349	team_1_home_court_advantage
+  350	team_1_is_neutral_site
+  351	team_2_is_home_game
+  352	team_2_home_court_advantage
+  353	team_2_is_neutral_site
+  354	is_conference_game
+  355	is_conference_rematch
+  356	is_early_game
+  357	is_afternoon_game
+  358	is_evening_game
+  359	is_late_game
+  360	hour_of_day
+  361	hours_until_game_from_odds

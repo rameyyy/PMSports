@@ -128,98 +128,81 @@ def prepare_data(df: pl.DataFrame, feature_cols: list) -> np.ndarray:
 
 
 def load_expected_feature_columns() -> list:
-    """Load the list of expected feature columns from file"""
+    """Load the list of expected feature columns from file (tab-separated index and name)"""
     expected_file = Path(__file__).parent / "models" / "moneyline" / "saved" / "feature_columns.txt"
 
     if expected_file.exists():
+        feature_cols = []
         with open(expected_file, 'r') as f:
-            return [line.strip() for line in f if line.strip()]
+            for line in f:
+                line = line.strip()
+                if line:
+                    # Parse "index\tcolumn_name" format
+                    parts = line.split('\t')
+                    if len(parts) >= 2:
+                        feature_cols.append(parts[1])
+        return feature_cols if feature_cols else None
 
     return None
 
 
-def align_features_to_model(df: pl.DataFrame, model: XGBClassifier) -> tuple:
+def align_features_to_model(df: pl.DataFrame) -> tuple:
     """
-    Get numeric features (same as training) by excluding metadata columns.
-    Converts object columns to numeric first (same as ou_main.py).
+    Align features using the exact list from training (feature_columns.txt)
+    Convert American odds to decimal (same as training).
     Returns (X array, feature_cols list) or (None, None) if alignment fails.
     """
-    # Convert polars to pandas for compatibility with numeric conversion
-    df_pd = df.to_pandas()
-
-    # Get metadata columns
-    metadata_cols = get_metadata_cols()
-
-    # Step 1: Convert all non-metadata object columns to numeric (same as ou_main.py line 551)
-    # Many columns will be null early in season - convert them to numeric so they're recognized as features
-    print("[*] Converting object columns to numeric...")
-    object_cols_converted = 0
-
-    # First check what dtypes we have
-    non_numeric_cols = [col for col in df_pd.columns if col not in metadata_cols and not np.issubdtype(df_pd[col].dtype, np.number)]
-
-    # Find which types these are
-    non_numeric_types = {}
-    for col in non_numeric_cols:
-        dtype_str = str(df_pd[col].dtype)
-        if dtype_str not in non_numeric_types:
-            non_numeric_types[dtype_str] = 0
-        non_numeric_types[dtype_str] += 1
-
-    print(f"    [DEBUG] Non-numeric columns: {len(non_numeric_cols)}")
-    for dtype, count in non_numeric_types.items():
-        print(f"             {dtype}: {count}")
-
-    # Convert all non-numeric columns (object or anything else, even if all NaN)
-    for col in df_pd.columns:
-        if col not in metadata_cols and not np.issubdtype(df_pd[col].dtype, np.number):
-            try:
-                before_dtype = df_pd[col].dtype
-                df_pd[col] = pd.to_numeric(df_pd[col], errors='coerce')
-                after_dtype = df_pd[col].dtype
-                object_cols_converted += 1
-                if object_cols_converted <= 3:  # Show first 3
-                    print(f"             Converted {col}: {before_dtype} -> {after_dtype}")
-            except Exception as e:
-                print(f"             Failed to convert {col}: {e}")
-
-    print(f"\n    Total converted: {object_cols_converted} non-numeric columns to numeric\n")
-
-    # Step 2: Get all numeric feature columns (same as ou_main.py line 557-559)
-    feature_cols = [col for col in df_pd.columns
-                   if col not in metadata_cols
-                   and np.issubdtype(df_pd[col].dtype, np.number)]
-
-    if not feature_cols:
-        print("[-] No numeric feature columns found")
+    # Load expected feature columns from training
+    expected_feature_cols = load_expected_feature_columns()
+    if not expected_feature_cols:
+        print("[-] Could not load expected feature columns from training")
         return None, None
 
-    print(f"[+] Feature alignment complete:")
-    print(f"    Numeric feature columns: {len(feature_cols)}")
-    print(f"    Expected by model: 361")
+    # Convert polars to pandas
+    df_pd = df.to_pandas()
 
-    # Trim to exactly 361 features if needed
-    if len(feature_cols) > 361:
-        extra = len(feature_cols) - 361
-        print(f"    Trimming {extra} extra features - using first 361")
-        feature_cols = feature_cols[:361]
-    elif len(feature_cols) < 361:
-        print(f"    WARNING: Missing {361 - len(feature_cols)} features")
+    print(f"[+] Feature alignment:")
+    print(f"    Expected features from training: {len(expected_feature_cols)}")
 
-    print()
+    # Check which expected columns are available
+    available_cols = [col for col in expected_feature_cols if col in df_pd.columns]
+    missing_cols = [col for col in expected_feature_cols if col not in df_pd.columns]
 
-    # Step 3: Prepare feature matrix and fill nulls
+    if len(available_cols) < len(expected_feature_cols):
+        print(f"    WARNING: Missing {len(missing_cols)} columns")
+
+    # Convert all odds columns from American to decimal (same as training)
+    odds_cols = [
+        'betonline_ml_team_1', 'betonline_ml_team_2',
+        'bovada_ml_team_1', 'bovada_ml_team_2',
+        'betmgm_ml_team_1', 'betmgm_ml_team_2',
+        'draftkings_ml_team_1', 'draftkings_ml_team_2',
+        'fanduel_ml_team_1', 'fanduel_ml_team_2',
+        'lowvig_ml_team_1', 'lowvig_ml_team_2',
+        'mybookie_ml_team_1', 'mybookie_ml_team_2',
+        'avg_ml_team_1', 'avg_ml_team_2',
+    ]
+
+    for col in odds_cols:
+        if col in df_pd.columns:
+            # Convert American odds to decimal
+            df_pd[col] = df_pd[col].apply(lambda x: american_to_decimal(x) if x is not None else None)
+
+    # Use the expected feature columns (as they were used in training)
+    feature_cols = expected_feature_cols
+
+    # For missing columns, add zeros
+    for col in missing_cols:
+        if col not in df_pd.columns:
+            df_pd[col] = 0.0
+
+    # Fill null values with 0
+    df_pd[feature_cols] = df_pd[feature_cols].fillna(0)
+
+    # Convert to numpy
     try:
-        X = df_pd[feature_cols].copy()
-
-        # Fill NaN values with 0 (same as ou_main.py line 571)
-        null_cols = X.columns[X.isnull().any()].tolist()
-        if null_cols:
-            print(f"    Filling {len(null_cols)} columns with NaN values")
-            X = X.fillna(0)
-
-        X = X.to_numpy()
-        # Replace any remaining NaN/inf values
+        X = df_pd[feature_cols].to_numpy(dtype=np.float64)
+        # Replace any NaN/inf values
         X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
     except Exception as e:
         print(f"[-] Error preparing feature matrix: {e}\n")
@@ -356,7 +339,7 @@ def get_ml_bets(features_df: pl.DataFrame, lgb_model, xgb_model, allowed_bookmak
 
     # Get LGB predictions for all games
     try:
-        X, feature_cols = align_features_to_model(features_df, lgb_model)
+        X, feature_cols = align_features_to_model(features_df)
         if X is None:
             print("[-] Could not align features to LGB model\n")
             return ml_bets
@@ -596,7 +579,7 @@ def export_all_predictions(features_df: pl.DataFrame, lgb_model, xgb_model, ou_p
 
         # Get ML predictions for all games
         try:
-            X, feature_cols = align_features_to_model(features_df, lgb_model)
+            X, feature_cols = align_features_to_model(features_df)
             if X is not None:
                 lgb_proba = lgb_model.predict(X)
                 xgb_proba = xgb_model.predict_proba(X)[:, 1]
@@ -664,7 +647,7 @@ def export_all_games_with_odds(features_df: pl.DataFrame, lgb_model, xgb_model, 
 
     # Get LGB predictions for all games
     try:
-        X, feature_cols = align_features_to_model(features_df, lgb_model)
+        X, feature_cols = align_features_to_model(features_df)
         if X is None:
             print("[-] Could not align features to LGB model\n")
             return
@@ -758,32 +741,6 @@ def main(manual_date: str = None):
 
     print("\n[+] OU pipeline complete - data has been scraped and prepared")
     print(f"[DEBUG] features_df shape: {features_df.shape}")
-
-    # Convert odds columns from American to decimal format (model was trained on decimal odds)
-    print("[*] Converting American odds to decimal format...")
-    odds_cols_to_convert = [
-        'betonline_ml_team_1', 'betonline_ml_team_2',
-        'bovada_ml_team_1', 'bovada_ml_team_2',
-        'draftkings_ml_team_1', 'draftkings_ml_team_2',
-        'fanduel_ml_team_1', 'fanduel_ml_team_2',
-        'lowvig_ml_team_1', 'lowvig_ml_team_2',
-        'mybookie_ml_team_1', 'mybookie_ml_team_2',
-        'betmgm_ml_team_1', 'betmgm_ml_team_2',
-        'avg_ml_team_1', 'avg_ml_team_2',
-        'avg_ml_home', 'avg_ml_away'
-    ]
-
-    for col in odds_cols_to_convert:
-        if col in features_df.columns:
-            # Convert American odds to decimal:
-            # positive: 1 + (x/100), negative: 1 + (100/|x|)
-            features_df = features_df.with_columns(
-                pl.col(col).map_elements(
-                    lambda x: 1 + (x / 100) if x >= 0 else 1 + (100 / abs(x)) if x is not None else None,
-                    return_dtype=pl.Float64
-                ).alias(col)
-            )
-    print(f"    Converted {len([c for c in odds_cols_to_convert if c in features_df.columns])} odds columns to decimal\n")
 
     # Define allowed bookmakers
     allowed_bookmakers = {'BetOnline.ag', 'Bovada', 'MyBookie.ag', 'betonlineag'}
