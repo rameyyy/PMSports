@@ -1,0 +1,15 @@
+{
+  "best_score": 0.7481471589676909,
+  "best_params": {
+    "max_depth": 5,
+    "learning_rate": 0.1865438873672565,
+    "subsample": 0.993676521364417,
+    "colsample_bytree": 0.4004651867138166,
+    "min_child_weight": 15,
+    "gamma": 9.716292143222592,
+    "lambda": 10.106789860164419,
+    "n_estimators": 79
+  },
+  "iterations": 100,
+  "timestamp": "2025-11-27T19:32:58.022645"
+}
