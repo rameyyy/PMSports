@@ -281,6 +281,15 @@ def build_flat_df(season: Optional[int] = None, limit: Optional[int] = None, tar
         if i % 100 == 0:
             print(f"Processing game {i+1}/{len(games_to_process)}...")
 
+        # IMPORTANT: Enforce alphabetical ordering of team_1 and team_2
+        # This matches how the training data was structured
+        team_a = str(row.get('team_1', '')).strip()
+        team_b = str(row.get('team_2', '')).strip()
+        teams_sorted = sorted([team_a, team_b])
+        row = dict(row)  # Convert to mutable dict
+        row['team_1'] = teams_sorted[0]
+        row['team_2'] = teams_sorted[1]
+
         # Build the flat row
         flat_row = build_flat_row_for_game(row, games_df, leaderboard_df, player_stats_df, odds_dict)
 

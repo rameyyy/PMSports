@@ -15,7 +15,10 @@ from .ou_feature_build_utils import (
     calculate_trend,
     find_closest_rank_games,
     calculate_weighted_average,
-    assess_data_quality
+    assess_data_quality,
+    american_to_decimal,
+    decimal_to_american,
+    average_american_odds
 )
 from .ou_advanced_features import (
     calculate_rest_features,
@@ -282,10 +285,14 @@ def process_odds_data(odds_list: list, team_1: str = None, team_2: str = None, t
             odds_features['ou_line_variance'] = float(variance ** 0.5)
 
     if over_odds_all:
-        odds_features['avg_over_odds'] = float(sum(over_odds_all) / len(over_odds_all))
+        # Using decimal odds conversion to properly handle mixed +/- odds
+        avg_over_odds = average_american_odds(over_odds_all)
+        odds_features['avg_over_odds'] = float(avg_over_odds) if avg_over_odds is not None else None
 
     if under_odds_all:
-        odds_features['avg_under_odds'] = float(sum(under_odds_all) / len(under_odds_all))
+        # Using decimal odds conversion to properly handle mixed +/- odds
+        avg_under_odds = average_american_odds(under_odds_all)
+        odds_features['avg_under_odds'] = float(avg_under_odds) if avg_under_odds is not None else None
 
     # Fill individual sportsbook columns, use average for nulls (O/U only)
     for book in sportsbooks:
@@ -334,18 +341,25 @@ def process_odds_data(odds_list: list, team_1: str = None, team_2: str = None, t
         odds_features['spread_variance'] = float(variance ** 0.5)
 
     if spread_odds_team_1_all:
-        odds_features['avg_spread_odds_team_1'] = float(sum(spread_odds_team_1_all) / len(spread_odds_team_1_all))
+        # Using decimal odds conversion to properly handle mixed +/- odds
+        avg_spread_odds_team_1 = average_american_odds(spread_odds_team_1_all)
+        odds_features['avg_spread_odds_team_1'] = float(avg_spread_odds_team_1) if avg_spread_odds_team_1 is not None else None
 
     if spread_odds_team_2_all:
-        odds_features['avg_spread_odds_team_2'] = float(sum(spread_odds_team_2_all) / len(spread_odds_team_2_all))
+        # Using decimal odds conversion to properly handle mixed +/- odds
+        avg_spread_odds_team_2 = average_american_odds(spread_odds_team_2_all)
+        odds_features['avg_spread_odds_team_2'] = float(avg_spread_odds_team_2) if avg_spread_odds_team_2 is not None else None
 
     # Moneyline averages - now correctly mapped to team_1/team_2
+    # Using decimal odds conversion to properly handle mixed +/- odds
     if ml_for_team_1:
         odds_features['num_books_with_ml'] = len(ml_for_team_1)
-        odds_features['avg_ml_team_1'] = float(sum(ml_for_team_1) / len(ml_for_team_1))
+        avg_ml_team_1 = average_american_odds(ml_for_team_1)
+        odds_features['avg_ml_team_1'] = float(avg_ml_team_1) if avg_ml_team_1 is not None else None
 
     if ml_for_team_2:
-        odds_features['avg_ml_team_2'] = float(sum(ml_for_team_2) / len(ml_for_team_2))
+        avg_ml_team_2 = average_american_odds(ml_for_team_2)
+        odds_features['avg_ml_team_2'] = float(avg_ml_team_2) if avg_ml_team_2 is not None else None
 
     return odds_features
 

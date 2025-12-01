@@ -759,23 +759,28 @@ def get_game_data_for_games(games_df: pd.DataFrame, season: str):
     # Create game data dictionary with game histories
     print(f"\nBuilding game data for {len(games_df)} games...\n")
     for idx, row in games_df.iterrows():
-        team1 = str(row['team1']).strip()
-        team2 = str(row['team2']).strip()
+        sched_team1 = str(row['team1']).strip()
+        sched_team2 = str(row['team2']).strip()
 
-        game_id = f"{row['date'].replace('/', '')}_{team1}_{team2}"
+        # Assign team_1 and team_2 based on ALPHABETICAL order (not schedule order)
+        teams_sorted = sorted([sched_team1, sched_team2])
+        team_1 = teams_sorted[0]
+        team_2 = teams_sorted[1]
+
+        game_id = f"{row['date'].replace('/', '')}_{team_1}_{team_2}"
 
         game_data[game_id] = {
-            'team_1': team1,
-            'team_2': team2,
+            'team_1': team_1,
+            'team_2': team_2,
             'date': row['date'],
-            'team_1_history': game_histories.get(team1),
-            'team_2_history': game_histories.get(team2),
+            'team_1_history': game_histories.get(team_1),
+            'team_2_history': game_histories.get(team_2),
         }
 
-        t1_hist_count = len(game_histories.get(team1, [])) if game_histories.get(team1) is not None else 0
-        t2_hist_count = len(game_histories.get(team2, [])) if game_histories.get(team2) is not None else 0
+        t1_hist_count = len(game_histories.get(team_1, [])) if game_histories.get(team_1) is not None else 0
+        t2_hist_count = len(game_histories.get(team_2, [])) if game_histories.get(team_2) is not None else 0
 
-        print(f"  {team1:25} vs {team2:25} | Histories: {t1_hist_count}/{t2_hist_count}")
+        print(f"  {team_1:25} vs {team_2:25} | Histories: {t1_hist_count}/{t2_hist_count}")
 
     return game_data
 
@@ -794,23 +799,28 @@ def main():
         print("\n" + "-"*80)
         print("STEP 1: Pushing games to database")
         print("-"*80 + "\n")
-        success = push_todays_games_to_db(todays_games)
-        game_data = get_game_data_for_games(todays_games, season='2026')
-        # success=True
+        SCRAPEDATA = False
+        if SCRAPEDATA:
+            success = push_todays_games_to_db(todays_games)
+            game_data = get_game_data_for_games(todays_games, season='2026')
+        else:
+            success=True
 
         if success:
-            # Step 1.3: Fetch and push leaderboard
-            fetch_and_push_leaderboard(season='2026')
+            if SCRAPEDATA:
+                # Step 1.3: Fetch and push leaderboard
+                fetch_and_push_leaderboard(season='2026')
 
-            # # Step 1.5: Push match history for today's teams
-            push_match_history(game_data, season='2026')
+                # # Step 1.5: Push match history for today's teams
+                push_match_history(game_data, season='2026')
 
-            # # Step 2: Load player stats
-            load_player_stats(season='2026')
+                # # Step 2: Load player stats
+                load_player_stats(season='2026')
 
-            # # Step 1.5b: Fetch and push odds data
-            odds_success = fetch_and_push_odds_data()
-            # odds_success = True
+                # # Step 1.5b: Fetch and push odds data
+                odds_success = fetch_and_push_odds_data()
+            else:
+                odds_success = True
             if odds_success:
                 # Step 3: Build flat DataFrame for today's games
                 todays_games_df = build_todays_games_df(season='2026')

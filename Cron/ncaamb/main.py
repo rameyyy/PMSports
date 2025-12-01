@@ -2,8 +2,7 @@
 """
 Futures Report: Combined ML and OU Betting Recommendations
 Generates daily betting report with:
-- Moneyline (ML) bets using LGB + Good Bets Model (Strategy 2 Variance-Optimized: EV >= 3%, Good Bets >= 0.40)
-  Expected: 221 bets/season, 55.2% win rate, 299% ROI
+- Moneyline (ML) bets using Ensemble (18% LGB + 82% XGB): EV > 0%, Probability > 0.50
 - Over/Under (OU) bets where ensemble - over_point > 2.3
 Only considers odds from: BetOnline.ag, Bovada, MyBookie.ag
 """
@@ -57,7 +56,7 @@ def get_todays_date_yyyymmdd():
 
 
 def load_ml_models() -> tuple:
-    """Load LGB and Good Bets models for Strategy 2 implementation"""
+    """Load LGB and XGB models for Ensemble implementation (18% LGB + 82% XGB)"""
     saved_dir = Path(__file__).parent / "models" / "moneyline" / "saved"
 
     # Load LightGBM model
@@ -73,20 +72,20 @@ def load_ml_models() -> tuple:
         print(f"[-] Error loading LGB model: {e}\n")
         return None, None
 
-    # Load Good Bets model
-    gb_path = saved_dir / "good_bets_rf_model_final.pkl"
-    if not gb_path.exists():
-        print(f"[-] Good Bets model not found at {gb_path}\n")
+    # Load XGBoost model
+    xgb_path = saved_dir / "xgboost_model_final.pkl"
+    if not xgb_path.exists():
+        print(f"[-] XGB model not found at {xgb_path}\n")
         return lgb_model, None
 
     try:
-        gb_model = pickle.load(open(gb_path, 'rb'))
-        print(f"[+] Good Bets model loaded from {gb_path}\n")
+        xgb_model = pickle.load(open(xgb_path, 'rb'))
+        print(f"[+] XGB model loaded from {xgb_path}\n")
     except Exception as e:
-        print(f"[-] Error loading Good Bets model: {e}\n")
+        print(f"[-] Error loading XGB model: {e}\n")
         return lgb_model, None
 
-    return lgb_model, gb_model
+    return lgb_model, xgb_model
 
 
 def identify_feature_columns(df: pl.DataFrame) -> list:
@@ -297,123 +296,20 @@ def calculate_ev(win_prob: float, american_odds: int, stake: float = 10) -> floa
     return float(ev / stake)
 
 
-def create_good_bets_features(df: pl.DataFrame, lgb_proba: np.ndarray,
-                              xgb_proba: np.ndarray) -> pl.DataFrame:
+
+
+def get_ml_bets(features_df: pl.DataFrame, lgb_model, xgb_model, allowed_bookmakers: set, team_mappings: dict = None) -> list:
     """
-    Create good bets features in 2-row-per-game format using vectorized Polars operations.
-    Returns DataFrame with features ready for good_bets model prediction.
-    """
-    # Add predictions to dataframe
-    df = df.with_columns([
-        pl.lit(xgb_proba[:, 1]).alias('xgb_prob_team_1'),
-        pl.lit(lgb_proba).alias('lgb_prob_team_1'),
-    ])
-
-    # Fill missing odds/spread data with 0
-    for col in ['avg_ml_team_1', 'avg_ml_team_2', 'avg_spread_pts_team_1', 'avg_spread_pts_team_2',
-                'avg_spread_odds_team_1', 'avg_spread_odds_team_2', 'month', 'team_1_adjoe',
-                'team_1_adjde', 'team_2_adjoe', 'team_2_adjde']:
-        if col in df.columns:
-            df = df.with_columns(pl.col(col).fill_null(0))
-        else:
-            df = df.with_columns(pl.lit(0).alias(col))
-
-    # Calculate implied probabilities
-    df = df.with_columns([
-        pl.col('avg_ml_team_1').map_elements(
-            lambda x: 0.5 if x == 0 else (100/(x+100) if x > 0 else abs(x)/(abs(x)+100)),
-            return_dtype=pl.Float64
-        ).alias('implied_prob_team_1'),
-        pl.col('avg_ml_team_2').map_elements(
-            lambda x: 0.5 if x == 0 else (100/(x+100) if x > 0 else abs(x)/(abs(x)+100)),
-            return_dtype=pl.Float64
-        ).alias('implied_prob_team_2'),
-    ])
-
-    # Calculate EV using LGB probabilities (strategy 2 uses LGB EV)
-    df = df.with_columns([
-        (pl.col('lgb_prob_team_1') * pl.when(pl.col('avg_ml_team_1') == 0).then(1.0)
-            .when(pl.col('avg_ml_team_1') > 0).then(1 + (pl.col('avg_ml_team_1') / 100))
-            .otherwise(1 + (100 / pl.col('avg_ml_team_1').abs())) - 1)
-        .alias('ev_team_1'),
-        ((1 - pl.col('lgb_prob_team_1')) * pl.when(pl.col('avg_ml_team_2') == 0).then(1.0)
-            .when(pl.col('avg_ml_team_2') > 0).then(1 + (pl.col('avg_ml_team_2') / 100))
-            .otherwise(1 + (100 / pl.col('avg_ml_team_2').abs())) - 1)
-        .alias('ev_team_2'),
-    ])
-
-    # Calculate strength differentials
-    df = df.with_columns([
-        (pl.col('team_1_adjoe') - pl.col('team_2_adjoe')).abs().alias('strength_diff_1'),
-        (pl.col('team_2_adjoe') - pl.col('team_1_adjoe')).abs().alias('strength_diff_2'),
-    ])
-
-    # Create team 1 perspective rows
-    team_1_data = df.select([
-        pl.col('game_id'),
-        pl.col('team_1').alias('team'),
-        pl.col('team_2').alias('opponent'),
-        pl.col('date'),
-        pl.col('team_1_is_home_game').alias('is_home'),
-        pl.lit(1).alias('team_perspective'),  # team 1
-        pl.col('xgb_prob_team_1'),
-        pl.col('lgb_prob_team_1'),
-        (pl.col('xgb_prob_team_1') - pl.col('lgb_prob_team_1')).abs().alias('model_disagreement'),
-        pl.col('avg_ml_team_1').alias('moneyline_odds'),
-        pl.col('implied_prob_team_1').alias('implied_prob'),
-        pl.col('ev_team_1').alias('ev'),
-        pl.col('avg_spread_pts_team_1').alias('spread_pts_self'),
-        pl.col('avg_spread_pts_team_2').alias('spread_pts_opp'),
-        pl.col('avg_spread_odds_team_1').alias('spread_odds_self'),
-        pl.col('avg_spread_odds_team_2').alias('spread_odds_opp'),
-        pl.col('month'),
-        pl.col('strength_diff_1').alias('strength_differential'),
-    ])
-
-    # Create team 2 perspective rows
-    team_2_data = df.select([
-        pl.col('game_id'),
-        pl.col('team_2').alias('team'),
-        pl.col('team_1').alias('opponent'),
-        pl.col('date'),
-        (1 - pl.col('team_1_is_home_game')).alias('is_home'),
-        pl.lit(2).alias('team_perspective'),  # team 2
-        (1 - pl.col('xgb_prob_team_1')).alias('xgb_prob_team_1'),
-        (1 - pl.col('lgb_prob_team_1')).alias('lgb_prob_team_1'),
-        (pl.col('xgb_prob_team_1') - pl.col('lgb_prob_team_1')).abs().alias('model_disagreement'),
-        pl.col('avg_ml_team_2').alias('moneyline_odds'),
-        pl.col('implied_prob_team_2').alias('implied_prob'),
-        pl.col('ev_team_2').alias('ev'),
-        pl.col('avg_spread_pts_team_2').alias('spread_pts_self'),
-        pl.col('avg_spread_pts_team_1').alias('spread_pts_opp'),
-        pl.col('avg_spread_odds_team_2').alias('spread_odds_self'),
-        pl.col('avg_spread_odds_team_1').alias('spread_odds_opp'),
-        pl.col('month'),
-        pl.col('strength_diff_2').alias('strength_differential'),
-    ])
-
-    # Combine both perspectives
-    all_bets = pl.concat([team_1_data, team_2_data])
-
-    return all_bets
-
-
-def get_ml_bets(features_df: pl.DataFrame, lgb_model, gb_model, allowed_bookmakers: set, team_mappings: dict = None) -> list:
-    """
-    Get moneyline bets using Strategy 2: EV >= 5% AND Good Bets confidence >= 0.55
-    Uses LightGBM predictions + Good Bets Random Forest confidence filtering.
+    Get moneyline bets using Ensemble predictions: 18% LGB + 82% XGB
+    Filters by EV > 0 AND probability > 0.5
     """
     ml_bets = []
 
-    if lgb_model is None:
-        print("[-] LGB model not loaded\n")
+    if lgb_model is None or xgb_model is None:
+        print("[-] LGB or XGB model not loaded\n")
         return ml_bets
 
-    if gb_model is None:
-        print("[-] Good Bets model not loaded\n")
-        return ml_bets
-
-    print("STEP 2.5: Getting ML Predictions (Strategy 2)")
+    print("STEP 2.5: Getting ML Predictions (Ensemble: 18% LGB + 82% XGB)")
     print("-"*80 + "\n")
 
     # Get LGB predictions for all games
@@ -430,120 +326,144 @@ def get_ml_bets(features_df: pl.DataFrame, lgb_model, gb_model, allowed_bookmake
         print(f"[-] Error during LGB prediction: {e}\n")
         return ml_bets
 
-    # Get XGB predictions for good_bets features (need both for feature engineering)
+    # Get XGB predictions
     try:
-        xgb_model = XGBClassifier()
-        xgb_path = Path(__file__).parent / "models" / "moneyline" / "saved" / "xgboost_model.pkl"
-        xgb_model.load_model(str(xgb_path))
-        xgb_proba = xgb_model.predict_proba(X)
+        xgb_proba = xgb_model.predict_proba(X)[:, 1]  # Get probability of class 1
         print(f"[+] Made XGB predictions for {len(X)} games\n")
     except Exception as e:
-        print(f"[-] Could not load XGB for good_bets features: {e}")
-        print(f"    Continuing with LGB only...\n")
-        # Create fake XGB proba from LGB proba
-        xgb_proba = np.column_stack([1 - lgb_proba, lgb_proba])
-
-    # Create good_bets features
-    try:
-        gb_features_df = create_good_bets_features(features_df, lgb_proba, xgb_proba)
-        print(f"[+] Created {len(gb_features_df)} betting rows\n")
-    except Exception as e:
-        print(f"[-] Error creating good_bets features: {e}\n")
+        print(f"[-] Error during XGB prediction: {e}\n")
         return ml_bets
 
-    # Get good_bets predictions
-    try:
-        # Extract features in the correct order
-        feature_order = ['xgb_prob_team_1', 'lgb_prob_team_1', 'model_disagreement', 'moneyline_odds',
-                        'implied_prob', 'ev', 'spread_pts_self', 'spread_pts_opp',
-                        'spread_odds_self', 'spread_odds_opp', 'month', 'strength_differential']
+    # Create ensemble predictions: 18% LGB + 82% XGB
+    ensemble_proba = 0.18 * lgb_proba + 0.82 * xgb_proba
+    print(f"[+] Created ensemble predictions (18% LGB + 82% XGB)\n")
 
-        X_gb = gb_features_df.select(feature_order).to_numpy()
-        gb_proba = gb_model.predict_proba(X_gb)[:, 1]  # Get probability of class 1 (good bet)
-
-        gb_features_df = gb_features_df.with_columns(pl.lit(gb_proba).alias('gb_confidence'))
-        print(f"[+] Got good_bets confidence scores\n")
-    except Exception as e:
-        print(f"[-] Error getting good_bets predictions: {e}\n")
-        return ml_bets
+    # Add ensemble probabilities to features dataframe
+    features_df = features_df.with_columns([
+        pl.lit(ensemble_proba).alias('ensemble_prob_team_1'),
+    ])
 
     # Load odds
     game_ids = features_df['game_id'].to_list()
     odds_dict = load_odds_for_games(game_ids)
 
-    # Strategy 2 (Optimized for Variance): Filter by EV >= 3% AND Good Bets confidence >= 0.40
-    # This configuration provides 221 bets/season, 55.2% win rate, 299% ROI
-    print(f"[*] Evaluating bets with Strategy 2 (Variance-Optimized) criteria:")
-    print(f"    - EV >= 3.0%")
-    print(f"    - Good Bets confidence >= 0.40\n")
+    print(f"[*] Evaluating bets with Ensemble criteria:")
+    print(f"    - EV > 0%")
+    print(f"    - Probability > 0.50\n")
 
-    # Process each bet row
-    for bet_row in gb_features_df.iter_rows(named=True):
-        game_id = bet_row.get('game_id')
-        team = bet_row.get('team')
-        opponent = bet_row.get('opponent')
-        date = bet_row.get('date')
-        ev = bet_row.get('ev')
-        gb_confidence = bet_row.get('gb_confidence')
+    # Process each game
+    for i, game_row in enumerate(features_df.iter_rows(named=True)):
+        game_id = game_row.get('game_id')
+        team_1 = game_row.get('team_1')
+        team_2 = game_row.get('team_2')
+        date = game_row.get('date')
+        ensemble_prob_t1 = ensemble_proba[i]
+        ensemble_prob_t2 = 1 - ensemble_prob_t1
 
-        # Check Strategy 2 (Optimized) criteria
-        if ev < 0.03:  # EV < 3%
-            continue
-        if gb_confidence < 0.40:  # Good Bets confidence < 40%
-            continue
-
-        # Get odds for this team
+        # Get odds for this game
         all_odds = odds_dict.get(game_id, [])
         if not all_odds:
             continue
 
-        # Find best odds from allowed bookmakers
-        best_odds = None
-        best_bm = None
+        # Process Team 1
+        if ensemble_prob_t1 > 0.5:  # Probability filter
+            # Find best ML odds for team_1
+            best_odds_t1 = None
+            best_bm_t1 = None
 
-        for odds_rec in all_odds:
-            bm_name = odds_rec.get('bookmaker')
-            team_a_odds_name = odds_rec.get('home_team')
-            team_b_odds_name = odds_rec.get('away_team')
-            ml_team_a = odds_rec.get('ml_home')
-            ml_team_b = odds_rec.get('ml_away')
+            for odds_rec in all_odds:
+                bm_name = odds_rec.get('bookmaker')
+                team_a_odds_name = odds_rec.get('home_team')
+                team_b_odds_name = odds_rec.get('away_team')
+                ml_team_a = odds_rec.get('ml_home')
+                ml_team_b = odds_rec.get('ml_away')
 
-            # Map odds team names
-            team_a_mapped = team_a_odds_name
-            team_b_mapped = team_b_odds_name
-            if team_mappings:
-                team_a_mapped = team_mappings.get(team_a_odds_name, team_a_odds_name)
-                team_b_mapped = team_mappings.get(team_b_odds_name, team_b_odds_name)
+                # Map odds team names
+                team_a_mapped = team_a_odds_name
+                team_b_mapped = team_b_odds_name
+                if team_mappings:
+                    team_a_mapped = team_mappings.get(team_a_odds_name, team_a_odds_name)
+                    team_b_mapped = team_mappings.get(team_b_odds_name, team_b_odds_name)
 
-            # Find our team in odds
-            if team_a_mapped == team and ml_team_a is not None:
-                if best_odds is None or american_to_decimal(ml_team_a) > american_to_decimal(best_odds):
-                    best_odds = ml_team_a
-                    best_bm = bm_name
+                # Find team_1 in odds
+                if team_a_mapped == team_1 and ml_team_a is not None:
+                    if best_odds_t1 is None or american_to_decimal(ml_team_a) > american_to_decimal(best_odds_t1):
+                        best_odds_t1 = ml_team_a
+                        best_bm_t1 = bm_name
 
-            if team_b_mapped == team and ml_team_b is not None:
-                if best_odds is None or american_to_decimal(ml_team_b) > american_to_decimal(best_odds):
-                    best_odds = ml_team_b
-                    best_bm = bm_name
+                if team_b_mapped == team_1 and ml_team_b is not None:
+                    if best_odds_t1 is None or american_to_decimal(ml_team_b) > american_to_decimal(best_odds_t1):
+                        best_odds_t1 = ml_team_b
+                        best_bm_t1 = bm_name
 
-        # Add bet if odds found
-        if best_odds is not None:
-            ml_bets.append({
-                'type': 'ML',
-                'game_id': game_id,
-                'date': date,
-                'team': team,
-                'opponent': opponent,
-                'odds': int(best_odds),
-                'decimal': american_to_decimal(best_odds),
-                'win_prob': bet_row.get('lgb_prob_team_1'),
-                'ev': ev,
-                'ev_percent': ev * 100,
-                'gb_confidence': gb_confidence,
-                'bookmaker': best_bm
-            })
+            # Calculate EV for team_1 if odds found
+            if best_odds_t1 is not None:
+                ev_t1 = calculate_ev(ensemble_prob_t1, int(best_odds_t1))
+                if ev_t1 > 0:  # EV filter
+                    ml_bets.append({
+                        'type': 'ML',
+                        'game_id': game_id,
+                        'date': date,
+                        'team': team_1,
+                        'opponent': team_2,
+                        'odds': int(best_odds_t1),
+                        'decimal': american_to_decimal(best_odds_t1),
+                        'win_prob': ensemble_prob_t1,
+                        'ev': ev_t1,
+                        'ev_percent': ev_t1 * 100,
+                        'bookmaker': best_bm_t1
+                    })
 
-    print(f"[+] Found {len(ml_bets)} bets meeting Strategy 2 criteria\n")
+        # Process Team 2
+        if ensemble_prob_t2 > 0.5:  # Probability filter
+            # Find best ML odds for team_2
+            best_odds_t2 = None
+            best_bm_t2 = None
+
+            for odds_rec in all_odds:
+                bm_name = odds_rec.get('bookmaker')
+                team_a_odds_name = odds_rec.get('home_team')
+                team_b_odds_name = odds_rec.get('away_team')
+                ml_team_a = odds_rec.get('ml_home')
+                ml_team_b = odds_rec.get('ml_away')
+
+                # Map odds team names
+                team_a_mapped = team_a_odds_name
+                team_b_mapped = team_b_odds_name
+                if team_mappings:
+                    team_a_mapped = team_mappings.get(team_a_odds_name, team_a_odds_name)
+                    team_b_mapped = team_mappings.get(team_b_odds_name, team_b_odds_name)
+
+                # Find team_2 in odds
+                if team_a_mapped == team_2 and ml_team_a is not None:
+                    if best_odds_t2 is None or american_to_decimal(ml_team_a) > american_to_decimal(best_odds_t2):
+                        best_odds_t2 = ml_team_a
+                        best_bm_t2 = bm_name
+
+                if team_b_mapped == team_2 and ml_team_b is not None:
+                    if best_odds_t2 is None or american_to_decimal(ml_team_b) > american_to_decimal(best_odds_t2):
+                        best_odds_t2 = ml_team_b
+                        best_bm_t2 = bm_name
+
+            # Calculate EV for team_2 if odds found
+            if best_odds_t2 is not None:
+                ev_t2 = calculate_ev(ensemble_prob_t2, int(best_odds_t2))
+                if ev_t2 > 0:  # EV filter
+                    ml_bets.append({
+                        'type': 'ML',
+                        'game_id': game_id,
+                        'date': date,
+                        'team': team_2,
+                        'opponent': team_1,
+                        'odds': int(best_odds_t2),
+                        'decimal': american_to_decimal(best_odds_t2),
+                        'win_prob': ensemble_prob_t2,
+                        'ev': ev_t2,
+                        'ev_percent': ev_t2 * 100,
+                        'bookmaker': best_bm_t2
+                    })
+
+    print(f"[+] Found {len(ml_bets)} bets meeting Ensemble criteria (EV > 0% AND Prob > 0.50)\n")
     return ml_bets
 
 
@@ -617,6 +537,69 @@ def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2
     return ou_bets
 
 
+def export_all_games_with_odds(features_df: pl.DataFrame, lgb_model, xgb_model) -> None:
+    """Export all games with probabilities and moneyline averages"""
+    all_games = []
+
+    # Get LGB predictions for all games
+    try:
+        X, feature_cols = align_features_to_model(features_df, lgb_model)
+        if X is None:
+            print("[-] Could not align features to LGB model\n")
+            return
+
+        # LGB returns probabilities as 1D array (probability of class 1)
+        lgb_proba = lgb_model.predict(X)
+    except Exception as e:
+        print(f"[-] Error during LGB prediction: {e}\n")
+        return
+
+    # Get XGB predictions
+    try:
+        xgb_proba = xgb_model.predict_proba(X)[:, 1]  # Get probability of class 1
+    except Exception as e:
+        print(f"[-] Error during XGB prediction: {e}\n")
+        return
+
+    # Create ensemble predictions: 18% LGB + 82% XGB
+    ensemble_proba = 0.18 * lgb_proba + 0.82 * xgb_proba
+
+    # Process each game
+    for i, row in enumerate(features_df.iter_rows(named=True)):
+        game_id = row.get('game_id')
+        team_1 = row.get('team_1')
+        team_2 = row.get('team_2')
+        date = row.get('date')
+        ml_avg_team_1 = row.get('avg_ml_team_1')
+        ml_avg_team_2 = row.get('avg_ml_team_2')
+
+        prob_team_1 = ensemble_proba[i]
+        prob_team_2 = 1 - prob_team_1
+
+        all_games.append({
+            'date': date,
+            'game_id': game_id,
+            'team_1': team_1,
+            'team_2': team_2,
+            'prob_team_1': round(prob_team_1, 4),
+            'prob_team_2': round(prob_team_2, 4),
+            'ml_avg_team_1': ml_avg_team_1,
+            'ml_avg_team_2': ml_avg_team_2
+        })
+
+    if all_games:
+        output_df = pl.DataFrame(all_games)
+        # Sort by date and game_id
+        output_df = output_df.sort(['date', 'game_id'])
+
+        todays_date = get_todays_date_yyyymmdd()
+        output_file = Path(__file__).parent / f"all_games_{todays_date}.xlsx"
+        output_df.write_excel(str(output_file))
+        print(f"[+] Exported {len(all_games)} games with probabilities and ML averages to {output_file}\n")
+    else:
+        print("[*] No games to export\n")
+
+
 def main():
     print("\n")
     print("="*80)
@@ -676,6 +659,9 @@ def main():
     if dropped > 0:
         print(f"[*] Dropped {dropped} games missing odds")
 
+    # Keep original features_df for later export (after filtering out games with missing odds)
+    features_df_original = features_df.clone()
+
     # Analyze nulls after dropping metadata
     feature_cols = identify_feature_columns(features_df)
     print(f"[*] Using {len(feature_cols)} numeric features (excluding metadata)")
@@ -699,15 +685,15 @@ def main():
     else:
         print("[+] No null values in feature columns\n")
 
-    # Load ML models (Strategy 2: LGB + Good Bets)
-    print("STEP 2: Loading Moneyline Models (Strategy 2)")
+    # Load ML models (Ensemble: 18% LGB + 82% XGB)
+    print("STEP 2: Loading Moneyline Models (Ensemble: 18% LGB + 82% XGB)")
     print("-"*80 + "\n")
-    lgb_model, gb_model = load_ml_models()
-    if lgb_model is None or gb_model is None:
+    lgb_model, xgb_model = load_ml_models()
+    if lgb_model is None or xgb_model is None:
         print("[-] Could not load models\n")
         return
 
-    print("STEP 3: Getting ML Predictions (Strategy 2)")
+    print("STEP 3: Getting ML Predictions (Ensemble: 18% LGB + 82% XGB)")
     print("-"*80 + "\n")
 
     # Step 3b: Extract OU bets from predictions_df (ensemble - over_point > 2.3)
@@ -773,12 +759,12 @@ def main():
 
     print(f"[+] Found {len(ou_bets)} OU bets with difference > 2.3\n")
 
-    # Step 3c: Get ML bets with Strategy 2 (EV >= 5% AND Good Bets >= 0.55)
-    print("STEP 3c: Extracting ML Valid Bets (Strategy 2: EV >= 5%, Good Bets >= 0.55)")
+    # Step 3c: Get ML bets with Ensemble (EV > 0% AND Probability > 0.50)
+    print("STEP 3c: Extracting ML Valid Bets (Ensemble: EV > 0%, Probability > 0.50)")
     print("-"*80 + "\n")
 
     team_mappings = load_team_mappings()
-    ml_bets = get_ml_bets(features_df, lgb_model, gb_model, allowed_bookmakers, team_mappings=team_mappings)
+    ml_bets = get_ml_bets(features_df, lgb_model, xgb_model, allowed_bookmakers, team_mappings=team_mappings)
 
     # Export valid bets to Excel with date in filename
     print("\nExporting valid bets to Excel...")
@@ -836,7 +822,7 @@ def main():
     if True:  # Print results
         # Print ML bets
         if ml_bets:
-            print(f"MONEYLINE BETS (Strategy 2: EV >= 5%, Good Bets >= 0.55, Bookmakers: {', '.join(sorted(allowed_bookmakers))})")
+            print(f"MONEYLINE BETS (Ensemble: EV > 0%, Probability > 0.50, Bookmakers: {', '.join(sorted(allowed_bookmakers))})")
             print("-"*80 + "\n")
 
             # Sort by EV descending
@@ -849,7 +835,6 @@ def main():
                 print(f"  Odds: {bet['odds']:+d}  |  Decimal: {bet['decimal']:.3f}")
                 print(f"  Win Prob: {bet['win_prob']*100:.2f}%")
                 print(f"  EV: {bet['ev_percent']:.2f}%")
-                print(f"  Good Bets Confidence: {bet.get('gb_confidence', 'N/A'):.2%}" if isinstance(bet.get('gb_confidence'), float) else f"  Good Bets Confidence: {bet.get('gb_confidence', 'N/A')}")
                 print(f"  Bookmaker: {bet['bookmaker']}")
                 print()
 
@@ -873,16 +858,21 @@ def main():
         print("\n" + "="*80)
         print("SUMMARY")
         print("="*80 + "\n")
-        print(f"Total ML Bets (Strategy 2 Variance-Optimized: EV >= 3%, Good Bets >= 0.40): {len(ml_bets)}")
+        print(f"Total ML Bets (Ensemble: EV > 0%, Probability > 0.50): {len(ml_bets)}")
         print(f"Total OU Bets (Diff > 2.3): {len(ou_bets)}")
         print(f"Total Bets: {len(ml_bets) + len(ou_bets)}\n")
 
     else:
         print("No bets meet criteria")
-        print("  ML: Strategy 2 (EV >= 3% AND Good Bets >= 0.40)")
+        print("  ML: Ensemble (EV > 0% AND Probability > 0.50)")
         print("  OU: Difference > 2.3\n")
 
     print("="*80 + "\n")
+
+    # Export all games with their probabilities and moneyline averages
+    print("\nSTEP 4: Exporting All Games with Probabilities and ML Averages")
+    print("-"*80 + "\n")
+    export_all_games_with_odds(features_df_original, lgb_model, xgb_model)
 
 
 if __name__ == "__main__":
