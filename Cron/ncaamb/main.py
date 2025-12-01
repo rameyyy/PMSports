@@ -492,9 +492,42 @@ def get_ml_bets(features_df: pl.DataFrame, lgb_model, xgb_model, allowed_bookmak
     return ml_bets
 
 
+def get_sportsbook_recommendation(confidence: float) -> tuple:
+    """
+    Get recommended sportsbook and bet type based on ensemble confidence.
+    Returns (sportsbook, bet_type) or (None, None) if not in profitable range.
+
+    Profitable ranges identified from ROI analysis:
+    UNDER:
+    - 0.16-0.21: MyBookie
+    - 0.26-0.31: BetOnline
+    - 0.36-0.41: MyBookie
+    - 0.41-0.46: Bovada (PRIORITY - .36-.51 is main range)
+    - 0.46-0.51: Bovada (PRIORITY - .36-.51 is main range)
+
+    OVER:
+    - 0.65-0.70: MyBookie
+    """
+    # Check UNDER ranges
+    if 0.16 <= confidence < 0.21:
+        return 'MyBookie.ag', 'UNDER'
+    elif 0.26 <= confidence < 0.31:
+        return 'BetOnline.ag', 'UNDER'
+    elif 0.36 <= confidence < 0.41:
+        return 'MyBookie.ag', 'UNDER'
+    elif 0.41 <= confidence < 0.51:  # 0.41-0.46 and 0.46-0.51 - Bovada priority range
+        return 'Bovada', 'UNDER'
+    # Check OVER ranges
+    elif 0.65 <= confidence < 0.70:
+        return 'MyBookie.ag', 'OVER'
+
+    return None, None
+
+
 def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2.3, allowed_bookmakers: set = None) -> list:
     """
-    Extract OU bets where (ensemble - over_point) > threshold
+    Extract OU bets based on Good Bets confidence thresholds.
+    Uses sportsbook recommendations from confidence ranges.
     """
     ou_bets = []
 
@@ -511,53 +544,117 @@ def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2
             print("[-] Failed to connect to database for OU odds")
             return ou_bets
 
+        matched_ranges = 0
+        no_odds = 0
+        matched_but_no_odds_games = []
+
         for row in ou_predictions_df.iter_rows(named=True):
-            game_id = row.get('game_id')
-            ensemble = row.get('ensemble_pred', row.get('prediction'))
-            date = row.get('date')
+            try:
+                game_id = row.get('game_id')
+                ensemble = row.get('ensemble_pred', row.get('prediction'))
+                ensemble_confidence = row.get('ensemble_confidence')
+                date = row.get('date')
 
-            if game_id is None or ensemble is None:
+                if game_id is None or ensemble is None:
+                    continue
+
+                # Check if this game falls in a profitable confidence range
+                recommended_book, bet_type = get_sportsbook_recommendation(ensemble_confidence)
+
+                if recommended_book is None:
+                    continue  # Skip games not in profitable ranges
+
+                matched_ranges += 1
+
+                # Get odds for the recommended sportsbook
+                query = """
+                    SELECT over_point, under_odds, over_odds, bookmaker
+                    FROM odds
+                    WHERE game_id = %s
+                    AND bookmaker IN (%s, %s, %s, %s)
+                    ORDER BY bookmaker
+                """
+
+                results = sqlconn.fetch(conn, query, (
+                    game_id,
+                    'BetOnline.ag',
+                    'Bovada',
+                    'MyBookie.ag',
+                    'betonlineag'
+                ))
+
+                if results:
+                    # Find result from recommended bookmaker
+                    ou_result = None
+                    for result in results:
+                        if result['bookmaker'].lower() in recommended_book.lower():
+                            ou_result = result
+                            break
+
+                    # If recommended book not found, use first available
+                    if ou_result is None and results:
+                        ou_result = results[0]
+
+                    if ou_result is None:
+                        no_odds += 1
+                        matched_but_no_odds_games.append(game_id)
+
+                    if ou_result:
+                        if bet_type == 'OVER':
+                            over_point = float(ou_result.get('over_point'))
+                            if over_point is not None:
+                                difference = ensemble - over_point
+                                ou_bets.append({
+                                    'type': 'OU',
+                                    'game_id': game_id,
+                                    'date': date,
+                                    'ensemble': round(ensemble, 2),
+                                    'over_point': round(over_point, 2),
+                                    'difference': round(difference, 2),
+                                    'confidence': round(ensemble_confidence, 4),
+                                    'bookmaker': ou_result.get('bookmaker', recommended_book),
+                                    'bet': 'OVER'
+                                })
+                        else:  # UNDER
+                            under_point = float(ou_result.get('over_point'))  # under_point is same as over_point
+                            if under_point is not None:
+                                difference = ensemble - under_point
+                                ou_bets.append({
+                                    'type': 'OU',
+                                    'game_id': game_id,
+                                    'date': date,
+                                    'ensemble': round(ensemble, 2),
+                                    'under_point': round(under_point, 2),
+                                    'difference': round(difference, 2),
+                                    'confidence': round(ensemble_confidence, 4),
+                                    'bookmaker': ou_result.get('bookmaker', recommended_book),
+                                    'bet': 'UNDER'
+                                })
+                else:
+                    no_odds += 1
+                    matched_but_no_odds_games.append(game_id)
+
+            except Exception as row_error:
+                # Continue processing other rows even if one fails
+                print(f"  [!] Error processing game: {row_error}")
                 continue
-
-            # Get odds from allowed bookmakers
-            query = """
-                SELECT over_point, bookmaker
-                FROM odds
-                WHERE game_id = %s
-                AND bookmaker IN (%s, %s, %s, %s)
-                ORDER BY bookmaker
-            """
-
-            results = sqlconn.fetch(conn, query, (
-                game_id,
-                'BetOnline.ag',
-                'Bovada',
-                'MyBookie.ag',
-                'betonlineag'
-            ))
-
-            if results:
-                over_point = results[0].get('over_point')
-                bookmaker = results[0].get('bookmaker')
-
-                if over_point is not None:
-                    difference = ensemble - over_point
-                    if difference > difference_threshold:
-                        ou_bets.append({
-                            'type': 'OU',
-                            'game_id': game_id,
-                            'date': date,
-                            'ensemble': round(ensemble, 2),
-                            'over_point': round(over_point, 2),
-                            'difference': round(difference, 2),
-                            'bookmaker': bookmaker,
-                            'bet': 'OVER'
-                        })
 
         conn.close()
 
+        # Debug output
+        if matched_ranges > 0:
+            print(f"[DEBUG] Matched {matched_ranges} games to profitable confidence ranges")
+            print(f"[DEBUG] {len(ou_bets)} had odds available in BetOnline/Bovada/MyBookie")
+            if matched_but_no_odds_games:
+                print(f"[DEBUG] {no_odds} matched ranges but had no odds:")
+                for gid in matched_but_no_odds_games:
+                    print(f"  - {gid}")
+            print()
+
     except Exception as e:
         print(f"[-] Error processing OU bets: {e}")
+        import traceback
+        traceback.print_exc()
 
     return ou_bets
 
@@ -615,6 +712,8 @@ def export_all_predictions(features_df: pl.DataFrame, lgb_model, xgb_model, ou_p
                 game_id = row.get('game_id')
                 date = row.get('date')
                 ensemble = row.get('ensemble_pred')
+                ensemble_confidence = row.get('ensemble_confidence')
+                good_bets_confidence = row.get('good_bets_confidence')
 
                 all_predictions.append({
                     'type': 'OU',
@@ -627,6 +726,8 @@ def export_all_predictions(features_df: pl.DataFrame, lgb_model, xgb_model, ou_p
                     'lgb_prob_team_1': '',
                     'xgb_prob_team_1': '',
                     'ensemble_pred': round(ensemble, 2) if ensemble else '',
+                    'ensemble_confidence': round(ensemble_confidence, 4) if ensemble_confidence else '',
+                    'good_bets_confidence': round(good_bets_confidence, 4) if good_bets_confidence else '',
                 })
 
         if all_predictions:
@@ -822,67 +923,13 @@ def main(manual_date: str = None):
     print("-"*80 + "\n")
 
     # Step 3b: Extract OU bets from predictions_df (ensemble - over_point > 2.3)
-    print("STEP 3b: Extracting OU Valid Bets (Difference > 2.3)")
+    print("STEP 3b: Extracting OU Valid Bets (Good Bets Confidence Thresholds)")
     print("-"*80 + "\n")
 
-    # Use the predictions_df generated in Step 0 to find valid OU bets
-    ou_bets = []
+    # Use the updated get_ou_bets function with confidence-based filtering
+    ou_bets = get_ou_bets(predictions_df, allowed_bookmakers=allowed_bookmakers)
 
-    try:
-        conn = ou_module.sqlconn.create_connection()
-        if not conn:
-            print("[-] Failed to connect to database for OU odds")
-        else:
-            for row in predictions_df.iter_rows(named=True):
-                game_id = row.get('game_id')
-                ensemble = row.get('ensemble_pred')
-                date = row.get('date')
-
-                if game_id is None or ensemble is None:
-                    continue
-
-                # Get O/U line from database
-                query = """
-                    SELECT over_point, bookmaker
-                    FROM odds
-                    WHERE game_id = %s
-                    AND bookmaker IN (%s, %s, %s, %s)
-                    ORDER BY bookmaker
-                    LIMIT 1
-                """
-
-                results = ou_module.sqlconn.fetch(conn, query, (
-                    game_id,
-                    'BetOnline.ag',
-                    'Bovada',
-                    'MyBookie.ag',
-                    'betonlineag'
-                ))
-
-                if results:
-                    over_point = results[0].get('over_point')
-                    bookmaker = results[0].get('bookmaker')
-
-                    if over_point is not None:
-                        difference = float(ensemble) - float(over_point)
-                        if difference > 2.3:
-                            ou_bets.append({
-                                'type': 'OU',
-                                'game_id': game_id,
-                                'date': date,
-                                'ensemble': round(float(ensemble), 2),
-                                'over_point': round(float(over_point), 2),
-                                'difference': round(difference, 2),
-                                'bookmaker': bookmaker,
-                                'bet': 'OVER'
-                            })
-
-            conn.close()
-
-    except Exception as e:
-        print(f"[-] Error extracting OU bets: {e}")
-
-    print(f"[+] Found {len(ou_bets)} OU bets with difference > 2.3\n")
+    print(f"[+] Found {len(ou_bets)} OU bets meeting Good Bets criteria\n")
 
     # Step 3c: Get ML bets with Ensemble (EV > 0% AND Probability > 0.50)
     print("STEP 3c: Extracting ML Valid Bets (Ensemble: EV > 0%, Probability > 0.50)")
@@ -921,6 +968,9 @@ def main(manual_date: str = None):
 
     # Add OU bets
     for bet in ou_bets:
+        point_key = 'over_point' if bet.get('bet') == 'OVER' else 'under_point'
+        point_value = bet.get(point_key, bet.get('over_point', ''))
+
         all_bets.append({
             'type': 'OU',
             'date': bet['date'],
@@ -933,7 +983,8 @@ def main(manual_date: str = None):
             'ev_percent': round(bet['difference'], 2),
             'bookmaker': bet['bookmaker'],
             'ensemble': round(bet['ensemble'], 2),
-            'over_point': round(bet['over_point'], 2)
+            'ou_point': round(point_value, 2) if point_value else '',
+            'confidence': round(bet.get('confidence', 0), 4)
         })
 
     if all_bets:
@@ -969,17 +1020,20 @@ def main(manual_date: str = None):
 
         # Print OU bets
         if ou_bets:
-            print(f"\nOVER/UNDER BETS (Difference > 2.3, Bookmakers: {', '.join(sorted(allowed_bookmakers))})")
+            print(f"\nOVER/UNDER BETS (Good Bets Confidence Thresholds)")
             print("-"*80 + "\n")
 
-            # Sort by difference descending
-            ou_bets_sorted = sorted(ou_bets, key=lambda x: x['difference'], reverse=True)
+            # Sort by confidence descending
+            ou_bets_sorted = sorted(ou_bets, key=lambda x: x.get('confidence', 0), reverse=True)
 
             for bet in ou_bets_sorted:
+                point_key = 'over_point' if bet.get('bet') == 'OVER' else 'under_point'
+                point_val = bet.get(point_key, bet.get('over_point', 'N/A'))
                 print(f"Date: {bet['date']}")
                 print(f"Game ID: {bet['game_id']}")
-                print(f"  Ensemble: {bet['ensemble']}  |  Over Point: {bet['over_point']}")
+                print(f"  Ensemble: {bet['ensemble']}  |  Line: {point_val}")
                 print(f"  Difference: {bet['difference']} (BET: {bet['bet']})")
+                print(f"  Confidence: {bet.get('confidence', 0):.4f}")
                 print(f"  Bookmaker: {bet['bookmaker']}")
                 print()
 
@@ -988,7 +1042,7 @@ def main(manual_date: str = None):
         print("SUMMARY")
         print("="*80 + "\n")
         print(f"Total ML Bets (Ensemble: EV > 0%, Probability > 0.50): {len(ml_bets)}")
-        print(f"Total OU Bets (Diff > 2.3): {len(ou_bets)}")
+        print(f"Total OU Bets (Good Bets Confidence Thresholds): {len(ou_bets)}")
         print(f"Total Bets: {len(ml_bets) + len(ou_bets)}\n")
 
     else:

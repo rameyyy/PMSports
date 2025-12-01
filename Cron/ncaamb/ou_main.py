@@ -8,6 +8,7 @@ import os
 import sys
 from datetime import datetime
 import pandas as pd
+import numpy as np
 
 # Add current directory to path
 ncaamb_dir = os.path.dirname(os.path.abspath(__file__))
@@ -492,6 +493,7 @@ def generate_features(flat_df: pl.DataFrame):
 def make_ou_predictions(features_df: pl.DataFrame):
     """
     Load trained models and make O/U predictions using ensemble.
+    Also loads Good Bets model for confidence-based bet recommendations.
 
     Args:
         features_df: Polars DataFrame with generated features
@@ -509,6 +511,7 @@ def make_ou_predictions(features_df: pl.DataFrame):
         from xgboost import XGBRegressor
         from lightgbm import LGBMRegressor
         from catboost import CatBoostRegressor
+        import pickle
 
         # Load models from saved directory
         models_dir = Path(__file__).parent / "models" / "overunder" / "saved"
@@ -528,7 +531,18 @@ def make_ou_predictions(features_df: pl.DataFrame):
         # Load CatBoost model (JSON format)
         cb_model = CatBoostRegressor(verbose=False)
         cb_model.load_model(str(models_dir / "catboost_model.pkl"))
-        print("  [+] Loaded CatBoost model\n")
+        print("  [+] Loaded CatBoost model")
+
+        # Load Good Bets model
+        good_bets_path = models_dir / "ou_good_bets_final.pkl"
+        if good_bets_path.exists():
+            with open(good_bets_path, 'rb') as f:
+                good_bets_model = pickle.load(f)
+            print("  [+] Loaded Good Bets model\n")
+        else:
+            print(f"  [!] Good Bets model not found at {good_bets_path}")
+            good_bets_model = None
+            print()
 
         # Convert Polars to Pandas for sklearn compatibility
         print("Converting features to Pandas for prediction...")
@@ -588,6 +602,12 @@ def make_ou_predictions(features_df: pl.DataFrame):
         # BEST_OPTIMIZATIONS: 44.1% XGB, 46.6% LGB, 9.3% CatBoost
         ensemble_preds = (0.441 * xgb_preds + 0.466 * lgb_preds + 0.093 * cb_preds)
 
+        # Calculate ensemble confidence (sigmoid of difference from O/U line)
+        # Using betonline_ou_line as reference for confidence calculation
+        betonline_ou_line = features_pd['betonline_ou_line'].fillna(0).values
+        ensemble_confidence = 1.0 / (1.0 + np.exp(-(ensemble_preds - betonline_ou_line) / 3.0))
+        ensemble_confidence = np.clip(ensemble_confidence, 0.01, 0.99)
+
         print("="*80)
         print("ENSEMBLE PREDICTIONS (Total Points O/U)")
         print("="*80 + "\n")
@@ -603,6 +623,7 @@ def make_ou_predictions(features_df: pl.DataFrame):
             lgb_pred = lgb_preds[idx]
             cb_pred = cb_preds[idx]
             ensemble_pred = ensemble_preds[idx]
+            confidence = ensemble_confidence[idx]
 
             print(f"{team_1} vs {team_2}")
             print(f"  Game ID: {game_id}")
@@ -610,17 +631,96 @@ def make_ou_predictions(features_df: pl.DataFrame):
             print(f"  LightGBM: {lgb_pred:.1f}")
             print(f"  CatBoost: {cb_pred:.1f}")
             print(f"  Ensemble: {ensemble_pred:.1f}")
+            print(f"  Confidence: {confidence:.2f}")
             if actual != 'N/A':
                 print(f"  Actual:   {actual:.1f}")
             print()
 
+        # Make Good Bets predictions if model loaded
+        good_bets_probs = None
+        if good_bets_model is not None:
+            print("\n[+] Making Good Bets predictions...\n")
+            try:
+                # Build Good Bets input features from ensemble predictions
+                betonline_ou_line_vals = features_pd['betonline_ou_line'].fillna(0).values
+                avg_ou_line_vals = features_pd.get('avg_ou_line', pd.Series([0]*len(features_pd))).fillna(0).values
+                ou_line_variance_vals = features_pd.get('ou_line_variance', pd.Series([0]*len(features_pd))).fillna(0).values
+
+                # Calculate confidence scores for each model
+                xgb_confidence_over = 1.0 / (1.0 + np.exp(-(xgb_preds - betonline_ou_line_vals) / 3.0))
+                lgb_confidence_over = 1.0 / (1.0 + np.exp(-(lgb_preds - betonline_ou_line_vals) / 3.0))
+                cat_confidence_over = 1.0 / (1.0 + np.exp(-(cb_preds - betonline_ou_line_vals) / 3.0))
+
+                # Clip to valid range
+                xgb_confidence_over = np.clip(xgb_confidence_over, 0.01, 0.99)
+                lgb_confidence_over = np.clip(lgb_confidence_over, 0.01, 0.99)
+                cat_confidence_over = np.clip(cat_confidence_over, 0.01, 0.99)
+
+                # Ensemble confidence
+                ensemble_confidence_over = (
+                    0.441 * xgb_confidence_over +
+                    0.466 * lgb_confidence_over +
+                    0.093 * cat_confidence_over
+                )
+
+                # Model std dev
+                model_std_dev = np.std([xgb_confidence_over, lgb_confidence_over, cat_confidence_over], axis=0)
+
+                # Build feature matrix for Good Bets model
+                good_bets_features = np.column_stack([
+                    xgb_confidence_over,
+                    lgb_confidence_over,
+                    cat_confidence_over,
+                    ensemble_confidence_over,
+                    model_std_dev,
+                    betonline_ou_line_vals,
+                    avg_ou_line_vals,
+                    ou_line_variance_vals
+                ])
+
+                good_bets_probs = good_bets_model.predict_proba(good_bets_features)[:, 1]
+                print(f"[+] Generated Good Bets confidence scores for {len(good_bets_probs)} games\n")
+            except Exception as e:
+                print(f"[-] Error generating Good Bets predictions: {e}\n")
+                import traceback
+                traceback.print_exc()
+                good_bets_probs = None
+
+        # Calculate ensemble_confidence_over if not already done (for Good Bets predictions)
+        if good_bets_probs is None:
+            # If Good Bets model failed, still calculate ensemble confidence for output
+            betonline_ou_line_vals = features_pd['betonline_ou_line'].fillna(0).values
+
+            xgb_confidence_over = 1.0 / (1.0 + np.exp(-(xgb_preds - betonline_ou_line_vals) / 3.0))
+            lgb_confidence_over = 1.0 / (1.0 + np.exp(-(lgb_preds - betonline_ou_line_vals) / 3.0))
+            cat_confidence_over = 1.0 / (1.0 + np.exp(-(cb_preds - betonline_ou_line_vals) / 3.0))
+
+            xgb_confidence_over = np.clip(xgb_confidence_over, 0.01, 0.99)
+            lgb_confidence_over = np.clip(lgb_confidence_over, 0.01, 0.99)
+            cat_confidence_over = np.clip(cat_confidence_over, 0.01, 0.99)
+
+            ensemble_confidence_over = (
+                0.441 * xgb_confidence_over +
+                0.466 * lgb_confidence_over +
+                0.093 * cat_confidence_over
+            )
+        else:
+            # Extract ensemble_confidence_over from the features we just built
+            ensemble_confidence_over = ensemble_confidence_over if 'ensemble_confidence_over' in locals() else ensemble_confidence
+
         # Add predictions to dataframe
-        features_df = features_df.with_columns([
+        cols_to_add = [
             pl.Series("xgb_pred", xgb_preds),
             pl.Series("lgb_pred", lgb_preds),
             pl.Series("cb_pred", cb_preds),
-            pl.Series("ensemble_pred", ensemble_preds)
-        ])
+            pl.Series("ensemble_pred", ensemble_preds),
+            pl.Series("ensemble_confidence", ensemble_confidence_over)
+        ]
+
+        if good_bets_probs is not None:
+            cols_to_add.append(pl.Series("good_bets_confidence", good_bets_probs))
+
+        features_df = features_df.with_columns(cols_to_add)
 
         print("="*80 + "\n")
 
