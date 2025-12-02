@@ -326,7 +326,12 @@ def calculate_ev(win_prob: float, american_odds: int, stake: float = 10) -> floa
 def get_ml_bets(features_df: pl.DataFrame, lgb_model, xgb_model, allowed_bookmakers: set, team_mappings: dict = None) -> list:
     """
     Get moneyline bets using Ensemble predictions: 18% LGB + 82% XGB
-    Filters by EV > 0 AND probability > 0.5
+    Uses Clay's optimal betting rules:
+    - PRIMARY VOLUME: 0.52 <= prob < 0.57 AND 0% < EV < 10%
+    - HIGH ROI TARGETS: 0.59 <= prob < 0.60 AND 0% < EV < 10%
+    - HIDDEN GEMS: 0.74 <= prob < 0.76 AND 0% < EV < 10%
+    - HIDDEN GEMS: 0.80 <= prob < 0.84 AND 0% < EV < 10%
+    - AVOID: EV <= 0%, EV >= 10%, 0.55 <= prob < 0.59
     """
     ml_bets = []
 
@@ -372,9 +377,36 @@ def get_ml_bets(features_df: pl.DataFrame, lgb_model, xgb_model, allowed_bookmak
     game_ids = features_df['game_id'].to_list()
     odds_dict = load_odds_for_games(game_ids)
 
-    print(f"[*] Evaluating bets with Ensemble criteria:")
-    print(f"    - EV > 0%")
-    print(f"    - Probability > 0.50\n")
+    print(f"[*] Evaluating bets with Clay's Optimal Rules:")
+    print(f"    - PRIMARY VOLUME: 0.52 <= prob < 0.57 AND 0% < EV < 10%")
+    print(f"    - HIGH ROI TARGETS: 0.59 <= prob < 0.60 AND 0% < EV < 10%")
+    print(f"    - HIDDEN GEMS: 0.74 <= prob < 0.76 AND 0% < EV < 10%")
+    print(f"    - HIDDEN GEMS: 0.80 <= prob < 0.84 AND 0% < EV < 10%")
+    print(f"    - AVOID: EV <= 0%, EV >= 10%, 0.55 <= prob < 0.59\n")
+
+    def matches_ml_rule(prob: float, ev: float) -> bool:
+        """Check if probability and EV match any profitable ML betting rule"""
+        # Avoid: EV <= 0%, EV >= 10%, 0.55 <= prob < 0.59
+        if ev <= 0 or ev >= 10 or (0.55 <= prob < 0.59):
+            return False
+
+        # PRIMARY VOLUME: 0.52 <= prob < 0.57 AND 0% < EV < 10%
+        if 0.52 <= prob < 0.57 and 0 < ev < 10:
+            return True
+
+        # HIGH ROI TARGETS: 0.59 <= prob < 0.60 AND 0% < EV < 10%
+        if 0.59 <= prob < 0.60 and 0 < ev < 10:
+            return True
+
+        # HIDDEN GEMS: 0.74 <= prob < 0.76 AND 0% < EV < 10%
+        if 0.74 <= prob < 0.76 and 0 < ev < 10:
+            return True
+
+        # HIDDEN GEMS: 0.80 <= prob < 0.84 AND 0% < EV < 10%
+        if 0.80 <= prob < 0.84 and 0 < ev < 10:
+            return True
+
+        return False
 
     # Process each game
     for i, game_row in enumerate(features_df.iter_rows(named=True)):
@@ -391,104 +423,104 @@ def get_ml_bets(features_df: pl.DataFrame, lgb_model, xgb_model, allowed_bookmak
             continue
 
         # Process Team 1
-        if ensemble_prob_t1 > 0.5:  # Probability filter
-            # Find best ML odds for team_1
-            best_odds_t1 = None
-            best_bm_t1 = None
+        # Find best ML odds for team_1
+        best_odds_t1 = None
+        best_bm_t1 = None
 
-            for odds_rec in all_odds:
-                bm_name = odds_rec.get('bookmaker')
-                team_a_odds_name = odds_rec.get('home_team')
-                team_b_odds_name = odds_rec.get('away_team')
-                ml_team_a = odds_rec.get('ml_home')
-                ml_team_b = odds_rec.get('ml_away')
+        for odds_rec in all_odds:
+            bm_name = odds_rec.get('bookmaker')
+            team_a_odds_name = odds_rec.get('home_team')
+            team_b_odds_name = odds_rec.get('away_team')
+            ml_team_a = odds_rec.get('ml_home')
+            ml_team_b = odds_rec.get('ml_away')
 
-                # Map odds team names
-                team_a_mapped = team_a_odds_name
-                team_b_mapped = team_b_odds_name
-                if team_mappings:
-                    team_a_mapped = team_mappings.get(team_a_odds_name, team_a_odds_name)
-                    team_b_mapped = team_mappings.get(team_b_odds_name, team_b_odds_name)
+            # Map odds team names
+            team_a_mapped = team_a_odds_name
+            team_b_mapped = team_b_odds_name
+            if team_mappings:
+                team_a_mapped = team_mappings.get(team_a_odds_name, team_a_odds_name)
+                team_b_mapped = team_mappings.get(team_b_odds_name, team_b_odds_name)
 
-                # Find team_1 in odds
-                if team_a_mapped == team_1 and ml_team_a is not None:
-                    if best_odds_t1 is None or american_to_decimal(ml_team_a) > american_to_decimal(best_odds_t1):
-                        best_odds_t1 = ml_team_a
-                        best_bm_t1 = bm_name
+            # Find team_1 in odds
+            if team_a_mapped == team_1 and ml_team_a is not None:
+                if best_odds_t1 is None or american_to_decimal(ml_team_a) > american_to_decimal(best_odds_t1):
+                    best_odds_t1 = ml_team_a
+                    best_bm_t1 = bm_name
 
-                if team_b_mapped == team_1 and ml_team_b is not None:
-                    if best_odds_t1 is None or american_to_decimal(ml_team_b) > american_to_decimal(best_odds_t1):
-                        best_odds_t1 = ml_team_b
-                        best_bm_t1 = bm_name
+            if team_b_mapped == team_1 and ml_team_b is not None:
+                if best_odds_t1 is None or american_to_decimal(ml_team_b) > american_to_decimal(best_odds_t1):
+                    best_odds_t1 = ml_team_b
+                    best_bm_t1 = bm_name
 
-            # Calculate EV for team_1 if odds found
-            if best_odds_t1 is not None:
-                ev_t1 = calculate_ev(ensemble_prob_t1, int(best_odds_t1))
-                if ev_t1 > 0:  # EV filter
-                    ml_bets.append({
-                        'type': 'ML',
-                        'game_id': game_id,
-                        'date': date,
-                        'team': team_1,
-                        'opponent': team_2,
-                        'odds': int(best_odds_t1),
-                        'decimal': american_to_decimal(best_odds_t1),
-                        'win_prob': ensemble_prob_t1,
-                        'ev': ev_t1,
-                        'ev_percent': ev_t1 * 100,
-                        'bookmaker': best_bm_t1
-                    })
+        # Calculate EV for team_1 if odds found
+        if best_odds_t1 is not None:
+            ev_t1 = calculate_ev(ensemble_prob_t1, int(best_odds_t1))
+            # Check if matches any profitable rule
+            if matches_ml_rule(ensemble_prob_t1, ev_t1 * 100):
+                ml_bets.append({
+                    'type': 'ML',
+                    'game_id': game_id,
+                    'date': date,
+                    'team': team_1,
+                    'opponent': team_2,
+                    'odds': int(best_odds_t1),
+                    'decimal': american_to_decimal(best_odds_t1),
+                    'win_prob': ensemble_prob_t1,
+                    'ev': ev_t1,
+                    'ev_percent': ev_t1 * 100,
+                    'bookmaker': best_bm_t1
+                })
 
         # Process Team 2
-        if ensemble_prob_t2 > 0.5:  # Probability filter
-            # Find best ML odds for team_2
-            best_odds_t2 = None
-            best_bm_t2 = None
+        # Find best ML odds for team_2
+        best_odds_t2 = None
+        best_bm_t2 = None
 
-            for odds_rec in all_odds:
-                bm_name = odds_rec.get('bookmaker')
-                team_a_odds_name = odds_rec.get('home_team')
-                team_b_odds_name = odds_rec.get('away_team')
-                ml_team_a = odds_rec.get('ml_home')
-                ml_team_b = odds_rec.get('ml_away')
+        for odds_rec in all_odds:
+            bm_name = odds_rec.get('bookmaker')
+            team_a_odds_name = odds_rec.get('home_team')
+            team_b_odds_name = odds_rec.get('away_team')
+            ml_team_a = odds_rec.get('ml_home')
+            ml_team_b = odds_rec.get('ml_away')
 
-                # Map odds team names
-                team_a_mapped = team_a_odds_name
-                team_b_mapped = team_b_odds_name
-                if team_mappings:
-                    team_a_mapped = team_mappings.get(team_a_odds_name, team_a_odds_name)
-                    team_b_mapped = team_mappings.get(team_b_odds_name, team_b_odds_name)
+            # Map odds team names
+            team_a_mapped = team_a_odds_name
+            team_b_mapped = team_b_odds_name
+            if team_mappings:
+                team_a_mapped = team_mappings.get(team_a_odds_name, team_a_odds_name)
+                team_b_mapped = team_mappings.get(team_b_odds_name, team_b_odds_name)
 
-                # Find team_2 in odds
-                if team_a_mapped == team_2 and ml_team_a is not None:
-                    if best_odds_t2 is None or american_to_decimal(ml_team_a) > american_to_decimal(best_odds_t2):
-                        best_odds_t2 = ml_team_a
-                        best_bm_t2 = bm_name
+            # Find team_2 in odds
+            if team_a_mapped == team_2 and ml_team_a is not None:
+                if best_odds_t2 is None or american_to_decimal(ml_team_a) > american_to_decimal(best_odds_t2):
+                    best_odds_t2 = ml_team_a
+                    best_bm_t2 = bm_name
 
-                if team_b_mapped == team_2 and ml_team_b is not None:
-                    if best_odds_t2 is None or american_to_decimal(ml_team_b) > american_to_decimal(best_odds_t2):
-                        best_odds_t2 = ml_team_b
-                        best_bm_t2 = bm_name
+            if team_b_mapped == team_2 and ml_team_b is not None:
+                if best_odds_t2 is None or american_to_decimal(ml_team_b) > american_to_decimal(best_odds_t2):
+                    best_odds_t2 = ml_team_b
+                    best_bm_t2 = bm_name
 
-            # Calculate EV for team_2 if odds found
-            if best_odds_t2 is not None:
-                ev_t2 = calculate_ev(ensemble_prob_t2, int(best_odds_t2))
-                if ev_t2 > 0:  # EV filter
-                    ml_bets.append({
-                        'type': 'ML',
-                        'game_id': game_id,
-                        'date': date,
-                        'team': team_2,
-                        'opponent': team_1,
-                        'odds': int(best_odds_t2),
-                        'decimal': american_to_decimal(best_odds_t2),
-                        'win_prob': ensemble_prob_t2,
-                        'ev': ev_t2,
-                        'ev_percent': ev_t2 * 100,
-                        'bookmaker': best_bm_t2
-                    })
+        # Calculate EV for team_2 if odds found
+        if best_odds_t2 is not None:
+            ev_t2 = calculate_ev(ensemble_prob_t2, int(best_odds_t2))
+            # Check if matches any profitable rule
+            if matches_ml_rule(ensemble_prob_t2, ev_t2 * 100):
+                ml_bets.append({
+                    'type': 'ML',
+                    'game_id': game_id,
+                    'date': date,
+                    'team': team_2,
+                    'opponent': team_1,
+                    'odds': int(best_odds_t2),
+                    'decimal': american_to_decimal(best_odds_t2),
+                    'win_prob': ensemble_prob_t2,
+                    'ev': ev_t2,
+                    'ev_percent': ev_t2 * 100,
+                    'bookmaker': best_bm_t2
+                })
 
-    print(f"[+] Found {len(ml_bets)} bets meeting Ensemble criteria (EV > 0% AND Prob > 0.50)\n")
+    print(f"[+] Found {len(ml_bets)} bets meeting Clay's Optimal Rules\n")
     return ml_bets
 
 
@@ -526,8 +558,19 @@ def get_sportsbook_recommendation(confidence: float) -> tuple:
 
 def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2.3, allowed_bookmakers: set = None) -> list:
     """
-    Extract OU bets based on Good Bets confidence thresholds.
-    Uses sportsbook recommendations from confidence ranges.
+    Extract OU bets using optimized betting rules based on confidence and difference.
+
+    OVER Rules (bet when ANY apply):
+      Rule 1: confidence >= 0.75 AND confidence < 0.80 AND difference >= 3.0 AND difference < 5.0
+      Rule 2: confidence >= 0.90 (any difference)
+      Rule 3: difference >= 6.0 AND difference < 6.5 (any confidence)
+      Rule 4: difference >= 3.5 AND difference < 4.0 (any confidence)
+
+    UNDER Rules (bet when ANY apply):
+      Rule 1: confidence >= 0.40 AND confidence < 0.45 AND difference >= -0.5 AND difference < 0.0
+      Rule 2: confidence >= 0.35 AND confidence < 0.40 AND difference >= -2.0 AND difference < -1.5
+      Rule 3: confidence >= 0.30 AND confidence < 0.35 AND difference >= -1.5 AND difference < -1.0
+      Rule 4: confidence >= 0.45 AND confidence < 0.50 AND difference >= 0.0 AND difference < 0.5
     """
     ou_bets = []
 
@@ -538,15 +581,47 @@ def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2
     if allowed_bookmakers is None:
         allowed_bookmakers = {'betonlineag', 'BetOnline.ag', 'Bovada', 'MyBookie.ag'}
 
+    def matches_over_rule(confidence: float, difference: float) -> bool:
+        """Check if confidence and difference match any OVER betting rule"""
+        # Rule 1: confidence >= 0.75 AND confidence < 0.80 AND difference >= 3.0 AND difference < 5.0
+        if 0.75 <= confidence < 0.80 and 3.0 <= difference < 5.0:
+            return True
+        # Rule 2: confidence >= 0.90 (any difference)
+        if confidence >= 0.90:
+            return True
+        # Rule 3: difference >= 6.0 AND difference < 6.5 (any confidence)
+        if 6.0 <= difference < 6.5:
+            return True
+        # Rule 4: difference >= 3.5 AND difference < 4.0 (any confidence)
+        if 3.5 <= difference < 4.0:
+            return True
+        return False
+
+    def matches_under_rule(confidence: float, difference: float) -> bool:
+        """Check if confidence and difference match any UNDER betting rule"""
+        # Rule 1: confidence >= 0.40 AND confidence < 0.45 AND difference >= -0.5 AND difference < 0.0
+        if 0.40 <= confidence < 0.45 and -0.5 <= difference < 0.0:
+            return True
+        # Rule 2: confidence >= 0.35 AND confidence < 0.40 AND difference >= -2.0 AND difference < -1.5
+        if 0.35 <= confidence < 0.40 and -2.0 <= difference < -1.5:
+            return True
+        # Rule 3: confidence >= 0.30 AND confidence < 0.35 AND difference >= -1.5 AND difference < -1.0
+        if 0.30 <= confidence < 0.35 and -1.5 <= difference < -1.0:
+            return True
+        # Rule 4: confidence >= 0.45 AND confidence < 0.50 AND difference >= 0.0 AND difference < 0.5
+        if 0.45 <= confidence < 0.50 and 0.0 <= difference < 0.5:
+            return True
+        return False
+
     try:
         conn = sqlconn.create_connection()
         if not conn:
             print("[-] Failed to connect to database for OU odds")
             return ou_bets
 
-        matched_ranges = 0
+        matched_over = 0
+        matched_under = 0
         no_odds = 0
-        matched_but_no_odds_games = []
 
         for row in ou_predictions_df.iter_rows(named=True):
             try:
@@ -558,17 +633,9 @@ def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2
                 if game_id is None or ensemble is None:
                     continue
 
-                # Check if this game falls in a profitable confidence range
-                recommended_book, bet_type = get_sportsbook_recommendation(ensemble_confidence)
-
-                if recommended_book is None:
-                    continue  # Skip games not in profitable ranges
-
-                matched_ranges += 1
-
-                # Get odds for the recommended sportsbook
+                # Get odds for this game
                 query = """
-                    SELECT over_point, under_odds, over_odds, bookmaker
+                    SELECT over_point, over_odds, under_odds, bookmaker
                     FROM odds
                     WHERE game_id = %s
                     AND bookmaker IN (%s, %s, %s, %s)
@@ -583,56 +650,48 @@ def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2
                     'betonlineag'
                 ))
 
-                if results:
-                    # Find result from recommended bookmaker
-                    ou_result = None
-                    for result in results:
-                        if result['bookmaker'].lower() in recommended_book.lower():
-                            ou_result = result
-                            break
-
-                    # If recommended book not found, use first available
-                    if ou_result is None and results:
-                        ou_result = results[0]
-
-                    if ou_result is None:
-                        no_odds += 1
-                        matched_but_no_odds_games.append(game_id)
-
-                    if ou_result:
-                        if bet_type == 'OVER':
-                            over_point = float(ou_result.get('over_point'))
-                            if over_point is not None:
-                                difference = ensemble - over_point
-                                ou_bets.append({
-                                    'type': 'OU',
-                                    'game_id': game_id,
-                                    'date': date,
-                                    'ensemble': round(ensemble, 2),
-                                    'over_point': round(over_point, 2),
-                                    'difference': round(difference, 2),
-                                    'confidence': round(ensemble_confidence, 4),
-                                    'bookmaker': ou_result.get('bookmaker', recommended_book),
-                                    'bet': 'OVER'
-                                })
-                        else:  # UNDER
-                            under_point = float(ou_result.get('over_point'))  # under_point is same as over_point
-                            if under_point is not None:
-                                difference = ensemble - under_point
-                                ou_bets.append({
-                                    'type': 'OU',
-                                    'game_id': game_id,
-                                    'date': date,
-                                    'ensemble': round(ensemble, 2),
-                                    'under_point': round(under_point, 2),
-                                    'difference': round(difference, 2),
-                                    'confidence': round(ensemble_confidence, 4),
-                                    'bookmaker': ou_result.get('bookmaker', recommended_book),
-                                    'bet': 'UNDER'
-                                })
-                else:
+                if not results:
                     no_odds += 1
-                    matched_but_no_odds_games.append(game_id)
+                    continue
+
+                # Use first bookmaker's O/U line for calculation
+                ou_result = results[0]
+                over_point = float(ou_result.get('over_point'))
+                if over_point is None:
+                    continue
+
+                # Calculate difference = predicted_total - line
+                difference = ensemble - over_point
+
+                # Check OVER rules
+                if matches_over_rule(ensemble_confidence, difference):
+                    matched_over += 1
+                    ou_bets.append({
+                        'type': 'OU',
+                        'game_id': game_id,
+                        'date': date,
+                        'ensemble': round(ensemble, 2),
+                        'over_point': round(over_point, 2),
+                        'difference': round(difference, 2),
+                        'confidence': round(ensemble_confidence, 4),
+                        'bookmaker': ou_result.get('bookmaker'),
+                        'bet': 'OVER'
+                    })
+
+                # Check UNDER rules
+                elif matches_under_rule(ensemble_confidence, difference):
+                    matched_under += 1
+                    ou_bets.append({
+                        'type': 'OU',
+                        'game_id': game_id,
+                        'date': date,
+                        'ensemble': round(ensemble, 2),
+                        'under_point': round(over_point, 2),
+                        'difference': round(difference, 2),
+                        'confidence': round(ensemble_confidence, 4),
+                        'bookmaker': ou_result.get('bookmaker'),
+                        'bet': 'UNDER'
+                    })
 
             except Exception as row_error:
                 # Continue processing other rows even if one fails
@@ -642,14 +701,11 @@ def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2
         conn.close()
 
         # Debug output
-        if matched_ranges > 0:
-            print(f"[DEBUG] Matched {matched_ranges} games to profitable confidence ranges")
-            print(f"[DEBUG] {len(ou_bets)} had odds available in BetOnline/Bovada/MyBookie")
-            if matched_but_no_odds_games:
-                print(f"[DEBUG] {no_odds} matched ranges but had no odds:")
-                for gid in matched_but_no_odds_games:
-                    print(f"  - {gid}")
-            print()
+        print(f"[+] Evaluated {len(ou_predictions_df)} games for OU bets")
+        print(f"    OVER bets matched: {matched_over}")
+        print(f"    UNDER bets matched: {matched_under}")
+        print(f"    No odds available: {no_odds}")
+        print()
 
     except Exception as e:
         print(f"[-] Error processing OU bets: {e}")
@@ -922,17 +978,17 @@ def main(manual_date: str = None):
     print("STEP 3: Getting ML Predictions (Ensemble: 18% LGB + 82% XGB)")
     print("-"*80 + "\n")
 
-    # Step 3b: Extract OU bets from predictions_df (ensemble - over_point > 2.3)
-    print("STEP 3b: Extracting OU Valid Bets (Good Bets Confidence Thresholds)")
+    # Step 3b: Extract OU bets from predictions_df using optimized betting rules
+    print("STEP 3b: Extracting OU Valid Bets (Optimized Betting Rules)")
     print("-"*80 + "\n")
 
-    # Use the updated get_ou_bets function with confidence-based filtering
+    # Use the updated get_ou_bets function with new betting rules
     ou_bets = get_ou_bets(predictions_df, allowed_bookmakers=allowed_bookmakers)
 
-    print(f"[+] Found {len(ou_bets)} OU bets meeting Good Bets criteria\n")
+    print(f"[+] Found {len(ou_bets)} OU bets meeting Optimized Rules criteria\n")
 
-    # Step 3c: Get ML bets with Ensemble (EV > 0% AND Probability > 0.50)
-    print("STEP 3c: Extracting ML Valid Bets (Ensemble: EV > 0%, Probability > 0.50)")
+    # Step 3c: Get ML bets with Clay's Optimal Rules
+    print("STEP 3c: Extracting ML Valid Bets (Clay's Optimal Rules)")
     print("-"*80 + "\n")
 
     team_mappings = load_team_mappings()
@@ -1002,7 +1058,7 @@ def main(manual_date: str = None):
     if True:  # Print results
         # Print ML bets
         if ml_bets:
-            print(f"MONEYLINE BETS (Ensemble: EV > 0%, Probability > 0.50, Bookmakers: {', '.join(sorted(allowed_bookmakers))})")
+            print(f"MONEYLINE BETS (Clay's Optimal Rules, Bookmakers: {', '.join(sorted(allowed_bookmakers))})")
             print("-"*80 + "\n")
 
             # Sort by EV descending
@@ -1020,7 +1076,7 @@ def main(manual_date: str = None):
 
         # Print OU bets
         if ou_bets:
-            print(f"\nOVER/UNDER BETS (Good Bets Confidence Thresholds)")
+            print(f"\nOVER/UNDER BETS (Optimized Betting Rules)")
             print("-"*80 + "\n")
 
             # Sort by confidence descending
@@ -1041,14 +1097,14 @@ def main(manual_date: str = None):
         print("\n" + "="*80)
         print("SUMMARY")
         print("="*80 + "\n")
-        print(f"Total ML Bets (Ensemble: EV > 0%, Probability > 0.50): {len(ml_bets)}")
-        print(f"Total OU Bets (Good Bets Confidence Thresholds): {len(ou_bets)}")
+        print(f"Total ML Bets (Clay's Optimal Rules): {len(ml_bets)}")
+        print(f"Total OU Bets (Optimized Betting Rules): {len(ou_bets)}")
         print(f"Total Bets: {len(ml_bets) + len(ou_bets)}\n")
 
     else:
         print("No bets meet criteria")
-        print("  ML: Ensemble (EV > 0% AND Probability > 0.50)")
-        print("  OU: Difference > 2.3\n")
+        print("  ML: Clay's Optimal Rules (specific probability and EV ranges)")
+        print("  OU: Optimized Rules (specific confidence and difference ranges)\n")
 
     print("="*80 + "\n")
 

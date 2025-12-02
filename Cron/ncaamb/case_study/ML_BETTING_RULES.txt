@@ -1,0 +1,37 @@
+CLAY'S ALGOPICKS OPTIMAL BETTING STRATEGY
+==========================================
+
+BET ON THESE COMBINATIONS ONLY:
+
+PRIMARY VOLUME (Expected ~150 bets):
+- 0.52 <= prob < 0.57 AND EV > 0% AND EV < 10%
+
+HIGH ROI TARGETS (Expected ~30 bets):
+- 0.59 <= prob < 0.60 AND EV > 0% AND EV < 10%
+
+HIDDEN GEMS (Expected ~100 bets):
+- 0.74 <= prob < 0.76 AND EV > 0% AND EV < 10%
+- 0.80 <= prob < 0.84 AND EV > 0% AND EV < 10%
+
+NEVER BET ON THESE:
+
+AVOID COMPLETELY:
+- ANY bet with EV <= 0%
+- ANY bet with EV >= 10% (red flag - likely data error)
+- 0.55 <= prob < 0.59 (entire range - dead zone)
+- 0.57 <= prob < 0.59 (entire range - dead zone)
+
+EXPECTED PERFORMANCE:
+- Total Bets: ~280 per season
+- Expected ROI: 12-15%
+- Risk Level: Low (only positive EV bets, avoiding red flags)
+- Variance: Managed through volume diversity
+
+KEY NOTES:
+- Use Bovada when possible (best ROI in these ranges)
+- Bet size: $25 max until you hit 100 bets
+- Track performance separately for each range
+- If any range drops below 10% ROI over 50 bets, stop betting that range
+- Only bet when 0% < EV < 10% (avoid red flags)
+
+LAST UPDATED: December 2024
