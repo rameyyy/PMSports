@@ -1,5 +1,5 @@
 ====================================================================================================
-COMPLETE BETTING RULES - PRECISE IMPLEMENTATION GUIDE
+ALGOPICKS NCAA BASKETBALL O/U - COMPREHENSIVE BETTING RULES V3.0
 ====================================================================================================
 
 📐 HOW TO CALCULATE DIFFERENCE:
@@ -13,70 +13,258 @@ COMPLETE BETTING RULES - PRECISE IMPLEMENTATION GUIDE
     • Line is 140, you predict 139.7 →  Difference = 139.7 - 140 = -0.3
 
 ====================================================================================================
-🔥 OVER BET RULES (Bet when ANY of these 4 rules are true)
+🔥 OVER BET RULES (Bet when ANY of these 13 rules are true)
 ====================================================================================================
 
-Rule 1:
-  IF confidence >= 0.75 AND confidence < 0.80
-  AND difference >= 3.0 AND difference < 5.0
+3D RULES (good_bet_score + ensemble_confidence + difference):
+----------------------------------------------------------------------------------------------------
+
+Rule O1:
+  IF good_bet_score >= 0.8 AND good_bet_score < 0.9
+  AND ensemble_confidence >= 0.7 AND ensemble_confidence < 0.8
+  AND difference >= 4 AND difference < 5
   THEN bet OVER
-  Performance: 251 bets | 55.0% win rate | +5.50% ROI
+  Performance: 31 bets | 64.5% win rate | +23.79% ROI ⭐
 
-Rule 2:
-  IF confidence >= 0.90
-  THEN bet OVER (any difference)
-  Performance: 19 bets | 57.9% win rate | +11.11% ROI
+Rule O2:
+  IF good_bet_score >= 0.8 AND good_bet_score < 0.9
+  AND ensemble_confidence >= 0.6 AND ensemble_confidence < 0.7
+  AND difference >= 2 AND difference < 3
+  THEN bet OVER
+  Performance: 45 bets | 55.6% win rate | +6.72% ROI
 
-Rule 3:
-  IF difference >= 6.0 AND difference < 6.5
-  THEN bet OVER (any confidence)
-  Performance: 25 bets | 72.0% win rate | +37.99% ROI
+Rule O3:
+  IF good_bet_score >= 0.7 AND good_bet_score < 0.8
+  AND ensemble_confidence >= 0.7 AND ensemble_confidence < 0.8
+  AND difference >= 2 AND difference < 3
+  THEN bet OVER
+  Performance: 112 bets | 54.5% win rate | +4.48% ROI
 
-Rule 4:
-  IF difference >= 3.5 AND difference < 4.0
-  THEN bet OVER (any confidence)
-  Performance: 152 bets | 54.6% win rate | +4.80% ROI
+2D RULES - good_bet_score + difference:
+----------------------------------------------------------------------------------------------------
 
-⚠️  NOTE: Rule 1 and Rule 4 overlap when conf is [0.75, 0.80) AND diff is [3.5, 4.0)
-         This is fine - just bet OVER once, don't double bet!
+Rule O4:
+  IF good_bet_score >= 0.80 AND good_bet_score < 0.85
+  AND difference >= 3.5 AND difference < 4.0
+  THEN bet OVER
+  Performance: 46 bets | 65.2% win rate | +25.27% ROI ⭐⭐
+
+Rule O5:
+  IF good_bet_score >= 0.55 AND good_bet_score < 0.60
+  AND difference >= 1.5 AND difference < 2.0
+  THEN bet OVER
+  Performance: 74 bets | 59.5% win rate | +13.89% ROI
+
+Rule O6:
+  IF good_bet_score >= 0.50 AND good_bet_score < 0.55
+  AND difference >= 1.5 AND difference < 2.0
+  THEN bet OVER
+  Performance: 44 bets | 59.1% win rate | +13.32% ROI
+
+Rule O7:
+  IF good_bet_score >= 0.60 AND good_bet_score < 0.65
+  AND difference >= 1.0 AND difference < 1.5
+  THEN bet OVER
+  Performance: 76 bets | 55.3% win rate | +5.81% ROI
+
+Rule O8:
+  IF good_bet_score >= 0.65 AND good_bet_score < 0.70
+  AND difference >= 1.5 AND difference < 2.0
+  THEN bet OVER
+  Performance: 96 bets | 54.2% win rate | +4.05% ROI
+
+Rule O9:
+  IF good_bet_score >= 0.75 AND good_bet_score < 0.80
+  AND difference >= 2.5 AND difference < 3.0
+  THEN bet OVER
+  Performance: 94 bets | 54.3% win rate | +4.01% ROI
+
+2D RULES - good_bet_score + ensemble_confidence:
+----------------------------------------------------------------------------------------------------
+
+Rule O10:
+  IF good_bet_score >= 0.55 AND good_bet_score < 0.60
+  AND ensemble_confidence >= 0.50 AND ensemble_confidence < 0.55
+  THEN bet OVER
+  Performance: 33 bets | 66.7% win rate | +27.48% ROI ⭐⭐⭐
+
+Rule O11:
+  IF good_bet_score >= 0.80 AND good_bet_score < 0.85
+  AND ensemble_confidence >= 0.65 AND ensemble_confidence < 0.70
+  THEN bet OVER
+  Performance: 44 bets | 63.6% win rate | +22.33% ROI ⭐
+
+Rule O12:
+  IF good_bet_score >= 0.50 AND good_bet_score < 0.55
+  AND ensemble_confidence >= 0.50 AND ensemble_confidence < 0.55
+  THEN bet OVER
+  Performance: 65 bets | 55.4% win rate | +6.39% ROI
+
+Rule O13:
+  IF good_bet_score >= 0.65 AND good_bet_score < 0.70
+  AND ensemble_confidence >= 0.60 AND ensemble_confidence < 0.65
+  THEN bet OVER
+  Performance: 114 bets | 55.3% win rate | +6.17% ROI
 
 ====================================================================================================
-🔵 UNDER BET RULES (Bet when ANY of these 4 rules are true)
+🔵 UNDER BET RULES (Bet when ANY of these 13 rules are true)
 ====================================================================================================
 
-Rule 1:
-  IF confidence >= 0.40 AND confidence < 0.45
+2D RULES - good_bet_score + difference:
+----------------------------------------------------------------------------------------------------
+
+Rule U1:
+  IF good_bet_score >= 0.40 AND good_bet_score < 0.45
   AND difference >= -0.5 AND difference < 0.0
   THEN bet UNDER
-  Performance: 24 bets | 66.7% win rate | +27.68% ROI ⭐ BEST
+  Performance: 36 bets | 66.7% win rate | +27.80% ROI ⭐⭐⭐
 
-Rule 2:
-  IF confidence >= 0.35 AND confidence < 0.40
-  AND difference >= -2.0 AND difference < -1.5
+Rule U2:
+  IF good_bet_score >= 0.40 AND good_bet_score < 0.45
+  AND difference >= -1.0 AND difference < 0.0
   THEN bet UNDER
-  Performance: 102 bets | 52.9% win rate | +1.71% ROI
+  Performance: 48 bets | 64.6% win rate | +23.96% ROI ⭐⭐
 
-Rule 3:
-  IF confidence >= 0.30 AND confidence < 0.35
-  AND difference >= -1.5 AND difference < -1.0
-  THEN bet UNDER
-  Performance: 17 bets | 52.9% win rate | +1.62% ROI
-
-Rule 4:
-  IF confidence >= 0.45 AND confidence < 0.50
+Rule U3:
+  IF good_bet_score >= 0.25 AND good_bet_score < 0.30
   AND difference >= 0.0 AND difference < 0.5
   THEN bet UNDER
-  Performance: 78 bets | 52.6% win rate | +1.07% ROI
+  Performance: 47 bets | 62.8% win rate | +18.43% ROI ⭐
+
+Rule U4:
+  IF good_bet_score >= 0.25 AND good_bet_score < 0.30
+  AND difference >= 0.0 AND difference < 1.0
+  THEN bet UNDER
+  Performance: 54 bets | 61.1% win rate | +17.21% ROI ⭐
+
+Rule U5:
+  IF good_bet_score >= 0.00 AND good_bet_score < 0.05
+  AND difference >= -4.0 AND difference < -3.0
+  THEN bet UNDER
+  Performance: 44 bets | 61.4% win rate | +17.89% ROI ⭐
+
+Rule U6:
+  IF good_bet_score >= 0.20 AND good_bet_score < 0.25
+  AND difference >= -0.5 AND difference < 0.0
+  THEN bet UNDER
+  Performance: 53 bets | 60.4% win rate | +15.68% ROI
+
+Rule U7:
+  IF good_bet_score >= 0.15 AND good_bet_score < 0.20
+  AND difference >= -1.0 AND difference < -0.5
+  THEN bet UNDER
+  Performance: 41 bets | 56.1% win rate | +8.14% ROI
+
+Rule U8:
+  IF good_bet_score >= 0.25 AND good_bet_score < 0.30
+  AND difference >= -1.0 AND difference < -0.5
+  THEN bet UNDER
+  Performance: 72 bets | 54.2% win rate | +4.00% ROI
+
+2D RULES - good_bet_score + ensemble_confidence:
+----------------------------------------------------------------------------------------------------
+
+Rule U9:
+  IF good_bet_score >= 0.25 AND good_bet_score < 0.30
+  AND ensemble_confidence >= 0.50 AND ensemble_confidence < 0.55
+  THEN bet UNDER
+  Performance: 36 bets | 66.7% win rate | +27.82% ROI ⭐⭐⭐
+
+Rule U10:
+  IF good_bet_score >= 0.40 AND good_bet_score < 0.45
+  AND ensemble_confidence >= 0.45 AND ensemble_confidence < 0.50
+  THEN bet UNDER
+  Performance: 50 bets | 64.0% win rate | +22.92% ROI ⭐⭐
+
+Rule U11:
+  IF good_bet_score >= 0.15 AND good_bet_score < 0.20
+  AND ensemble_confidence >= 0.40 AND ensemble_confidence < 0.45
+  THEN bet UNDER
+  Performance: 54 bets | 61.1% win rate | +17.95% ROI ⭐
+
+Rule U12:
+  IF good_bet_score >= 0.00 AND good_bet_score < 0.05
+  AND ensemble_confidence >= 0.25 AND ensemble_confidence < 0.30
+  THEN bet UNDER
+  Performance: 37 bets | 56.8% win rate | +9.24% ROI
+
+Rule U13:
+  IF good_bet_score >= 0.20 AND good_bet_score < 0.25
+  AND ensemble_confidence >= 0.45 AND ensemble_confidence < 0.50
+  THEN bet UNDER
+  Performance: 65 bets | 56.9% win rate | +9.16% ROI
 
 ====================================================================================================
 📊 SUMMARY STATISTICS
 ====================================================================================================
 
-  Total Profitable Bets: 534 (from 4,936 total games)
-  Bet Reduction: 89.2%
-  Overall Win Rate: 55.4%
-  Overall ROI: +6.40%
-  Expected Season Profit: $341.60 at $10/bet
+  Total Profitable Bets: 1,091 (from 4,936 total games)
+  Bet Reduction: 77.9%
+  Overall ROI: +10.13%
+  Expected Season Profit: $1,105.20 at $10/bet
 
-  OVER Bets: 313 (58.6% of total) | +7.88% ROI
-  UNDER Bets: 221 (41.4% of total) | +4.30% ROI
+  OVER Bets: 712 (65.3% of total) | +9.12% ROI | $649.31 profit
+  UNDER Bets: 379 (34.7% of total) | +12.03% ROI | $455.93 profit
+
+====================================================================================================
+💡 KEY INSIGHTS
+====================================================================================================
+
+1. COMPREHENSIVE APPROACH WINS
+   - Using 26 total rules (13 OVER + 13 UNDER) captures maximum edge
+   - Multiple filtering approaches (3D, 2D-diff, 2D-conf) each find unique opportunities
+
+2. OVER BETS: Multiple pathways to profitability
+   - 3D filtering (all 3 params) for high-confidence, high-difference bets
+   - 2D filtering with difference for moderate good_bet_scores
+   - 2D filtering with ensemble_conf for specific confidence zones
+
+3. UNDER BETS: Simpler signals work better
+   - good_bet_score + difference is primary filter
+   - good_bet_score + ensemble_conf provides complementary windows
+   - UNDER has higher ROI (+12.03%) than OVER (+9.12%)
+
+4. good_bet_score RANGES reveal patterns:
+   - OVER: Profitable at 0.50+ (any signal towards OVER)
+   - UNDER: Profitable at 0.00-0.45 (strong to moderate UNDER signals)
+
+5. DIFFERENCE patterns:
+   - OVER: +1.0 to +5.0 points = profitable zones
+   - UNDER: -4.0 to +1.0 points = profitable zones (including near-line)
+
+====================================================================================================
+🔧 IMPLEMENTATION STRATEGY
+====================================================================================================
+
+For production deployment:
+
+TIER 1 - HIGHEST ROI (20%+ ROI):
+  - OVER: O4, O10, O11 (3 rules, 123 bets, ~24% avg ROI)
+  - UNDER: U1, U2, U9, U10 (4 rules, 170 bets, ~25% avg ROI)
+
+TIER 2 - HIGH ROI (10-20% ROI):
+  - OVER: O5, O6 (2 rules, 118 bets, ~13.6% avg ROI)
+  - UNDER: U3, U4, U5, U6, U11 (5 rules, 233 bets, ~17% avg ROI)
+
+TIER 3 - SOLID ROI (4-10% ROI):
+  - OVER: O2, O3, O7, O8, O9, O12, O13 (7 rules, 471 bets, ~5% avg ROI)
+  - UNDER: U7, U8, U12, U13 (4 rules, 169 bets, ~6.5% avg ROI)
+
+Strategy: Start with Tier 1 for conservative approach, add Tier 2 for balanced, add Tier 3 for maximum volume.
+
+====================================================================================================
+OPERATOR NOTES
+====================================================================================================
+
+All operators use:
+  >= (greater than or equal to) for LOWER bounds
+  <  (less than) for UPPER bounds
+
+Variables:
+  - good_bet_score: Direction signal (0=UNDER, 1=OVER)
+  - ensemble_confidence: Quality/certainty of total prediction
+  - difference: predicted_total - line
+
+Rule overlap is intentional - a single game may trigger multiple rules, but you only bet once.
+
+====================================================================================================

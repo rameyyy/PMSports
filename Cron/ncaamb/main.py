@@ -558,19 +558,12 @@ def get_sportsbook_recommendation(confidence: float) -> tuple:
 
 def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2.3, allowed_bookmakers: set = None) -> list:
     """
-    Extract OU bets using optimized betting rules based on confidence and difference.
+    Extract OU bets using V3.0 comprehensive betting rules.
 
-    OVER Rules (bet when ANY apply):
-      Rule 1: confidence >= 0.75 AND confidence < 0.80 AND difference >= 3.0 AND difference < 5.0
-      Rule 2: confidence >= 0.90 (any difference)
-      Rule 3: difference >= 6.0 AND difference < 6.5 (any confidence)
-      Rule 4: difference >= 3.5 AND difference < 4.0 (any confidence)
+    Uses good_bet_score + ensemble_confidence + difference in various combinations.
 
-    UNDER Rules (bet when ANY apply):
-      Rule 1: confidence >= 0.40 AND confidence < 0.45 AND difference >= -0.5 AND difference < 0.0
-      Rule 2: confidence >= 0.35 AND confidence < 0.40 AND difference >= -2.0 AND difference < -1.5
-      Rule 3: confidence >= 0.30 AND confidence < 0.35 AND difference >= -1.5 AND difference < -1.0
-      Rule 4: confidence >= 0.45 AND confidence < 0.50 AND difference >= 0.0 AND difference < 0.5
+    13 OVER rules + 13 UNDER rules = 26 total rules
+    Overall ROI: +10.13% (from 1,091 profitable bets out of 4,936 games)
     """
     ou_bets = []
 
@@ -581,36 +574,102 @@ def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2
     if allowed_bookmakers is None:
         allowed_bookmakers = {'betonlineag', 'BetOnline.ag', 'Bovada', 'MyBookie.ag'}
 
-    def matches_over_rule(confidence: float, difference: float) -> bool:
-        """Check if confidence and difference match any OVER betting rule"""
-        # Rule 1: confidence >= 0.75 AND confidence < 0.80 AND difference >= 3.0 AND difference < 5.0
-        if 0.75 <= confidence < 0.80 and 3.0 <= difference < 5.0:
+    def matches_over_rule(good_bet_score: float, ensemble_confidence: float, difference: float) -> bool:
+        """Check if parameters match any OVER betting rule (V3.0 - 13 rules)"""
+
+        # 3D RULES (good_bet_score + ensemble_confidence + difference)
+        # O1: 31 bets | 64.5% win | +23.79% ROI
+        if 0.8 <= good_bet_score < 0.9 and 0.7 <= ensemble_confidence < 0.8 and 4 <= difference < 5:
             return True
-        # Rule 2: confidence >= 0.90 (any difference)
-        if confidence >= 0.90:
+        # O2: 45 bets | 55.6% win | +6.72% ROI
+        if 0.8 <= good_bet_score < 0.9 and 0.6 <= ensemble_confidence < 0.7 and 2 <= difference < 3:
             return True
-        # Rule 3: difference >= 6.0 AND difference < 6.5 (any confidence)
-        if 6.0 <= difference < 6.5:
+        # O3: 112 bets | 54.5% win | +4.48% ROI
+        if 0.7 <= good_bet_score < 0.8 and 0.7 <= ensemble_confidence < 0.8 and 2 <= difference < 3:
             return True
-        # Rule 4: difference >= 3.5 AND difference < 4.0 (any confidence)
-        if 3.5 <= difference < 4.0:
+
+        # 2D RULES - good_bet_score + difference
+        # O4: 46 bets | 65.2% win | +25.27% ROI ⭐⭐
+        if 0.80 <= good_bet_score < 0.85 and 3.5 <= difference < 4.0:
             return True
+        # O5: 74 bets | 59.5% win | +13.89% ROI
+        if 0.55 <= good_bet_score < 0.60 and 1.5 <= difference < 2.0:
+            return True
+        # O6: 44 bets | 59.1% win | +13.32% ROI
+        if 0.50 <= good_bet_score < 0.55 and 1.5 <= difference < 2.0:
+            return True
+        # O7: 76 bets | 55.3% win | +5.81% ROI
+        if 0.60 <= good_bet_score < 0.65 and 1.0 <= difference < 1.5:
+            return True
+        # O8: 96 bets | 54.2% win | +4.05% ROI
+        if 0.65 <= good_bet_score < 0.70 and 1.5 <= difference < 2.0:
+            return True
+        # O9: 94 bets | 54.3% win | +4.01% ROI
+        if 0.75 <= good_bet_score < 0.80 and 2.5 <= difference < 3.0:
+            return True
+
+        # 2D RULES - good_bet_score + ensemble_confidence
+        # O10: 33 bets | 66.7% win | +27.48% ROI ⭐⭐⭐
+        if 0.55 <= good_bet_score < 0.60 and 0.50 <= ensemble_confidence < 0.55:
+            return True
+        # O11: 44 bets | 63.6% win | +22.33% ROI ⭐
+        if 0.80 <= good_bet_score < 0.85 and 0.65 <= ensemble_confidence < 0.70:
+            return True
+        # O12: 65 bets | 55.4% win | +6.39% ROI
+        if 0.50 <= good_bet_score < 0.55 and 0.50 <= ensemble_confidence < 0.55:
+            return True
+        # O13: 114 bets | 55.3% win | +6.17% ROI
+        if 0.65 <= good_bet_score < 0.70 and 0.60 <= ensemble_confidence < 0.65:
+            return True
+
         return False
 
-    def matches_under_rule(confidence: float, difference: float) -> bool:
-        """Check if confidence and difference match any UNDER betting rule"""
-        # Rule 1: confidence >= 0.40 AND confidence < 0.45 AND difference >= -0.5 AND difference < 0.0
-        if 0.40 <= confidence < 0.45 and -0.5 <= difference < 0.0:
+    def matches_under_rule(good_bet_score: float, ensemble_confidence: float, difference: float) -> bool:
+        """Check if parameters match any UNDER betting rule (V3.0 - 13 rules)"""
+
+        # 2D RULES - good_bet_score + difference
+        # U1: 36 bets | 66.7% win | +27.80% ROI ⭐⭐⭐
+        if 0.40 <= good_bet_score < 0.45 and -0.5 <= difference < 0.0:
             return True
-        # Rule 2: confidence >= 0.35 AND confidence < 0.40 AND difference >= -2.0 AND difference < -1.5
-        if 0.35 <= confidence < 0.40 and -2.0 <= difference < -1.5:
+        # U2: 48 bets | 64.6% win | +23.96% ROI ⭐⭐
+        if 0.40 <= good_bet_score < 0.45 and -1.0 <= difference < 0.0:
             return True
-        # Rule 3: confidence >= 0.30 AND confidence < 0.35 AND difference >= -1.5 AND difference < -1.0
-        if 0.30 <= confidence < 0.35 and -1.5 <= difference < -1.0:
+        # U3: 47 bets | 62.8% win | +18.43% ROI ⭐
+        if 0.25 <= good_bet_score < 0.30 and 0.0 <= difference < 0.5:
             return True
-        # Rule 4: confidence >= 0.45 AND confidence < 0.50 AND difference >= 0.0 AND difference < 0.5
-        if 0.45 <= confidence < 0.50 and 0.0 <= difference < 0.5:
+        # U4: 54 bets | 61.1% win | +17.21% ROI ⭐
+        if 0.25 <= good_bet_score < 0.30 and 0.0 <= difference < 1.0:
             return True
+        # U5: 44 bets | 61.4% win | +17.89% ROI ⭐
+        if 0.00 <= good_bet_score < 0.05 and -4.0 <= difference < -3.0:
+            return True
+        # U6: 53 bets | 60.4% win | +15.68% ROI
+        if 0.20 <= good_bet_score < 0.25 and -0.5 <= difference < 0.0:
+            return True
+        # U7: 41 bets | 56.1% win | +8.14% ROI
+        if 0.15 <= good_bet_score < 0.20 and -1.0 <= difference < -0.5:
+            return True
+        # U8: 72 bets | 54.2% win | +4.00% ROI
+        if 0.25 <= good_bet_score < 0.30 and -1.0 <= difference < -0.5:
+            return True
+
+        # 2D RULES - good_bet_score + ensemble_confidence
+        # U9: 36 bets | 66.7% win | +27.82% ROI ⭐⭐⭐
+        if 0.25 <= good_bet_score < 0.30 and 0.50 <= ensemble_confidence < 0.55:
+            return True
+        # U10: 50 bets | 64.0% win | +22.92% ROI ⭐⭐
+        if 0.40 <= good_bet_score < 0.45 and 0.45 <= ensemble_confidence < 0.50:
+            return True
+        # U11: 54 bets | 61.1% win | +17.95% ROI ⭐
+        if 0.15 <= good_bet_score < 0.20 and 0.40 <= ensemble_confidence < 0.45:
+            return True
+        # U12: 37 bets | 56.8% win | +9.24% ROI
+        if 0.00 <= good_bet_score < 0.05 and 0.25 <= ensemble_confidence < 0.30:
+            return True
+        # U13: 65 bets | 56.9% win | +9.16% ROI
+        if 0.20 <= good_bet_score < 0.25 and 0.45 <= ensemble_confidence < 0.50:
+            return True
+
         return False
 
     try:
@@ -628,9 +687,14 @@ def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2
                 game_id = row.get('game_id')
                 ensemble = row.get('ensemble_pred', row.get('prediction'))
                 ensemble_confidence = row.get('ensemble_confidence')
+                good_bets_confidence = row.get('good_bets_confidence')
                 date = row.get('date')
 
                 if game_id is None or ensemble is None:
+                    continue
+
+                # Skip if good_bets_confidence is missing (required for V3.0 rules)
+                if good_bets_confidence is None:
                     continue
 
                 # Get odds for this game
@@ -663,8 +727,8 @@ def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2
                 # Calculate difference = predicted_total - line
                 difference = ensemble - over_point
 
-                # Check OVER rules
-                if matches_over_rule(ensemble_confidence, difference):
+                # Check OVER rules (V3.0 - uses good_bet_score, ensemble_confidence, difference)
+                if matches_over_rule(good_bets_confidence, ensemble_confidence, difference):
                     matched_over += 1
                     ou_bets.append({
                         'type': 'OU',
@@ -674,12 +738,13 @@ def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2
                         'over_point': round(over_point, 2),
                         'difference': round(difference, 2),
                         'confidence': round(ensemble_confidence, 4),
+                        'good_bet_score': round(good_bets_confidence, 4),
                         'bookmaker': ou_result.get('bookmaker'),
                         'bet': 'OVER'
                     })
 
-                # Check UNDER rules
-                elif matches_under_rule(ensemble_confidence, difference):
+                # Check UNDER rules (V3.0 - uses good_bet_score, ensemble_confidence, difference)
+                elif matches_under_rule(good_bets_confidence, ensemble_confidence, difference):
                     matched_under += 1
                     ou_bets.append({
                         'type': 'OU',
@@ -689,6 +754,7 @@ def get_ou_bets(ou_predictions_df: pl.DataFrame, difference_threshold: float = 2
                         'under_point': round(over_point, 2),
                         'difference': round(difference, 2),
                         'confidence': round(ensemble_confidence, 4),
+                        'good_bet_score': round(good_bets_confidence, 4),
                         'bookmaker': ou_result.get('bookmaker'),
                         'bet': 'UNDER'
                     })
@@ -978,14 +1044,14 @@ def main(manual_date: str = None):
     print("STEP 3: Getting ML Predictions (Ensemble: 18% LGB + 82% XGB)")
     print("-"*80 + "\n")
 
-    # Step 3b: Extract OU bets from predictions_df using optimized betting rules
-    print("STEP 3b: Extracting OU Valid Bets (Optimized Betting Rules)")
+    # Step 3b: Extract OU bets from predictions_df using V3.0 comprehensive betting rules
+    print("STEP 3b: Extracting OU Valid Bets (V3.0 Comprehensive Rules - 26 rules)")
     print("-"*80 + "\n")
 
-    # Use the updated get_ou_bets function with new betting rules
+    # Use the updated get_ou_bets function with V3.0 betting rules
     ou_bets = get_ou_bets(predictions_df, allowed_bookmakers=allowed_bookmakers)
 
-    print(f"[+] Found {len(ou_bets)} OU bets meeting Optimized Rules criteria\n")
+    print(f"[+] Found {len(ou_bets)} OU bets meeting V3.0 Rules criteria (Expected ROI: +10.13%)\n")
 
     # Step 3c: Get ML bets with Clay's Optimal Rules
     print("STEP 3c: Extracting ML Valid Bets (Clay's Optimal Rules)")
@@ -1040,7 +1106,8 @@ def main(manual_date: str = None):
             'bookmaker': bet['bookmaker'],
             'ensemble': round(bet['ensemble'], 2),
             'ou_point': round(point_value, 2) if point_value else '',
-            'confidence': round(bet.get('confidence', 0), 4)
+            'confidence': round(bet.get('confidence', 0), 4),
+            'good_bet_score': round(bet.get('good_bet_score', 0), 4)
         })
 
     if all_bets:
@@ -1076,11 +1143,11 @@ def main(manual_date: str = None):
 
         # Print OU bets
         if ou_bets:
-            print(f"\nOVER/UNDER BETS (Optimized Betting Rules)")
+            print(f"\nOVER/UNDER BETS (V3.0 Comprehensive Rules - 26 rules)")
             print("-"*80 + "\n")
 
-            # Sort by confidence descending
-            ou_bets_sorted = sorted(ou_bets, key=lambda x: x.get('confidence', 0), reverse=True)
+            # Sort by good_bet_score descending
+            ou_bets_sorted = sorted(ou_bets, key=lambda x: x.get('good_bet_score', 0), reverse=True)
 
             for bet in ou_bets_sorted:
                 point_key = 'over_point' if bet.get('bet') == 'OVER' else 'under_point'
@@ -1089,7 +1156,8 @@ def main(manual_date: str = None):
                 print(f"Game ID: {bet['game_id']}")
                 print(f"  Ensemble: {bet['ensemble']}  |  Line: {point_val}")
                 print(f"  Difference: {bet['difference']} (BET: {bet['bet']})")
-                print(f"  Confidence: {bet.get('confidence', 0):.4f}")
+                print(f"  Ensemble Confidence: {bet.get('confidence', 0):.4f}")
+                print(f"  Good Bet Score: {bet.get('good_bet_score', 0):.4f}")
                 print(f"  Bookmaker: {bet['bookmaker']}")
                 print()
 
@@ -1098,13 +1166,13 @@ def main(manual_date: str = None):
         print("SUMMARY")
         print("="*80 + "\n")
         print(f"Total ML Bets (Clay's Optimal Rules): {len(ml_bets)}")
-        print(f"Total OU Bets (Optimized Betting Rules): {len(ou_bets)}")
+        print(f"Total OU Bets (V3.0 Comprehensive Rules): {len(ou_bets)}")
         print(f"Total Bets: {len(ml_bets) + len(ou_bets)}\n")
 
     else:
         print("No bets meet criteria")
         print("  ML: Clay's Optimal Rules (specific probability and EV ranges)")
-        print("  OU: Optimized Rules (specific confidence and difference ranges)\n")
+        print("  OU: V3.0 Comprehensive Rules (26 rules using good_bet_score + ensemble_confidence + difference)\n")
 
     print("="*80 + "\n")
 

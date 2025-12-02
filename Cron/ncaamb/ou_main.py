@@ -923,7 +923,7 @@ def main(target_date: str = None):
         print("\n" + "-"*80)
         print("STEP 1: Pushing games to database")
         print("-"*80 + "\n")
-        SCRAPEDATA = True
+        SCRAPEDATA = False
         if SCRAPEDATA:
             success = push_todays_games_to_db(todays_games)
             game_data = get_game_data_for_games(todays_games, season='2026')

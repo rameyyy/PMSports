@@ -325,11 +325,6 @@ def main():
 
         predicted_total = ensemble_preds[idx]
         good_bet_score = good_bets_probs[idx]
-
-        # Only export if good bet score is high enough
-        if good_bet_score < 0.50:  # Filter for good bets above 50% confidence
-            continue
-
         confidence = ensemble_confidence_over_test[idx]
 
         # Get best odds for Over and Under
@@ -369,11 +364,11 @@ def main():
         })
 
     if not all_bets:
-        print("No good bets found with score >= 0.50")
+        print("No bets found")
         return
 
     # Export
-    print("STEP 9: Exporting to Excel and CSV")
+    print("STEP 9: Exporting to CSV")
     print("-"*80 + "\n")
 
     df_bets = pd.DataFrame(all_bets)
@@ -381,39 +376,17 @@ def main():
     saved_dir = Path(__file__).parent / "saved"
     saved_dir.mkdir(parents=True, exist_ok=True)
 
-    # Excel export
-    excel_filename = saved_dir / f'ou_clean_good_bets_2025_{timestamp}.xlsx'
-    with pd.ExcelWriter(excel_filename, engine='openpyxl') as writer:
-        df_bets.to_excel(writer, sheet_name='Good_Bets', index=False)
-
-        from openpyxl.styles import Font, PatternFill, Alignment
-        workbook = writer.book
-        worksheet = writer.sheets['Good_Bets']
-
-        # Header formatting
-        for cell in worksheet[1]:
-            cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-
-        # Adjust column widths
-        for col, width in [('A', 18), ('B', 12), ('C', 20), ('D', 20), ('E', 12),
-                          ('F', 12), ('G', 12), ('H', 15), ('I', 15), ('J', 12),
-                          ('K', 12), ('L', 12), ('M', 12), ('N', 14), ('O', 14)]:
-            worksheet.column_dimensions[col].width = width
-
-    print(f"[+] Excel saved: {excel_filename}")
-
-    # CSV export
-    csv_filename = saved_dir / f'ou_clean_good_bets_2025_{timestamp}.csv'
+    # CSV export only
+    csv_filename = saved_dir / f'ou_all_bets_with_good_bets_score_2025_{timestamp}.csv'
     df_bets.to_csv(csv_filename, index=False)
     print(f"[+] CSV saved: {csv_filename}")
 
     # Summary
-    print(f"\n[SUMMARY - CLEAN 2025 GOOD BETS (trained on 2021-2024 only)]")
-    print(f"  Good bets found: {len(all_bets)}")
-    print(f"  Avg confidence: {df_bets['confidence'].mean():.4f}")
+    print(f"\n[SUMMARY - ALL 2025 BETS WITH GOOD BETS SCORE (trained on 2021-2024)]")
+    print(f"  Total games: {len(all_bets)}")
+    print(f"  Avg ensemble confidence: {df_bets['confidence'].mean():.4f}")
     print(f"  Avg good bet score: {df_bets['good_bet_score'].mean():.4f}")
+    print(f"  Good bet score >= 0.50: {len(df_bets[df_bets['good_bet_score'] >= 0.50])}")
     print("="*80 + "\n")
 
 
