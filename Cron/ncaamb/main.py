@@ -1295,7 +1295,7 @@ def update_my_bankroll():
                 updated_at = NOW()
         """
 
-        season = int(yesterday[:4]) if int(yesterday[5:7]) >= 10 else int(yesterday[:4]) + 1
+        season = int(yesterday[:4]) + 1 if int(yesterday[5:7]) >= 10 else int(yesterday[:4])
 
         cursor.execute(upsert_query, (
             yesterday, round(current_bankroll, 2), round(net_profit_loss, 2), round(roi, 2),
@@ -1435,8 +1435,8 @@ def update_bankroll():
         ml_bets_count = sum(bet['count'] for bet in ml_bets) if ml_bets else 0
         total_bet_count = ou_bets_count + ml_bets_count
 
-        # Calculate wager per bet: 1% of previous bankroll per bet
-        wager_per_bet = previous_bankroll * 0.01
+        # Calculate wager per bet: 0.85% of previous bankroll per bet
+        wager_per_bet = previous_bankroll * 0.0085
 
         # Calculate OU stats
         ou_wins = 0
@@ -1566,7 +1566,7 @@ def update_bankroll():
                 updated_at = NOW()
         """
 
-        season = int(yesterday[:4]) if int(yesterday[5:7]) >= 10 else int(yesterday[:4]) + 1
+        season = int(yesterday[:4]) + 1 if int(yesterday[5:7]) >= 10 else int(yesterday[:4])
 
         cursor.execute(upsert_query, (
             yesterday, round(current_bankroll, 2), round(net_profit_loss, 2), round(roi, 2),
