@@ -135,7 +135,13 @@ def fetch_and_push_odds_data():
     # Fetch odds from OddsAPI
     odds_data = get_historical_odds(today_iso)
 
-    if not odds_data or 'data' not in odds_data:
+    # Handle both list (live endpoint) and dict (historical endpoint) responses
+    if not odds_data:
+        print("  [-] Failed to fetch odds data from OddsAPI")
+        return False
+
+    # If it's a dict, ensure it has 'data' key
+    if isinstance(odds_data, dict) and 'data' not in odds_data:
         print("  [-] Failed to fetch odds data from OddsAPI")
         return False
 

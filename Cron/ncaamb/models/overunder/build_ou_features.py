@@ -246,30 +246,35 @@ def process_odds_data(odds_list: list, team_1: str = None, team_2: str = None, t
                     spread_odds_team_2_by_book[bookmaker] = spread_odds_team_2_val
 
         # Process moneyline data
+        # ml_home corresponds to home_team, ml_away corresponds to away_team
         ml_home = odds.get('ml_home')
         ml_away = odds.get('ml_away')
 
-        # Map moneyline to team_1 and team_2
-        if home_is_team_1 and ml_home is not None:
+        # Map moneyline to team_1 and team_2 by checking which team matches
+        # If home_team matches team_1, use ml_home for team_1
+        if home_team_mapped == team_1 and ml_home is not None:
             ml_team_1_val = float(ml_home)
             ml_for_team_1.append(ml_team_1_val)
             if bookmaker in sportsbooks:
                 ml_team_1_by_book[bookmaker] = ml_team_1_val
 
-        if home_is_team_1 and ml_away is not None:
-            ml_team_2_val = float(ml_away)
-            ml_for_team_2.append(ml_team_2_val)
-            if bookmaker in sportsbooks:
-                ml_team_2_by_book[bookmaker] = ml_team_2_val
-
-        if away_is_team_1 and ml_away is not None:
+        # If away_team matches team_1, use ml_away for team_1
+        if away_team_mapped == team_1 and ml_away is not None:
             ml_team_1_val = float(ml_away)
             ml_for_team_1.append(ml_team_1_val)
             if bookmaker in sportsbooks:
                 ml_team_1_by_book[bookmaker] = ml_team_1_val
 
-        if away_is_team_1 and ml_home is not None:
+        # If home_team matches team_2, use ml_home for team_2
+        if home_team_mapped == team_2 and ml_home is not None:
             ml_team_2_val = float(ml_home)
+            ml_for_team_2.append(ml_team_2_val)
+            if bookmaker in sportsbooks:
+                ml_team_2_by_book[bookmaker] = ml_team_2_val
+
+        # If away_team matches team_2, use ml_away for team_2
+        if away_team_mapped == team_2 and ml_away is not None:
+            ml_team_2_val = float(ml_away)
             ml_for_team_2.append(ml_team_2_val)
             if bookmaker in sportsbooks:
                 ml_team_2_by_book[bookmaker] = ml_team_2_val

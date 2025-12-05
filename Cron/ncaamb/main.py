@@ -2107,10 +2107,12 @@ def export_all_predictions(features_df: pl.DataFrame, lgb_model, xgb_model, ou_p
                 })
 
         if all_predictions:
-            output_df = pl.DataFrame(all_predictions)
-            output_file = Path(__file__).parent / f"all_predictions_{target_date_yyyymmdd}.xlsx"
-            output_df.write_excel(str(output_file))
-            print(f"[+] Exported {len(all_predictions)} all predictions (ML and OU) to {output_file}\n")
+            # Export disabled - only bets file will be exported
+            # output_df = pl.DataFrame(all_predictions)
+            # output_file = Path(__file__).parent / f"all_predictions_{target_date_yyyymmdd}.xlsx"
+            # output_df.write_excel(str(output_file))
+            # print(f"[+] Exported {len(all_predictions)} all predictions (ML and OU) to {output_file}\n")
+            pass
         else:
             print("[*] No predictions to export\n")
 
@@ -2169,15 +2171,17 @@ def export_all_games_with_odds(features_df: pl.DataFrame, lgb_model, xgb_model, 
         })
 
     if all_games:
-        output_df = pl.DataFrame(all_games)
-        # Sort by date and game_id
-        output_df = output_df.sort(['date', 'game_id'])
-
-        if target_date_yyyymmdd is None:
-            target_date_yyyymmdd = get_todays_date_yyyymmdd()
-        output_file = Path(__file__).parent / f"all_games_{target_date_yyyymmdd}.xlsx"
-        output_df.write_excel(str(output_file))
-        print(f"[+] Exported {len(all_games)} games with probabilities and ML averages to {output_file}\n")
+        # Export disabled - only bets file will be exported
+        # output_df = pl.DataFrame(all_games)
+        # # Sort by date and game_id
+        # output_df = output_df.sort(['date', 'game_id'])
+        #
+        # if target_date_yyyymmdd is None:
+        #     target_date_yyyymmdd = get_todays_date_yyyymmdd()
+        # output_file = Path(__file__).parent / f"all_games_{target_date_yyyymmdd}.xlsx"
+        # output_df.write_excel(str(output_file))
+        # print(f"[+] Exported {len(all_games)} games with probabilities and ML averages to {output_file}\n")
+        pass
     else:
         print("[*] No games to export\n")
 
@@ -2295,10 +2299,10 @@ def main(manual_date: str = None):
     else:
         print("[+] No null values in feature columns\n")
 
-    # Export features to Excel
-    print("STEP 2.5: Exporting All Generated Features to Excel")
-    print("-"*80 + "\n")
-    export_features_to_excel(features_df, target_date_yyyymmdd)
+    # Export features to Excel - DISABLED
+    # print("STEP 2.5: Exporting All Generated Features to Excel")
+    # print("-"*80 + "\n")
+    # export_features_to_excel(features_df, target_date_yyyymmdd)
 
     # Load ML models (Ensemble: 18% LGB + 82% XGB)
     print("STEP 3: Loading Moneyline Models (Ensemble: 18% LGB + 82% XGB)")

@@ -17,7 +17,7 @@ load_dotenv(env_path)
 
 ODDS_API_KEY1 = os.getenv("ODDS_API_KEY1")
 ODDS_API_KEY2 = os.getenv("ODDS_API_KEY2")
-ODDS_API_KEY = ODDS_API_KEY2  # Default to KEY2 (KEY1 being verified)
+ODDS_API_KEY = ODDS_API_KEY2  # Default to KEY2
 BASE_URL = "https://api.the-odds-api.com/v4"
 USAGE_THRESHOLD = 460  # Switch to next key when usage >= 460
 
