@@ -1,0 +1,12 @@
+Sports Betting With Machine Learning & Market Arbitrage: AlgoPicks
+Clay Ramey
+
+1. Overview
+AlgoPicks was developed with two goals in mind, finding positive expected value bets and researching market data trends. Currently I have only done extensive research on mens college basketball. At first I scraped 30,000 games from the 2021-2025 season. this includes all historical basic and advanced sport data, plus historical market data including multiple books lines for moneyline, spread, and totals.
+
+2. Purpose
+The goal was specifically to find bets for moneyline and totals that would yield a positive return on investment by the end of the season. While accuracy is important, the goal is not to predict the most games correctly, it is to find inefficiencies in market data.
+
+3. Expected Value
+Expected Value as a percent represents the average percentage return you should
+ expect from that wager. For example, if you found 100 bets each with an expected value of 1%, per wager. IE 100 bets with an EV of 1% at 10$ per bet means you can expect to make .10c per bet for a total profit of 10$
