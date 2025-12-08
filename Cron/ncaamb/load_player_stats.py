@@ -34,7 +34,7 @@ def construct_game_id(date_str, team, opponent):
     return game_id
 
 
-def load_player_stats_to_db(year='2025', season=2025):
+def load_player_stats_to_db(year='2025', season=2025, target_game_ids=None):
     """
     Load player stats from Bart Torvik API into player_stats table.
     Only inserts stats for games that exist in the games table.
@@ -42,18 +42,9 @@ def load_player_stats_to_db(year='2025', season=2025):
     Args:
         year: Season year (e.g., '2025')
         season: Season number for database (e.g., 2025)
+        target_game_ids: Optional set/list of game_ids to load stats for. If None, loads for all games.
     """
     try:
-        # Scrape player stats
-        print(f"Loading player stats for {year}...")
-        df = scrape_player_stats(year=year)
-
-        if df is None or len(df) == 0:
-            print("No player stats data found")
-            return
-
-        print(f"\nProcessing {len(df)} player records...")
-
         # Connect to database
         conn = mysql.connector.connect(
             host=os.getenv("DB_HOST"),
@@ -69,7 +60,54 @@ def load_player_stats_to_db(year='2025', season=2025):
         print(f"Fetching existing game_ids from database...")
         cursor.execute("SELECT DISTINCT game_id FROM games WHERE season = %s", (season,))
         existing_game_ids = set(row[0] for row in cursor.fetchall())
-        print(f"  Found {len(existing_game_ids)} games in database for season {season}\n")
+        print(f"  Found {len(existing_game_ids)} games in database for season {season}")
+
+        # If target_game_ids provided, filter to only those that exist in games table
+        if target_game_ids:
+            target_game_ids = set(target_game_ids) & existing_game_ids
+            print(f"  Filtering to {len(target_game_ids)} target game_ids")
+        else:
+            target_game_ids = existing_game_ids
+
+        # Check which game_ids already have player stats
+        print(f"Checking which games already have player stats...")
+        placeholders = ','.join(['%s'] * len(target_game_ids))
+        cursor.execute(
+            f"SELECT DISTINCT game_id FROM player_stats WHERE game_id IN ({placeholders})",
+            tuple(target_game_ids)
+        )
+        games_with_stats = set(row[0] for row in cursor.fetchall())
+        games_needing_stats = target_game_ids - games_with_stats
+
+        print(f"  {len(games_with_stats)} games already have player stats")
+        print(f"  {len(games_needing_stats)} games need player stats")
+
+        if len(games_needing_stats) == 0:
+            print("\n[+] All target games already have player stats - skipping scrape\n")
+            cursor.close()
+            conn.close()
+            return
+
+        # Scrape player stats only if needed
+        print(f"\nScraping player stats for {year}...")
+        df = scrape_player_stats(year=year)
+
+        if df is None or len(df) == 0:
+            print("No player stats data found")
+            cursor.close()
+            conn.close()
+            return
+
+        print(f"Retrieved {len(df)} total player records")
+
+        # Filter DataFrame to only include target games BEFORE processing
+        print(f"Filtering to only target games...")
+        df['game_id'] = df.apply(
+            lambda row: construct_game_id(str(row.get('numdate')), row.get('tt'), row.get('opponent')),
+            axis=1
+        )
+        df = df[df['game_id'].isin(target_game_ids)]
+        print(f"  Filtered down to {len(df)} records for target games\n")
 
         # Prepare insert statement
         insert_query = """
@@ -110,20 +148,14 @@ def load_player_stats_to_db(year='2025', season=2025):
 
         successful = 0
         failed = 0
-        skipped = 0
 
         for idx, row in df.iterrows():
             try:
-                # Construct game_id using numdate (YYYYMMDD format) instead of datetext (M-D format)
-                game_id = construct_game_id(str(row.get('numdate')), row.get('tt'), row.get('opponent'))
+                # Use game_id already computed during filtering
+                game_id = row.get('game_id')
 
                 if not game_id:
                     failed += 1
-                    continue
-
-                # Skip if game doesn't exist in database
-                if game_id not in existing_game_ids:
-                    skipped += 1
                     continue
 
                 # Prepare values - convert NaN to None for SQL NULL
@@ -169,7 +201,7 @@ def load_player_stats_to_db(year='2025', season=2025):
         conn.close()
 
         print(f"\n{'='*100}")
-        print(f"Load complete: {successful} inserted, {skipped} skipped (game not in DB), {failed} failed out of {len(df)} records")
+        print(f"Load complete: {successful} inserted, {failed} failed out of {len(df)} records")
         print(f"{'='*100}")
 
     except Exception as e:

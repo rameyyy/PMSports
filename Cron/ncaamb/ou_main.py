@@ -413,12 +413,13 @@ def push_match_history(game_data: dict, season: str):
     return len(teams_pushed)
 
 
-def load_player_stats(season: str = '2026'):
+def load_player_stats(season: str = '2026', target_game_ids=None):
     """
     Load player stats for the given season from Barttorvik API.
 
     Args:
         season: Season year (e.g., '2026')
+        target_game_ids: Optional list/set of game_ids to load stats for
 
     Returns:
         bool: True if successful, False otherwise
@@ -429,7 +430,7 @@ def load_player_stats(season: str = '2026'):
 
     try:
         print(f"Loading player stats for season {season}...")
-        load_player_stats_to_db(year=season, season=int(season))
+        load_player_stats_to_db(year=season, season=int(season), target_game_ids=target_game_ids)
         print()
         return True
     except Exception as e:
@@ -944,8 +945,9 @@ def main(target_date: str = None):
                 # # Step 1.5: Push match history for today's teams
                 push_match_history(game_data, season='2026')
 
-                # # Step 2: Load player stats
-                load_player_stats(season='2026')
+                # # Step 2: Load player stats (only for today's games)
+                todays_game_ids = list(game_data.keys())
+                load_player_stats(season='2026', target_game_ids=todays_game_ids)
 
                 # # Step 1.5b: Fetch and push odds data
                 odds_success = fetch_and_push_odds_data()

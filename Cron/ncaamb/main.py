@@ -1616,6 +1616,38 @@ def update_overunder_outcomes():
 
         print(f"[*] Found {len(results)} OU games needing outcome updates")
 
+        # Collect all unique teams that need scraping
+        teams_to_scrape = {}
+        for ou_row in results:
+            team_1 = ou_row.get('team_1')
+            season = ou_row.get('season')
+            season_key = str(season)
+
+            if season_key not in teams_to_scrape:
+                teams_to_scrape[season_key] = set()
+            teams_to_scrape[season_key].add(team_1)
+
+        # Scrape game history for each unique team (once per team)
+        print(f"[*] Scraping game history for unique teams...")
+        game_histories_cache = {}
+
+        for season_key, teams in teams_to_scrape.items():
+            for team in sorted(teams):
+                cache_key = f"{season_key}_{team}"
+                try:
+                    hist = scrape_game_history(season_key, team)
+                    if hist is not None and len(hist) > 0:
+                        game_histories_cache[cache_key] = hist
+                        print(f"  [+] {team}: {len(hist)} games retrieved")
+                    else:
+                        game_histories_cache[cache_key] = None
+                        print(f"  [-] {team}: No game history found")
+                except Exception as e:
+                    game_histories_cache[cache_key] = None
+                    print(f"  [-] {team}: Error - {e}")
+
+        print(f"[*] Processing {len(results)} games...")
+
         updated = 0
         for ou_row in results:
             ou_id = ou_row.get('id')
@@ -1626,8 +1658,9 @@ def update_overunder_outcomes():
             bet_on_side = ou_row.get('bet_on_side')
             season = ou_row.get('season')
 
-            # Scrape game history for team_1 to find the game result
-            game_history = scrape_game_history(str(season), team_1)
+            # Get cached game history for team_1
+            cache_key = f"{season}_{team_1}"
+            game_history = game_histories_cache.get(cache_key)
 
             if game_history is None or len(game_history) == 0:
                 continue
@@ -1741,6 +1774,38 @@ def update_moneyline_outcomes():
 
         print(f"[*] Found {len(results)} ML games needing outcome updates")
 
+        # Collect all unique teams that need scraping
+        teams_to_scrape = {}
+        for ml_row in results:
+            team_1 = ml_row.get('team_1')
+            season = ml_row.get('season')
+            season_key = str(season)
+
+            if season_key not in teams_to_scrape:
+                teams_to_scrape[season_key] = set()
+            teams_to_scrape[season_key].add(team_1)
+
+        # Scrape game history for each unique team (once per team)
+        print(f"[*] Scraping game history for unique teams...")
+        game_histories_cache = {}
+
+        for season_key, teams in teams_to_scrape.items():
+            for team in sorted(teams):
+                cache_key = f"{season_key}_{team}"
+                try:
+                    hist = scrape_game_history(season_key, team)
+                    if hist is not None and len(hist) > 0:
+                        game_histories_cache[cache_key] = hist
+                        print(f"  [+] {team}: {len(hist)} games retrieved")
+                    else:
+                        game_histories_cache[cache_key] = None
+                        print(f"  [-] {team}: No game history found")
+                except Exception as e:
+                    game_histories_cache[cache_key] = None
+                    print(f"  [-] {team}: Error - {e}")
+
+        print(f"[*] Processing {len(results)} games...")
+
         updated = 0
         for ml_row in results:
             ml_id = ml_row.get('id')
@@ -1751,8 +1816,9 @@ def update_moneyline_outcomes():
             bet_on = ml_row.get('bet_on')
             season = ml_row.get('season')
 
-            # Scrape game history for team_1 to find the game result
-            game_history = scrape_game_history(str(season), team_1)
+            # Get cached game history for team_1
+            cache_key = f"{season}_{team_1}"
+            game_history = game_histories_cache.get(cache_key)
 
             if game_history is None or len(game_history) == 0:
                 continue
