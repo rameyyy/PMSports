@@ -898,7 +898,10 @@ def get_game_data_for_games(games_df: pd.DataFrame, season: str):
         team_1 = teams_sorted[0]
         team_2 = teams_sorted[1]
 
-        game_id = f"{row['date'].replace('/', '')}_{team_1}_{team_2}"
+        # Parse date to YYYYMMDD format (same as push_todays_games_to_db)
+        date_obj = pd.to_datetime(row['date'], format='%m/%d/%y')
+        date_yyyymmdd = date_obj.strftime('%Y%m%d')
+        game_id = f"{date_yyyymmdd}_{team_1}_{team_2}"
 
         game_data[game_id] = {
             'team_1': team_1,

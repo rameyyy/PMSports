@@ -69,6 +69,13 @@ def load_player_stats_to_db(year='2025', season=2025, target_game_ids=None):
         else:
             target_game_ids = existing_game_ids
 
+        # Early exit if no target games
+        if len(target_game_ids) == 0:
+            print("\n[+] No target games to process - skipping player stats load\n")
+            cursor.close()
+            conn.close()
+            return
+
         # Check which game_ids already have player stats
         print(f"Checking which games already have player stats...")
         placeholders = ','.join(['%s'] * len(target_game_ids))
