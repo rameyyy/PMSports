@@ -525,9 +525,13 @@ def make_ou_predictions(features_df: pl.DataFrame):
 
         print(f"Loading trained models from {models_dir}...\n")
 
-        # Load XGBoost model (JSON format)
+        # Load XGBoost model using Booster
+        from xgboost import Booster as XGBBooster
+        xgb_booster = XGBBooster()
+        xgb_booster.load_model(str(models_dir / "xgboost_model.pkl"))
+        # Wrap in XGBRegressor for sklearn compatibility
         xgb_model = XGBRegressor()
-        xgb_model.load_model(str(models_dir / "xgboost_model.pkl"))
+        xgb_model._Booster = xgb_booster
         print("  [+] Loaded XGBoost model")
 
         # Load LightGBM model (JSON format)
