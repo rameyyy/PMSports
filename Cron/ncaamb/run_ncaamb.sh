@@ -10,5 +10,5 @@ CRON_DIR="$PROJECT_DIR/Cron/ncaamb"
 source "$VENV_DIR/bin/activate"
 
 # Run scripts
-python "$CRON_DIR/main.py"
+python "$CRON_DIR/main.py" --no-scrape --no-push
 python "$CRON_DIR/send_email.py"
