@@ -919,7 +919,7 @@ def get_game_data_for_games(games_df: pd.DataFrame, season: str):
     return game_data
 
 
-def main(target_date: str = None):
+def main(target_date: str = None, scrape_data: bool = True):
     print("\n")
     features_df = None
     predictions_df = None
@@ -933,15 +933,14 @@ def main(target_date: str = None):
         print("\n" + "-"*80)
         print("STEP 1: Pushing games to database")
         print("-"*80 + "\n")
-        SCRAPEDATA = True
-        if SCRAPEDATA:
+        if scrape_data:
             success = push_todays_games_to_db(todays_games)
             game_data = get_game_data_for_games(todays_games, season='2026')
         else:
             success=True
 
         if success:
-            if SCRAPEDATA:
+            if scrape_data:
                 # Step 1.3: Fetch and push leaderboard
                 fetch_and_push_leaderboard(season='2026')
 

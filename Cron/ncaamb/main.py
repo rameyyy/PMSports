@@ -2252,7 +2252,7 @@ def export_all_games_with_odds(features_df: pl.DataFrame, lgb_model, xgb_model, 
         print("[*] No games to export\n")
 
 
-def main(manual_date: str = None):
+def main(manual_date: str = None, scrape_data: bool = True, push_predictions: bool = True):
     print("\n")
     print("="*80)
     print("FUTURES REPORT - ML & OU BETTING RECOMMENDATIONS")
@@ -2276,6 +2276,11 @@ def main(manual_date: str = None):
         target_date = get_todays_date()
         target_date_yyyymmdd = get_todays_date_yyyymmdd()
 
+    # Display configuration
+    print(f"[*] Configuration:")
+    print(f"    Scrape data: {scrape_data}")
+    print(f"    Push predictions: {push_predictions}\n")
+
     # Step 0: Update outcomes for any completed games and bankroll tables
     print("STEP 0: Updating Game Outcomes and Bankroll Tracking")
     print("-"*80 + "\n")
@@ -2293,7 +2298,7 @@ def main(manual_date: str = None):
     print("STEP 1: Running OU pipeline to scrape data and make predictions")
     print("-"*80 + "\n")
 
-    features_df, predictions_df = ou_module.main(target_date=target_date)
+    features_df, predictions_df = ou_module.main(target_date=target_date, scrape_data=scrape_data)
 
     if features_df is None or predictions_df is None:
         print("[-] OU pipeline failed")
@@ -2391,10 +2396,14 @@ def main(manual_date: str = None):
     print(f"[+] Found {len(ou_bets)} OU bets meeting V3.0 Rules criteria (Expected ROI: +10.13%)\n")
 
     # Step 4b.5: Insert over/under data into database
-    print("STEP 4b.5: Inserting Over/Under Data into Database")
-    print("-"*80 + "\n")
+    if push_predictions:
+        print("STEP 4b.5: Inserting Over/Under Data into Database")
+        print("-"*80 + "\n")
 
-    insert_overunder_bets(predictions_df, ou_bets, allowed_bookmakers, target_date_yyyymmdd)
+        insert_overunder_bets(predictions_df, ou_bets, allowed_bookmakers, target_date_yyyymmdd)
+    else:
+        print("STEP 4b.5: Skipping Over/Under Database Insert (--no-push flag)")
+        print("-"*80 + "\n")
 
     # Step 4c: Get ML bets with Clay's Optimal Rules
     print("STEP 4c: Extracting ML Valid Bets (Clay's Optimal Rules)")
@@ -2404,22 +2413,26 @@ def main(manual_date: str = None):
     ml_bets = get_ml_bets(features_df, lgb_model, xgb_model, allowed_bookmakers, team_mappings=team_mappings)
 
     # Step 4c.5: Insert moneyline data into database
-    print("\nSTEP 4c.5: Inserting Moneyline Data into Database")
-    print("-"*80 + "\n")
+    if push_predictions:
+        print("\nSTEP 4c.5: Inserting Moneyline Data into Database")
+        print("-"*80 + "\n")
 
-    # Get LGB and XGB predictions for insertion
-    X, feature_cols = align_features_to_model(features_df)
-    if X is not None:
-        lgb_proba_all = lgb_model.predict(X)
-        xgb_proba_all = xgb_model.predict_proba(X)[:, 1]
+        # Get LGB and XGB predictions for insertion
+        X, feature_cols = align_features_to_model(features_df)
+        if X is not None:
+            lgb_proba_all = lgb_model.predict(X)
+            xgb_proba_all = xgb_model.predict_proba(X)[:, 1]
 
-        # Load odds for database insertion
-        game_ids = features_df['game_id'].to_list()
-        odds_dict_all = load_odds_for_games(game_ids)
+            # Load odds for database insertion
+            game_ids = features_df['game_id'].to_list()
+            odds_dict_all = load_odds_for_games(game_ids)
 
-        insert_moneyline_bets(features_df, lgb_proba_all, xgb_proba_all, ml_bets, odds_dict_all, allowed_bookmakers, team_mappings, target_date_yyyymmdd)
+            insert_moneyline_bets(features_df, lgb_proba_all, xgb_proba_all, ml_bets, odds_dict_all, allowed_bookmakers, team_mappings, target_date_yyyymmdd)
+        else:
+            print("[-] Could not align features for database insertion\n")
     else:
-        print("[-] Could not align features for database insertion\n")
+        print("\nSTEP 4c.5: Skipping Moneyline Database Insert (--no-push flag)")
+        print("-"*80 + "\n")
 
     # Step 4c.6: Cleanup cancelled games (missing predictions after 7+ days)
     print("\nSTEP 4c.6: Cleaning Up Cancelled Games")
@@ -2431,59 +2444,7 @@ def main(manual_date: str = None):
     print("-"*80 + "\n")
     export_all_predictions(features_df, lgb_model, xgb_model, predictions_df, target_date_yyyymmdd)
 
-    # Export valid bets to Excel with date in filename
-    print("Exporting valid bets to Excel...")
-
-    output_file = Path(__file__).parent / f"bets_{target_date_yyyymmdd}.xlsx"
-
-    # Combine ML and OU bets
-    all_bets = []
-
-    # Add ML bets
-    for bet in ml_bets:
-        all_bets.append({
-            'type': 'ML',
-            'date': bet['date'],
-            'game_id': bet['game_id'],
-            'bet_on': bet['team'],
-            'opponent': bet['opponent'],
-            'odds': bet['odds'],
-            'decimal': round(bet['decimal'], 3),
-            'win_prob': round(bet['win_prob'], 4),
-            'ev_percent': round(bet['ev_percent'], 2),
-            'bookmaker': bet['bookmaker']
-        })
-
-    # Add OU bets
-    for bet in ou_bets:
-        point_key = 'over_point' if bet.get('bet') == 'OVER' else 'under_point'
-        point_value = bet.get(point_key, bet.get('over_point', ''))
-
-        all_bets.append({
-            'type': 'OU',
-            'date': bet['date'],
-            'game_id': bet['game_id'],
-            'bet_on': bet.get('bet', 'OVER'),
-            'opponent': '',
-            'odds': '',
-            'decimal': '',
-            'win_prob': '',
-            'ev_percent': round(bet['difference'], 2),
-            'bookmaker': bet['bookmaker'],
-            'ensemble': round(bet['ensemble'], 2),
-            'ou_point': round(point_value, 2) if point_value else '',
-            'confidence': round(bet.get('confidence', 0), 4),
-            'good_bet_score': round(bet.get('good_bet_score', 0), 4)
-        })
-
-    if all_bets:
-        output_df = pl.DataFrame(all_bets)
-        output_df.write_excel(str(output_file))
-        print(f"[+] Exported {len(all_bets)} bets to {output_file}\n")
-    else:
-        print(f"[*] No valid bets found to export\n")
-
-    # Done - exported to Excel
+    # Done
     print("\n" + "="*80)
     print("DONE")
     print("="*80 + "\n")
@@ -2553,6 +2514,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Run betting recommendations for a specific date')
     parser.add_argument('--date', type=str, default=None, help='Date to run for in YYYY-MM-DD format (default: today)')
+    parser.add_argument('--no-scrape', action='store_true', help='Skip data scraping (default: scrape data)')
+    parser.add_argument('--no-push', action='store_true', help='Skip pushing predictions to database (default: push predictions)')
     args = parser.parse_args()
 
-    main(manual_date=args.date)
+    main(manual_date=args.date, scrape_data=not args.no_scrape, push_predictions=not args.no_push)
