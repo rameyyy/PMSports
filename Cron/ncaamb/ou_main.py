@@ -527,7 +527,7 @@ def make_ou_predictions(features_df: pl.DataFrame):
 
         # Load XGBoost model (JSON format)
         xgb_model = XGBRegressor()
-        xgb_model.load_model(str(models_dir / "xgboost_model.pkl"))
+        xgb_model.load_model(str(models_dir / "xgboost_model.ubj"))
         print("  [+] Loaded XGBoost model")
 
         # Load LightGBM model (JSON format)
