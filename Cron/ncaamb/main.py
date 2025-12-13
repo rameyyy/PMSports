@@ -2282,17 +2282,21 @@ def main(manual_date: str = None, scrape_data: bool = True, push_predictions: bo
     print(f"    Push predictions: {push_predictions}\n")
 
     # Step 0: Update outcomes for any completed games and bankroll tables
-    print("STEP 0: Updating Game Outcomes and Bankroll Tracking")
-    print("-"*80 + "\n")
+    if scrape_data:
+        print("STEP 0: Updating Game Outcomes and Bankroll Tracking")
+        print("-"*80 + "\n")
 
-    update_overunder_outcomes()
-    update_moneyline_outcomes()
+        update_overunder_outcomes()
+        update_moneyline_outcomes()
 
-    # Update bankroll tables for yesterday's bets
-    print("STEP 0.5: Updating Bankroll Tables")
-    print("-"*80 + "\n")
-    update_my_bankroll()
-    update_bankroll()
+        # Update bankroll tables for yesterday's bets
+        print("STEP 0.5: Updating Bankroll Tables")
+        print("-"*80 + "\n")
+        update_my_bankroll()
+        update_bankroll()
+    else:
+        print("STEP 0: Skipping Game Outcomes and Bankroll Updates (--no-scrape flag)")
+        print("-"*80 + "\n")
 
     # Step 1: Run ou_main.main() to scrape all data and get predictions
     print("STEP 1: Running OU pipeline to scrape data and make predictions")

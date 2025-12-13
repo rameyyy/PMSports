@@ -244,7 +244,7 @@ def format_email_body(ml_bets, ou_bets, yesterday_results=None):
             body += f"BET: {bet_side} {over_point}\n\n"
 
     if not ml_bets and not ou_bets:
-        body = "No bets for today.\n"
+        body += "No bets for today.\n"
 
     return body
 
