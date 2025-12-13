@@ -8,3 +8,4 @@ config*.json
 # *.csv
 /react-site/src/Captcha.tsx
 .DS_store
+venv/
