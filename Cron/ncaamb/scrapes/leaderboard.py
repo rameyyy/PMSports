@@ -76,7 +76,7 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
     }
     options.add_experimental_option("prefs", prefs)
 
-    driver = uc.Chrome(options=options)
+    driver = uc.Chrome(options=options, use_subprocess=True)
 
     try:
         # Visit main page first
