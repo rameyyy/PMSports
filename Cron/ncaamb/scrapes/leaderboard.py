@@ -76,7 +76,18 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
     }
     options.add_experimental_option("prefs", prefs)
 
-    driver = uc.Chrome(options=options, use_subprocess=True)
+    try:
+        # Try to initialize Chrome driver with common configurations
+        driver = uc.Chrome(
+            options=options,
+            use_subprocess=True,
+            driver_executable_path=None,
+            browser_executable_path=None
+        )
+    except Exception as e:
+        # If that fails, try without use_subprocess
+        print(f"  [*] Retrying Chrome initialization without use_subprocess...")
+        driver = uc.Chrome(options=options)
 
     try:
         # Visit main page first
