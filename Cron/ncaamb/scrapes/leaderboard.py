@@ -105,7 +105,7 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
         downloaded_files = [f for f in os.listdir(download_dir) if f.endswith('.csv')]
 
         if not downloaded_files:
-            print("❌ Error: No CSV file found in download directory")
+            print("[-] Error: No CSV file found in download directory")
             return None
 
         # Get the most recent CSV
@@ -176,7 +176,6 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
             col_order = ['date', 'rank', 'team', 'barthag', 'wins', 'losses'] + stat_cols
             df = df[[col for col in col_order if col in df.columns]]
 
-
             # Push to database
             success = sqlconn.execute_query(df=df, table_name='leaderboard', if_exists='append')
 
@@ -187,17 +186,19 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
                 try:
                     os.remove(csv_path)
                 except Exception as e:
-                    print(f"⚠️  Warning: Could not remove {csv_file}: {e}")
+                    print(f"[!] Warning: Could not remove {csv_file}: {e}")
 
             if success:
-                print(f"✅ Data pushed to ncaamb.leaderboard successfully")
+                print(f"[+] Data pushed to ncaamb.leaderboard successfully")
             else:
-                print(f"❌ Failed to push data to database")
+                print(f"[-] Failed to push data to database")
 
             return df
 
         except Exception as e:
-            print(f"❌ Error processing CSV: {e}")
+            print(f"[-] Error processing CSV: {e}")
+            import traceback
+            traceback.print_exc()
             return None
             
     finally:

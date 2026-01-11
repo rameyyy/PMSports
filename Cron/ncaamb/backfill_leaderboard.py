@@ -86,6 +86,6 @@ if __name__ == "__main__":
     # This is part of the 2025-26 season (season year 2026)
     backfill_leaderboard_data(
         start_date_str="2025/12/09",
-        end_date_str="2026/01/11",
+        end_date_str="2025/12/10",
         season_year="2026"
     )
