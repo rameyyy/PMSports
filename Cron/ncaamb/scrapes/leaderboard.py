@@ -101,14 +101,14 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
         # Wait for download to complete
         time.sleep(5)
 
-        # Find the downloaded file
-        downloaded_files = [f for f in os.listdir(download_dir) if f.endswith('.csv')]
+        # Find the downloaded trank_data CSV file (not other CSV files in the directory)
+        downloaded_files = [f for f in os.listdir(download_dir) if f.startswith('trank_data') and f.endswith('.csv')]
 
         if not downloaded_files:
-            print("[-] Error: No CSV file found in download directory")
+            print("[-] Error: No trank_data CSV file found in download directory")
             return None
 
-        # Get the most recent CSV
+        # Get the most recent trank_data CSV
         latest_file = max([os.path.join(download_dir, f) for f in downloaded_files],
                         key=os.path.getctime)
         try:
