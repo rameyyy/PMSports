@@ -304,7 +304,11 @@ def fetch_and_push_leaderboard(season: str = '2026'):
         end_date = f"{month}{day}"
 
         print(f"Fetching leaderboard for {season} (end date: {month}/{day})...\n")
-        leaderboard_df = scrape_barttorvik_csv(year=season, end_date=end_date)
+        leaderboard_df = scrape_barttorvik_csv(
+            year=season,
+            end_date=end_date,
+            output_dir='/home/caramey/snap/chromium/3343/Downloads'
+        )
 
         if leaderboard_df is not None and len(leaderboard_df) > 0:
             print(f"  [+] Retrieved leaderboard with {len(leaderboard_df)} teams\n")

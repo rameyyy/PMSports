@@ -43,7 +43,7 @@ def backfill_leaderboard_data(start_date_str, end_date_str, season_year):
             # Call the scraper with current date
             df = scrape_barttorvik_csv(
                 year=season_year,
-                output_dir='.',
+                output_dir='/home/caramey/snap/chromium/3343/Downloads',
                 end_date=end_date_param
             )
 
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     # Backfill from December 9, 2025 to January 11, 2026
     # This is part of the 2025-26 season (season year 2026)
     backfill_leaderboard_data(
-        start_date_str="2025/12/09",
-        end_date_str="2025/12/10",
+        start_date_str="2026/01/12",
+        end_date_str="2026/01/12",
         season_year="2026"
     )
