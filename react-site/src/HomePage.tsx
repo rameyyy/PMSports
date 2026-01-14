@@ -18,7 +18,7 @@ export default function HomePage() {
   const [pickOfDay, setPickOfDay] = useState({
     todayPick: null as any,
     yesterdayPick: null as any,
-    record: { correct: 0, total: 0, accuracy: 0 }
+    record: { correct: 0, total: 0, accuracy: 0, roi: 0, avg_odds: 0 }
   });
   const [loading, setLoading] = useState(true);
 
