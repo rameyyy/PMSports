@@ -11,4 +11,5 @@ source "$VENV_DIR/bin/activate"
 
 # Run scripts
 python "$CRON_DIR/main.py"
+python "$CRON_DIR/pick_of_day.py"
 python "$CRON_DIR/send_email.py"
