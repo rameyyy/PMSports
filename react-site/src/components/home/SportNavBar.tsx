@@ -22,12 +22,7 @@ export default function SportNavBar({ sports }: SportNavBarProps) {
             <button
               key={sport.name}
               onClick={() => sport.available && navigate(sport.path)}
-              className={`flex items-center gap-2 md:gap-2.5 ${
-                sport.available
-                  ? 'text-white hover:text-orange-500 transition-colors'
-                  : 'text-slate-300 cursor-default'
-              }`}
-              disabled={!sport.available}
+              className="flex items-center gap-2 md:gap-2.5 text-white hover:text-orange-500 transition-colors"
             >
               <img src={sport.logo} alt={sport.name} className="h-5 w-5 md:h-6 md:w-6 object-contain" />
               <span className="text-sm md:text-base">{sport.name}</span>

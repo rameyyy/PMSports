@@ -1,6 +1,7 @@
 from flask import Flask
 # from flask_cors import CORS
 from routes.ufc_routes import ufc_bp
+from routes.ncaamb_routes import ncaamb_bp
 from config import Config
 
 app = Flask(__name__)
@@ -10,6 +11,7 @@ app.config.from_object(Config)
 
 # Register blueprints
 app.register_blueprint(ufc_bp)
+app.register_blueprint(ncaamb_bp)
 
 @app.route('/')
 def index():
