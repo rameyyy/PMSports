@@ -126,12 +126,9 @@ def get_pick_of_day_data():
             m.gbm_prob_team_2,
             m.best_book_odds_team_1,
             m.best_book_odds_team_2,
-            m.winning_team,
-            g.date,
-            g.time
+            m.winning_team
         FROM ncaamb.moneyline_picks mp
         JOIN ncaamb.moneyline m ON mp.game_id = m.game_id
-        JOIN ncaamb.games g ON mp.game_id = g.game_id
         WHERE mp.pick_of_day = 1
           AND mp.date = %s
     """
@@ -147,12 +144,9 @@ def get_pick_of_day_data():
             m.gbm_prob_team_2,
             m.best_book_odds_team_1,
             m.best_book_odds_team_2,
-            m.winning_team,
-            g.date,
-            g.time
+            m.winning_team
         FROM ncaamb.moneyline_picks mp
         JOIN ncaamb.moneyline m ON mp.game_id = m.game_id
-        JOIN ncaamb.games g ON mp.game_id = g.game_id
         WHERE mp.pick_of_day = 1
           AND mp.date = %s
     """
@@ -249,7 +243,7 @@ def get_pick_of_day_data():
         matchup = f"{pick_data['team_1']} vs {pick_data['team_2']}"
 
         result = None
-        if pick_data['winning_team']:
+        if pick_data.get('winning_team'):
             won = (pick_data['gbm_prob_team_1'] > pick_data['gbm_prob_team_2'] and pick_data['winning_team'] == pick_data['team_1']) or \
                   (pick_data['gbm_prob_team_1'] <= pick_data['gbm_prob_team_2'] and pick_data['winning_team'] == pick_data['team_2'])
             result = 'W' if won else 'L'
@@ -260,8 +254,8 @@ def get_pick_of_day_data():
             'picked_team': picked_team,
             'picked_odds': picked_odds,
             'betting_rule': pick_data['betting_rule'],
-            'date': str(pick_data['date']),
-            'time': str(pick_data['time']) if pick_data['time'] else None,
+            'date': str(pick_data['date']) if pick_data.get('date') else None,
+            'time': str(pick_data['time']) if pick_data.get('time') else None,
             'result': result
         }
 
