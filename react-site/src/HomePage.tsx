@@ -50,7 +50,7 @@ export default function HomePage() {
 
   // Sport navigation data
   const sports = [
-    { name: "NCAA Men's Basketball", logo: "/logo/ncaa-logo.png", path: "/cbb", available: false },
+    { name: "Men's Basketball", logo: "/logo/ncaa-logo.png", path: "/ncaamb", available: true },
     { name: "MMA", logo: "/logo/ufc-logo.png", path: "/ufc", available: true }
   ];
 
@@ -59,11 +59,11 @@ export default function HomePage() {
   };
 
   const basketballData = {
-    name: "NCAA Basketball",
+    name: "Men's Basketball",
     subtitle: "Daily games (Nov - Apr)",
     logo: "/logo/ncaa-logo.png",
-    path: "/cbb",
-    available: false,
+    path: "/ncaamb",
+    available: true,
     nextEvent: {
       name: basketballStats.gamesCount === -1 ? "Games updating..." : "Today's Games",
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -106,7 +106,7 @@ export default function HomePage() {
 
   // UFC data
   const ufcData = {
-    name: "MMA / UFC",
+    name: "MMA",
     subtitle: "Weekly events",
     logo: "/logo/ufc-logo.png",
     path: "/ufc",

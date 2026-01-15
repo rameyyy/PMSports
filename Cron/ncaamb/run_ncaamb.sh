@@ -1,4 +1,4 @@
-#!/bin/bash
+do'#!/bin/bash
 set -e
 
 # Absolute paths only (cron requires this)
