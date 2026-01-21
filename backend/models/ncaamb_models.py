@@ -50,7 +50,6 @@ def get_homepage_stats():
           AND gbm_prob_team_2 IS NOT NULL
           AND best_book_odds_team_1 IS NOT NULL
           AND best_book_odds_team_2 IS NOT NULL
-          AND best_book_odds_team_1 != best_book_odds_team_2
     """
     model_result = execute_query(model_accuracy_query, fetch_one=True, database='ncaamb')
 
@@ -79,7 +78,6 @@ def get_homepage_stats():
           AND winning_team IS NOT NULL
           AND best_book_odds_team_1 IS NOT NULL
           AND best_book_odds_team_2 IS NOT NULL
-          AND best_book_odds_team_1 != best_book_odds_team_2
     """
     vegas_result = execute_query(vegas_accuracy_query, fetch_one=True, database='ncaamb')
 
