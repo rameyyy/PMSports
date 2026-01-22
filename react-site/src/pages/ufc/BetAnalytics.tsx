@@ -362,7 +362,7 @@ export default function BetAnalyticsPage() {
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }}
                   labelStyle={{ color: '#e2e8f0' }}
                   itemStyle={{ color: '#10b981' }}
-                  formatter={(value: number | undefined) => value !== undefined ? `${value.toFixed(2)}%` : 'N/A'}
+                  formatter={(value) => typeof value === 'number' ? `${value.toFixed(2)}%` : 'N/A'}
                 />
                 <Area
                   type="monotone"
@@ -397,7 +397,7 @@ export default function BetAnalyticsPage() {
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }}
                   labelStyle={{ color: '#e2e8f0' }}
                   itemStyle={{ color: '#ef4444' }}
-                  formatter={(value: number | undefined) => value !== undefined ? formatCurrency(Math.abs(value)) : 'N/A'}
+                  formatter={(value) => typeof value === 'number' ? formatCurrency(Math.abs(value)) : 'N/A'}
                 />
                 <Area
                   type="monotone"

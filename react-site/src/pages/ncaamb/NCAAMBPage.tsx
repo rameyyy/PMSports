@@ -56,7 +56,7 @@ export default function NCAAMBPage() {
                 edgeAfterVig={6.6}
               />
             )}
-            <GamesTable />
+            <GamesTable isToday={selectedDate >= new Date(new Date().setHours(0, 0, 0, 0))} />
           </>
         )}
 

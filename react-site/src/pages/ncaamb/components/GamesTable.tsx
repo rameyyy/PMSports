@@ -52,9 +52,6 @@ export default function GamesTable({ isToday }: GamesTableProps) {
             // For past days, determine if predictions were correct
             const isPastGame = 'winner' in game && 'actualTotal' in game;
             const pickCorrect = isPastGame ? game.modelPick === game.winner : null;
-            const totalPredOver = game.modelTotal > game.totalLine;
-            const actualWentOver = isPastGame ? game.actualTotal > game.totalLine : null;
-            const totalCorrect = isPastGame ? totalPredOver === actualWentOver : null;
 
             return (
               <tr
