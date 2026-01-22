@@ -1,4 +1,4 @@
-name: Auto pull to prod
+name: Deploy Production
 
 on:
   push:
@@ -14,3 +14,8 @@ jobs:
           cd /home/caramey/prod
           git fetch origin main
           git reset --hard origin/main
+
+      - name: Make shell scripts executable
+        run: |
+          cd /home/caramey/prod
+          find . -name "*.sh" -exec chmod +x {} \;
