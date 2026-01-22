@@ -2,7 +2,15 @@ import undetected_chromedriver as uc
 import pandas as pd
 import time
 import os
-from . import sqlconn
+import sys
+
+# Handle imports for both package and direct execution
+try:
+    from . import sqlconn
+except ImportError:
+    # Running directly, adjust path
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from scrapes import sqlconn
 
 def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
     # Column headers - raw CSV columns (will be reordered and renamed)
@@ -46,8 +54,9 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
         'col36'         # 36: Drop
     ]
     
-    # Setup download directory
+    # Setup download directory - ensure it exists
     download_dir = os.path.abspath(output_dir)
+    os.makedirs(download_dir, exist_ok=True)
 
     # Build date parameters
     begin_date = f"{int(year)-1}1101"  # November 1st of previous year
@@ -63,54 +72,128 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
         # Default to current year's date (for simplicity, use end of season)
         end_date_full = f"{year}0630"  # June 30th as default
 
-    options = uc.ChromeOptions()
-    options.add_argument('--headless=new')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--window-size=1920,1080')
+    def create_chrome_options(download_dir):
+        """Create a fresh ChromeOptions object with download preferences"""
+        options = uc.ChromeOptions()
+        options.add_argument('--headless=new')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--window-size=1920,1080')
+        options.add_argument('--disable-dev-shm-usage')
 
-    # Set download preferences
-    prefs = {
-        "download.default_directory": download_dir,
-        "download.prompt_for_download": False,
-        "download.directory_upgrade": True,
-    }
-    options.add_experimental_option("prefs", prefs)
+        # Set download preferences
+        prefs = {
+            "download.default_directory": download_dir,
+            "download.prompt_for_download": False,
+            "download.directory_upgrade": True,
+            "safebrowsing.enabled": False
+        }
+        options.add_experimental_option("prefs", prefs)
+        return options
 
+    # Find Chromium/Chrome executable
+    chromium_paths = [
+        '/snap/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium',
+        '/usr/bin/google-chrome',
+        None  # Let uc auto-detect
+    ]
+
+    browser_path = None
+    for path in chromium_paths:
+        if path is None or os.path.exists(path):
+            browser_path = path
+            break
+
+    # Try to initialize Chrome driver
+    driver = None
     try:
-        # Try to initialize Chrome driver with common configurations
+        # First attempt with use_subprocess=True and Chrome version 143
+        options = create_chrome_options(download_dir)
         driver = uc.Chrome(
             options=options,
+            browser_executable_path=browser_path,
             use_subprocess=True,
-            driver_executable_path=None,
-            browser_executable_path=None
+            version_main=143  # Explicitly use Chrome 143
         )
     except Exception as e:
-        # If that fails, try without use_subprocess
-        print(f"  [*] Retrying Chrome initialization without use_subprocess...")
-        driver = uc.Chrome(options=options)
+        print(f"  [*] First attempt failed: {str(e)[:100]}...")
+        try:
+            # Try without use_subprocess with FRESH options
+            print(f"  [*] Retrying Chrome initialization without use_subprocess...")
+            options = create_chrome_options(download_dir)
+            driver = uc.Chrome(
+                options=options,
+                browser_executable_path=browser_path,
+                version_main=143  # Explicitly use Chrome 143
+            )
+        except Exception as e2:
+            print(f"  [*] Second attempt failed: {str(e2)[:100]}...")
+            # Last attempt: let uc find Chrome automatically with minimal config
+            print(f"  [*] Final attempt with minimal options...")
+            options = create_chrome_options(download_dir)
+            driver = uc.Chrome(options=options, use_subprocess=False, version_main=143)
 
     try:
+        # Enable downloads in headless mode using CDP
+        driver.execute_cdp_cmd("Page.setDownloadBehavior", {
+            "behavior": "allow",
+            "downloadPath": download_dir
+        })
+
         # Visit main page first
         driver.get("https://barttorvik.com/")
         time.sleep(3)
+
+        # Get initial list of CSV files before download
+        initial_files = set(f for f in os.listdir(download_dir)
+                          if f.startswith('trank_data') and f.endswith('.csv'))
 
         # Trigger the CSV download with date filters
         url = f"https://barttorvik.com/trank.php?year={year}&begin={begin_date}&end={end_date_full}&csv=1"
         driver.get(url)
 
-        # Wait for download to complete
-        time.sleep(5)
+        # Wait for download to complete with polling (max 30 seconds)
+        print(f"  [*] Waiting for CSV download to complete...")
+        latest_file = None
+        max_wait = 30
+        check_interval = 1
+        elapsed = 0
 
-        # Find the downloaded trank_data CSV file (not other CSV files in the directory)
-        downloaded_files = [f for f in os.listdir(download_dir) if f.startswith('trank_data') and f.endswith('.csv')]
+        while elapsed < max_wait:
+            time.sleep(check_interval)
+            elapsed += check_interval
 
-        if not downloaded_files:
-            print("[-] Error: No trank_data CSV file found in download directory")
-            return None
+            # Find new trank_data CSV files
+            current_files = set(f for f in os.listdir(download_dir)
+                              if f.startswith('trank_data') and f.endswith('.csv'))
+            new_files = current_files - initial_files
 
-        # Get the most recent trank_data CSV
-        latest_file = max([os.path.join(download_dir, f) for f in downloaded_files],
-                        key=os.path.getctime)
+            if new_files:
+                # Found new file(s), get the most recent one
+                candidate_files = [os.path.join(download_dir, f) for f in new_files]
+                latest_file = max(candidate_files, key=os.path.getctime)
+
+                # Check if file is complete (size not changing)
+                initial_size = os.path.getsize(latest_file)
+                time.sleep(0.5)
+                final_size = os.path.getsize(latest_file)
+
+                if initial_size == final_size and final_size > 0:
+                    print(f"  [+] CSV download complete: {os.path.basename(latest_file)}")
+                    break
+
+        if not latest_file:
+            # If no new file found, try to use the most recent existing one
+            all_files = [f for f in os.listdir(download_dir)
+                        if f.startswith('trank_data') and f.endswith('.csv')]
+            if all_files:
+                latest_file = max([os.path.join(download_dir, f) for f in all_files],
+                                key=os.path.getctime)
+                print(f"  [!] No new file detected, using most recent: {os.path.basename(latest_file)}")
+            else:
+                print(f"  [-] Error: No trank_data CSV file found in {download_dir}")
+                return None
         try:
             # Load CSV with no headers, then assign our headers
             df = pd.read_csv(latest_file, header=None)
@@ -206,3 +289,33 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
             driver.quit()
         except:
             pass
+
+
+if __name__ == "__main__":
+    from datetime import datetime
+
+    # Get today's date
+    today = datetime.now()
+    month = f"{today.month:02d}"
+    day = f"{today.day:02d}"
+    end_date = f"{month}{day}"
+    year = '2026'
+
+    # Use project-relative download directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_dir = os.path.dirname(script_dir)
+    download_dir = os.path.join(project_dir, 'downloads', 'leaderboard')
+
+    print(f"\nFetching leaderboard for {year} (end date: {month}/{day})...")
+    print(f"Download directory: {download_dir}\n")
+
+    result = scrape_barttorvik_csv(
+        year=year,
+        end_date=end_date,
+        output_dir=download_dir
+    )
+
+    if result is not None:
+        print(f"\n[+] Successfully scraped and pushed {len(result)} teams to database")
+    else:
+        print(f"\n[-] Failed to scrape leaderboard data")

@@ -303,11 +303,15 @@ def fetch_and_push_leaderboard(season: str = '2026'):
         day = f"{today.day:02d}"
         end_date = f"{month}{day}"
 
+        # Use a dedicated download directory within the project
+        ncaamb_dir = os.path.dirname(os.path.abspath(__file__))
+        download_dir = os.path.join(ncaamb_dir, 'downloads', 'leaderboard')
+
         print(f"Fetching leaderboard for {season} (end date: {month}/{day})...\n")
         leaderboard_df = scrape_barttorvik_csv(
             year=season,
             end_date=end_date,
-            output_dir='/home/caramey/snap/chromium/3343/Downloads'
+            output_dir=download_dir
         )
 
         if leaderboard_df is not None and len(leaderboard_df) > 0:
