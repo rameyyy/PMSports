@@ -1,45 +1,27 @@
 export interface HomepageStats {
-  todays_games: number;
-  model_accuracy: number;
-  model_correct: number;
-  model_total: number;
-  vegas_accuracy: number;
-  vegas_correct: number;
-  vegas_total: number;
-  edge: number;
-}
-
-export interface Pick {
-  game_id: string;
-  matchup: string;
-  picked_team: string;
-  picked_odds: number;
-  betting_rule: string;
   date: string;
-  time: string | null;
-  result: 'W' | 'L' | null;
-}
-
-export interface PickOfDayData {
-  today_pick: Pick | null;
-  yesterday_pick: Pick | null;
-  record: {
-    correct: number;
-    total: number;
-    accuracy: number;
-    roi: number;
-    avg_odds: number;
-  };
+  todays_games_count: number;
+  my_accuracy: number;
+  vegas_accuracy: number;
+  my_total_correct: number;
+  vegas_total_correct: number;
+  total_complete_matches: number;
+  pick_of_day_acc: number;
+  pick_of_day_correct: number;
+  pick_of_day_total: number;
+  pod_avg_odds: number;
+  pod_roi: number;
+  pod_td_matchup: string | null;
+  pod_td_pick: string | null;
+  pod_td_odds: number | null;
+  pod_yd_matchup: string | null;
+  pod_yd_pick: string | null;
+  pod_yd_odds: number | null;
+  pod_yd_outcome: string | null;
 }
 
 export async function fetchHomepageStats(): Promise<HomepageStats> {
   const res = await fetch('/api/ncaamb/homepage-stats');
   if (!res.ok) throw new Error('Failed to fetch homepage stats');
-  return res.json();
-}
-
-export async function fetchPickOfDay(): Promise<PickOfDayData> {
-  const res = await fetch('/api/ncaamb/pick-of-day');
-  if (!res.ok) throw new Error('Failed to fetch pick of the day');
   return res.json();
 }

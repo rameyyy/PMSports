@@ -2,44 +2,17 @@ import { useState, useEffect } from 'react';
 import Navbar from './components/home/Navbar';
 import SportNavBar from './components/home/SportNavBar';
 import SportSection from './components/home/SportSection';
-import { fetchHomepageStats, fetchPickOfDay } from './api/ncaamb';
+import { fetchHomepageStats } from './api/ncaamb';
+import type { HomepageStats } from './api/ncaamb';
 
 export default function HomePage() {
-  const [basketballStats, setBasketballStats] = useState({
-    gamesCount: 0,
-    modelAccuracy: 0,
-    modelCorrect: 0,
-    modelTotal: 0,
-    vegasAccuracy: 0,
-    vegasCorrect: 0,
-    vegasTotal: 0,
-    edge: 0
-  });
-  const [pickOfDay, setPickOfDay] = useState({
-    todayPick: null as any,
-    yesterdayPick: null as any,
-    record: { correct: 0, total: 0, accuracy: 0, roi: 0, avg_odds: 0 }
-  });
+  const [stats, setStats] = useState<HomepageStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([fetchHomepageStats(), fetchPickOfDay()])
-      .then(([stats, pickData]) => {
-        setBasketballStats({
-          gamesCount: stats.todays_games,
-          modelAccuracy: stats.model_accuracy,
-          modelCorrect: stats.model_correct,
-          modelTotal: stats.model_total,
-          vegasAccuracy: stats.vegas_accuracy,
-          vegasCorrect: stats.vegas_correct,
-          vegasTotal: stats.vegas_total,
-          edge: stats.edge
-        });
-        setPickOfDay({
-          todayPick: pickData.today_pick,
-          yesterdayPick: pickData.yesterday_pick,
-          record: pickData.record
-        });
+    fetchHomepageStats()
+      .then(data => {
+        setStats(data);
         setLoading(false);
       })
       .catch(err => {
@@ -48,14 +21,21 @@ export default function HomePage() {
       });
   }, []);
 
-  // Sport navigation data
   const sports = [
     { name: "Men's Basketball", logo: "/logo/ncaa-logo.png", path: "/ncaamb", available: true },
     { name: "MMA", logo: "/logo/ufc-logo.png", path: "/ufc", available: true }
   ];
 
-  const formatOdds = (odds: number) => {
+  const formatOdds = (odds: number | null) => {
+    if (odds === null) return '-';
     return odds > 0 ? `+${odds}` : `${odds}`;
+  };
+
+  const edge = stats ? stats.my_accuracy - stats.vegas_accuracy : 0;
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const basketballData = {
@@ -65,38 +45,38 @@ export default function HomePage() {
     path: "/ncaamb",
     available: true,
     nextEvent: {
-      name: basketballStats.gamesCount === -1 ? "Games updating..." : "Today's Games",
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      gamesCount: basketballStats.gamesCount === -1 ? 0 : basketballStats.gamesCount
+      name: stats?.todays_games_count === -1 ? "Games updating..." : "Today's Games",
+      date: stats?.date ? formatDate(stats.date) : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      gamesCount: stats?.todays_games_count === -1 ? 0 : (stats?.todays_games_count || 0)
     },
     modelAccuracy: {
-      winRate: loading ? "-.-%%" : `${basketballStats.modelAccuracy.toFixed(1)}%`,
-      record: loading ? "-/-" : `${basketballStats.modelCorrect}-${basketballStats.modelTotal}`,
-      totalPicks: basketballStats.modelTotal
+      winRate: loading ? "-.-%%" : `${stats?.my_accuracy.toFixed(1)}%`,
+      record: loading ? "-/-" : `${stats?.my_total_correct}-${stats?.total_complete_matches}`,
+      totalPicks: stats?.total_complete_matches || 0
     },
     vegasAccuracy: {
-      winRate: loading ? "-.-%%" : `${basketballStats.vegasAccuracy.toFixed(1)}%`,
-      record: loading ? "-/-" : `${basketballStats.vegasCorrect}-${basketballStats.vegasTotal}`,
-      totalPicks: basketballStats.vegasTotal
+      winRate: loading ? "-.-%%" : `${stats?.vegas_accuracy.toFixed(1)}%`,
+      record: loading ? "-/-" : `${stats?.vegas_total_correct}-${stats?.total_complete_matches}`,
+      totalPicks: stats?.total_complete_matches || 0
     },
-    edge: loading ? "-.-%%" : `${basketballStats.edge >= 0 ? '+' : ''}${basketballStats.edge.toFixed(1)}%`,
+    edge: loading ? "-.-%%" : `${edge >= 0 ? '+' : ''}${edge.toFixed(1)}%`,
     pick: {
-      record: loading ? "-/-" : `${pickOfDay.record.correct}-${pickOfDay.record.total}`,
-      winRate: loading ? "-.-%%" : `${pickOfDay.record.accuracy.toFixed(1)}%`,
-      avgOdds: loading ? "-" : formatOdds(pickOfDay.record.avg_odds),
-      roi: loading ? "-.-%%" : `${pickOfDay.record.roi >= 0 ? '+' : ''}${pickOfDay.record.roi.toFixed(1)}%`,
-      todayPick: pickOfDay.todayPick ? {
-        title: pickOfDay.todayPick.matchup,
-        prediction: `${pickOfDay.todayPick.picked_team}`,
-        odds: formatOdds(pickOfDay.todayPick.picked_odds),
+      record: loading ? "-/-" : `${stats?.pick_of_day_correct}-${stats?.pick_of_day_total}`,
+      winRate: loading ? "-.-%%" : `${stats?.pick_of_day_acc.toFixed(1)}%`,
+      avgOdds: loading ? "-" : formatOdds(stats?.pod_avg_odds || 0),
+      roi: loading ? "-.-%%" : `${(stats?.pod_roi || 0) >= 0 ? '+' : ''}${stats?.pod_roi.toFixed(1)}%`,
+      todayPick: stats?.pod_td_matchup && stats?.pod_td_pick ? {
+        title: stats.pod_td_matchup,
+        prediction: stats.pod_td_pick,
+        odds: formatOdds(stats.pod_td_odds),
         result: null
       } : null,
-      lastPick: pickOfDay.yesterdayPick ? {
-        title: pickOfDay.yesterdayPick.matchup,
-        prediction: `${pickOfDay.yesterdayPick.picked_team}`,
-        odds: formatOdds(pickOfDay.yesterdayPick.picked_odds),
-        result: pickOfDay.yesterdayPick.result === 'W' ? "correct" as const :
-                pickOfDay.yesterdayPick.result === 'L' ? "incorrect" as const :
+      lastPick: stats?.pod_yd_matchup && stats?.pod_yd_pick ? {
+        title: stats.pod_yd_matchup,
+        prediction: stats.pod_yd_pick,
+        odds: formatOdds(stats.pod_yd_odds),
+        result: stats.pod_yd_outcome === 'W' ? "correct" as const :
+                stats.pod_yd_outcome === 'L' ? "incorrect" as const :
                 null
       } : null,
       pickLabel: "Yesterday's Pick"
@@ -104,7 +84,6 @@ export default function HomePage() {
     pickTitle: "Pick of the Day"
   };
 
-  // UFC data
   const ufcData = {
     name: "MMA",
     subtitle: "Weekly events",
@@ -143,15 +122,12 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Navbar */}
       <div>
         <Navbar />
         <SportNavBar sports={sports} />
       </div>
 
-      {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Sports Sections */}
         <div className="space-y-12">
           <SportSection {...basketballData} />
           <SportSection {...ufcData} />
