@@ -9,7 +9,7 @@ Moneyline Picks & Pick of the Day Script
 """
 
 from scrapes.sqlconn import create_connection, execute_query, fetch
-from analyze_strategies import analyze_all_strategies, american_to_implied_prob
+from analyze_strategies import analyze_all_strategies, american_to_implied_prob, get_underdog_info
 from datetime import datetime
 import pytz
 
@@ -76,29 +76,49 @@ def find_all_picks(games, strategies):
 
     for game in games:
         pred = get_predicted_info(game)
+        dog = get_underdog_info(game)
 
-        if pred['predicted_ev'] is None or pred['predicted_odds'] is None:
-            continue
+        # Check favorite strategies
+        if pred['predicted_ev'] is not None and pred['predicted_odds'] is not None:
+            implied_prob = american_to_implied_prob(pred['predicted_odds'])
 
-        implied_prob = american_to_implied_prob(pred['predicted_odds'])
+            for strategy in strategies:
+                if strategy['side'] != 'favorite':
+                    continue
+                if (implied_prob >= strategy['min_implied'] and
+                    implied_prob < strategy['max_implied'] and
+                    pred['predicted_ev'] > strategy['min_ev']):
 
-        # Check which strategies this game matches
-        for strategy in strategies:
-            if (implied_prob >= strategy['min_implied'] and
-                implied_prob < strategy['max_implied'] and
-                pred['predicted_ev'] > strategy['min_ev']):
+                    all_picks.append({
+                        'game_id': game['game_id'],
+                        'betting_rule': strategy['name'],
+                        'predicted_ev': pred['predicted_ev'],
+                        'implied_prob': implied_prob,
+                        'strategy_roi': strategy['roi'],
+                        'team_1': game['team_1'],
+                        'team_2': game['team_2']
+                    })
+                    break
 
-                all_picks.append({
-                    'game_id': game['game_id'],
-                    'betting_rule': strategy['name'],
-                    'predicted_ev': pred['predicted_ev'],
-                    'implied_prob': implied_prob,
-                    'strategy_roi': strategy['roi'],  # For sorting
-                    'team_1': game['team_1'],
-                    'team_2': game['team_2']
-                })
-                # Only add once per strategy (don't duplicate if multiple strategies match)
-                break
+        # Check underdog strategies
+        if dog['underdog_ev'] is not None and dog['underdog_odds'] is not None:
+            for strategy in strategies:
+                if strategy['side'] != 'underdog':
+                    continue
+                if (dog['underdog_prob'] >= strategy['min_prob'] and
+                    dog['underdog_prob'] < strategy['max_prob'] and
+                    dog['underdog_ev'] > strategy['min_ev']):
+
+                    all_picks.append({
+                        'game_id': game['game_id'],
+                        'betting_rule': strategy['name'],
+                        'predicted_ev': dog['underdog_ev'],
+                        'implied_prob': american_to_implied_prob(dog['underdog_odds']),
+                        'strategy_roi': strategy['roi'],
+                        'team_1': game['team_1'],
+                        'team_2': game['team_2']
+                    })
+                    break
 
     return all_picks
 

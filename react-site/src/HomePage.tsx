@@ -44,11 +44,15 @@ export default function HomePage() {
     logo: "/logo/ncaa-logo.png",
     path: "/ncaamb",
     available: true,
-    nextEvent: {
-      name: stats?.todays_games_count === -1 ? "Games updating..." : "Today's Games",
-      date: stats?.date ? formatDate(stats.date) : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      gamesCount: stats?.todays_games_count === -1 ? 0 : (stats?.todays_games_count || 0)
-    },
+    nextEvent: {                                                                                                                                                                           
+      name: stats?.todays_games_count === -1 ? "-" : "Today's Games",
+    // nextEvent: stats?.todays_games_count !== -1 ? {
+    //   name: "Today's Games",
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      gamesCount: stats?.todays_games_count === -1 ? 0 : (stats?.todays_games_count || 0)                                                                                                  
+    },  
+    //   gamesCount: stats?.todays_games_count || 0
+    // } : null,
     modelAccuracy: {
       winRate: loading ? "-.-%%" : `${stats?.my_accuracy.toFixed(1)}%`,
       record: loading ? "-/-" : `${stats?.my_total_correct}-${stats?.total_complete_matches}`,
@@ -65,7 +69,7 @@ export default function HomePage() {
       winRate: loading ? "-.-%%" : `${stats?.pick_of_day_acc.toFixed(1)}%`,
       avgOdds: loading ? "-" : formatOdds(stats?.pod_avg_odds || 0),
       roi: loading ? "-.-%%" : `${(stats?.pod_roi || 0) >= 0 ? '+' : ''}${stats?.pod_roi.toFixed(1)}%`,
-      todayPick: stats?.pod_td_matchup && stats?.pod_td_pick ? {
+      todayPick: (stats?.pod_td_matchup && stats?.pod_td_pick && stats?.todays_games_count !== -1) ? {
         title: stats.pod_td_matchup,
         prediction: stats.pod_td_pick,
         odds: formatOdds(stats.pod_td_odds),

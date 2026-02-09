@@ -59,17 +59,44 @@ def get_predicted_info(row):
             'predicted_odds': int(row['best_book_odds_team_2']) if row['best_book_odds_team_2'] else None
         }
 
-# Define all strategies to test (50+ games historically)
+def get_underdog_info(row):
+    """Get the underdog team (model's predicted loser) and its EV/odds/prob"""
+    if row['gbm_prob_team_1'] > row['gbm_prob_team_2']:
+        # team_2 is the underdog
+        return {
+            'underdog_team': row['team_2'],
+            'underdog_prob': float(row['gbm_prob_team_2']) * 100,
+            'underdog_ev': float(row['best_ev_team_2']) if row['best_ev_team_2'] else None,
+            'underdog_odds': int(row['best_book_odds_team_2']) if row['best_book_odds_team_2'] else None
+        }
+    else:
+        # team_1 is the underdog
+        return {
+            'underdog_team': row['team_1'],
+            'underdog_prob': float(row['gbm_prob_team_1']) * 100,
+            'underdog_ev': float(row['best_ev_team_1']) if row['best_ev_team_1'] else None,
+            'underdog_odds': int(row['best_book_odds_team_1']) if row['best_book_odds_team_1'] else None
+        }
+
+# All strategies to test - script filters out negative ROI automatically
 STRATEGY_DEFINITIONS = [
-    {'name': '52-58% Implied + EV > 0%', 'min_implied': 52, 'max_implied': 58, 'min_ev': 0.01},
-    {'name': '60-65% Implied + EV > 0%', 'min_implied': 60, 'max_implied': 65, 'min_ev': 0.01},
-    {'name': '60-70% Implied + EV > 1%', 'min_implied': 60, 'max_implied': 70, 'min_ev': 1.0},
-    {'name': '60-70% Implied + EV > 0%', 'min_implied': 60, 'max_implied': 70, 'min_ev': 0.01},
-    {'name': '55-65% Implied + EV > 0%', 'min_implied': 55, 'max_implied': 65, 'min_ev': 0.01},
-    {'name': '55-65% Implied + EV > 1%', 'min_implied': 55, 'max_implied': 65, 'min_ev': 1.0},
-    {'name': '55-65% Implied + EV > 2%', 'min_implied': 55, 'max_implied': 65, 'min_ev': 2.0},
-    {'name': '54-60% Implied + EV > 0%', 'min_implied': 54, 'max_implied': 60, 'min_ev': 0.01},
-    {'name': '55-60% Implied + EV > 0%', 'min_implied': 55, 'max_implied': 60, 'min_ev': 0.01},
+    # Favorite strategies: bet on the model's predicted winner
+    {'name': '52-58% Implied + EV > 0%', 'min_implied': 52, 'max_implied': 58, 'min_ev': 0.01, 'side': 'favorite'},
+    {'name': '60-65% Implied + EV > 0%', 'min_implied': 60, 'max_implied': 65, 'min_ev': 0.01, 'side': 'favorite'},
+    {'name': '60-70% Implied + EV > 1%', 'min_implied': 60, 'max_implied': 70, 'min_ev': 1.0, 'side': 'favorite'},
+    {'name': '60-70% Implied + EV > 0%', 'min_implied': 60, 'max_implied': 70, 'min_ev': 0.01, 'side': 'favorite'},
+    {'name': '55-65% Implied + EV > 0%', 'min_implied': 55, 'max_implied': 65, 'min_ev': 0.01, 'side': 'favorite'},
+    {'name': '55-65% Implied + EV > 1%', 'min_implied': 55, 'max_implied': 65, 'min_ev': 1.0, 'side': 'favorite'},
+    {'name': '55-65% Implied + EV > 2%', 'min_implied': 55, 'max_implied': 65, 'min_ev': 2.0, 'side': 'favorite'},
+    {'name': '54-60% Implied + EV > 0%', 'min_implied': 54, 'max_implied': 60, 'min_ev': 0.01, 'side': 'favorite'},
+    {'name': '55-60% Implied + EV > 0%', 'min_implied': 55, 'max_implied': 60, 'min_ev': 0.01, 'side': 'favorite'},
+    # Underdog strategies: bet on the model's predicted loser when odds offer +EV
+    # Uses ensemble_prob of the underdog (0-50%) as the bucket range
+    {'name': 'Dog 25-35% Prob + EV > 0%', 'min_prob': 25, 'max_prob': 35, 'min_ev': 0.01, 'side': 'underdog'},
+    {'name': 'Dog 30-35% Prob + EV > 0%', 'min_prob': 30, 'max_prob': 35, 'min_ev': 0.01, 'side': 'underdog'},
+    {'name': 'Dog 25-30% Prob + EV > 0%', 'min_prob': 25, 'max_prob': 30, 'min_ev': 0.01, 'side': 'underdog'},
+    {'name': 'Dog 40-45% Prob + EV > 0%', 'min_prob': 40, 'max_prob': 45, 'min_ev': 0.01, 'side': 'underdog'},
+    {'name': 'Dog 10-20% Prob + EV > 0%', 'min_prob': 10, 'max_prob': 20, 'min_ev': 0.01, 'side': 'underdog'},
 ]
 
 def analyze_all_strategies():
@@ -116,34 +143,52 @@ def analyze_all_strategies():
 
     df = pd.DataFrame(data)
 
-    # Process games
-    processed = []
+    # Process games for favorite strategies
+    fav_processed = []
+    dog_processed = []
     for _, row in df.iterrows():
         pred = get_predicted_info(row)
-        if pred['predicted_ev'] is None or pred['predicted_odds'] is None:
-            continue
+        if pred['predicted_ev'] is not None and pred['predicted_odds'] is not None:
+            fav_processed.append({
+                'predicted_team': pred['predicted_team'],
+                'predicted_ev': pred['predicted_ev'],
+                'predicted_odds': pred['predicted_odds'],
+                'implied_prob': american_to_implied_prob(pred['predicted_odds']),
+                'winning_team': row['winning_team'],
+                'correct': pred['predicted_team'] == row['winning_team']
+            })
 
-        processed.append({
-            'predicted_team': pred['predicted_team'],
-            'predicted_ev': pred['predicted_ev'],
-            'predicted_odds': pred['predicted_odds'],
-            'implied_prob': american_to_implied_prob(pred['predicted_odds']),
-            'winning_team': row['winning_team'],
-            'correct': pred['predicted_team'] == row['winning_team']
-        })
+        dog = get_underdog_info(row)
+        if dog['underdog_ev'] is not None and dog['underdog_odds'] is not None:
+            dog_processed.append({
+                'predicted_team': dog['underdog_team'],
+                'predicted_ev': dog['underdog_ev'],
+                'predicted_odds': dog['underdog_odds'],
+                'underdog_prob': dog['underdog_prob'],
+                'implied_prob': american_to_implied_prob(dog['underdog_odds']),
+                'winning_team': row['winning_team'],
+                'correct': dog['underdog_team'] == row['winning_team']
+            })
 
-    df_processed = pd.DataFrame(processed)
+    df_fav = pd.DataFrame(fav_processed)
+    df_dog = pd.DataFrame(dog_processed)
 
     # Analyze each strategy
     results = []
 
     for strategy in STRATEGY_DEFINITIONS:
-        # Filter games matching this strategy
-        filtered = df_processed[
-            (df_processed['implied_prob'] >= strategy['min_implied']) &
-            (df_processed['implied_prob'] < strategy['max_implied']) &
-            (df_processed['predicted_ev'] > strategy['min_ev'])
-        ]
+        if strategy['side'] == 'favorite':
+            filtered = df_fav[
+                (df_fav['implied_prob'] >= strategy['min_implied']) &
+                (df_fav['implied_prob'] < strategy['max_implied']) &
+                (df_fav['predicted_ev'] > strategy['min_ev'])
+            ]
+        else:  # underdog
+            filtered = df_dog[
+                (df_dog['underdog_prob'] >= strategy['min_prob']) &
+                (df_dog['underdog_prob'] < strategy['max_prob']) &
+                (df_dog['predicted_ev'] > strategy['min_ev'])
+            ]
 
         if len(filtered) < 10:  # Need at least 10 games
             continue
@@ -159,17 +204,24 @@ def analyze_all_strategies():
 
         avg_ev = filtered['predicted_ev'].mean()
 
-        results.append({
+        result = {
             'name': strategy['name'],
-            'min_implied': strategy['min_implied'],
-            'max_implied': strategy['max_implied'],
+            'side': strategy['side'],
             'min_ev': strategy['min_ev'],
             'roi': roi,
             'win_rate': win_rate,
             'num_games': num_games,
             'num_wins': num_wins,
             'avg_ev': avg_ev
-        })
+        }
+        if strategy['side'] == 'favorite':
+            result['min_implied'] = strategy['min_implied']
+            result['max_implied'] = strategy['max_implied']
+        else:
+            result['min_prob'] = strategy['min_prob']
+            result['max_prob'] = strategy['max_prob']
+
+        results.append(result)
 
     # Sort by ROI descending
     results.sort(key=lambda x: x['roi'], reverse=True)

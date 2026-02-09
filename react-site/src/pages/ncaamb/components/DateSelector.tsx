@@ -1,13 +1,11 @@
-import { useRef } from 'react';
-
 interface DateSelectorProps {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
   gameCount?: number;
+  totalGameCount?: number;
 }
 
-export default function DateSelector({ selectedDate, onDateChange, gameCount }: DateSelectorProps) {
-  const dateInputRef = useRef<HTMLInputElement>(null);
+export default function DateSelector({ selectedDate, onDateChange, gameCount, totalGameCount }: DateSelectorProps) {
 
   const formatDisplayDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
@@ -18,7 +16,7 @@ export default function DateSelector({ selectedDate, onDateChange, gameCount }: 
   };
 
   const formatInputDate = (date: Date) => {
-    return date.toISOString().split('T')[0];
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   };
 
   const goToPreviousDay = () => {
@@ -28,6 +26,7 @@ export default function DateSelector({ selectedDate, onDateChange, gameCount }: 
   };
 
   const goToNextDay = () => {
+    if (isToday) return;
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + 1);
     onDateChange(newDate);
@@ -39,11 +38,10 @@ export default function DateSelector({ selectedDate, onDateChange, gameCount }: 
 
   const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDate = new Date(e.target.value + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (newDate > today) return;
     onDateChange(newDate);
-  };
-
-  const openDatePicker = () => {
-    dateInputRef.current?.showPicker();
   };
 
   const isToday = selectedDate.toDateString() === new Date().toDateString();
@@ -73,38 +71,39 @@ export default function DateSelector({ selectedDate, onDateChange, gameCount }: 
           </button>
         )}
 
-        {/* Clickable Date Button */}
-        <button
-          onClick={openDatePicker}
-          className="flex items-center gap-2 px-3 py-1.5 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-orange-500 rounded-lg transition-all group"
-        >
-          <svg className="w-4 h-4 text-slate-400 group-hover:text-orange-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <span className="text-white font-semibold text-sm sm:text-lg group-hover:text-orange-400 transition-colors">
-            {formatDisplayDate(selectedDate)}
-          </span>
-        </button>
-
-        {/* Hidden date input */}
-        <input
-          ref={dateInputRef}
-          type="date"
-          value={formatInputDate(selectedDate)}
-          onChange={handleDateInputChange}
-          className="sr-only"
-        />
+        {/* Date picker wrapper - input overlays the button for mobile compatibility */}
+        <div className="relative">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-orange-500 rounded-lg transition-all group">
+            <svg className="w-4 h-4 text-slate-400 group-hover:text-orange-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span className="text-white font-semibold text-sm sm:text-lg group-hover:text-orange-400 transition-colors">
+              {formatDisplayDate(selectedDate)}
+            </span>
+          </div>
+          <input
+            type="date"
+            value={formatInputDate(selectedDate)}
+            max={formatInputDate(new Date())}
+            onChange={handleDateInputChange}
+            onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          />
+        </div>
 
         {gameCount !== undefined && (
-          <span className="text-xs text-slate-400 mt-1">
-            {gameCount} Game{gameCount !== 1 ? 's' : ''}
+          <span className="text-xs text-slate-200 mt-1">
+            {gameCount === 0 ? null : totalGameCount !== undefined && gameCount !== totalGameCount
+              ? `${gameCount}/${totalGameCount} Games`
+              : `${gameCount} Game${gameCount !== 1 ? 's' : ''}`}
           </span>
         )}
       </div>
 
       <button
         onClick={goToNextDay}
-        className="p-1.5 sm:p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+        disabled={isToday}
+        className={`p-1.5 sm:p-2 rounded-lg transition-colors ${isToday ? 'text-slate-600 cursor-not-allowed' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
       >
         <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
