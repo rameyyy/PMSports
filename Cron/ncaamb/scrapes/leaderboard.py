@@ -108,13 +108,12 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
     # Try to initialize Chrome driver
     driver = None
     try:
-        # First attempt with use_subprocess=True and Chrome version 143
+        # First attempt with use_subprocess=True (auto-detect Chrome version)
         options = create_chrome_options(download_dir)
         driver = uc.Chrome(
             options=options,
             browser_executable_path=browser_path,
-            use_subprocess=True,
-            version_main=143  # Explicitly use Chrome 143
+            use_subprocess=True
         )
     except Exception as e:
         print(f"  [*] First attempt failed: {str(e)[:100]}...")
@@ -124,15 +123,14 @@ def scrape_barttorvik_csv(year='2024', output_dir='.', end_date=None):
             options = create_chrome_options(download_dir)
             driver = uc.Chrome(
                 options=options,
-                browser_executable_path=browser_path,
-                version_main=143  # Explicitly use Chrome 143
+                browser_executable_path=browser_path
             )
         except Exception as e2:
             print(f"  [*] Second attempt failed: {str(e2)[:100]}...")
             # Last attempt: let uc find Chrome automatically with minimal config
             print(f"  [*] Final attempt with minimal options...")
             options = create_chrome_options(download_dir)
-            driver = uc.Chrome(options=options, use_subprocess=False, version_main=143)
+            driver = uc.Chrome(options=options, use_subprocess=False)
 
     try:
         # Enable downloads in headless mode using CDP
