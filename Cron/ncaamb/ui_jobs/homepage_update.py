@@ -109,35 +109,9 @@ def decimal_to_american(decimal_odds):
 
 def get_pick_of_day_record(conn, before_date):
     """Get pick of day accuracy, ROI, and avg odds for PODs before given date"""
-    record_query = """
+    query = """
         SELECT
-            COUNT(*) as total_picks,
-            SUM(CASE
-                WHEN (m.gbm_prob_team_1 > m.gbm_prob_team_2 AND m.winning_team = m.team_1)
-                  OR (m.gbm_prob_team_1 <= m.gbm_prob_team_2 AND m.winning_team = m.team_2)
-                THEN 1
-                ELSE 0
-            END) as correct_picks
-        FROM ncaamb.moneyline_picks mp
-        JOIN ncaamb.moneyline m ON mp.game_id = m.game_id
-        WHERE mp.pick_of_day = 1
-          AND m.season = 2026
-          AND m.winning_team IS NOT NULL
-          AND mp.date < %s
-    """
-    record_result = fetch(conn, record_query, (before_date,))
-
-    if record_result and record_result[0]['total_picks']:
-        total_picks = int(record_result[0]['total_picks'])
-        correct_picks = int(record_result[0]['correct_picks']) if record_result[0]['correct_picks'] else 0
-        accuracy = round(correct_picks / total_picks * 100, 2) if total_picks > 0 else 0.0
-    else:
-        total_picks = 0
-        correct_picks = 0
-        accuracy = 0.0
-
-    roi_query = """
-        SELECT
+            mp.betting_rule,
             m.gbm_prob_team_1,
             m.gbm_prob_team_2,
             m.best_book_odds_team_1,
@@ -154,29 +128,52 @@ def get_pick_of_day_record(conn, before_date):
           AND m.best_book_odds_team_2 IS NOT NULL
           AND mp.date < %s
     """
-    roi_data = fetch(conn, roi_query, (before_date,))
+    data = fetch(conn, query, (before_date,))
 
+    if not data:
+        return 0.0, 0, 0, 0, 0.0
+
+    total_picks = len(data)
+    correct_picks = 0
     total_wagered = 0
     total_profit = 0
     decimal_odds_list = []
 
-    if roi_data:
-        for row in roi_data:
-            picked_team = row['team_1'] if row['gbm_prob_team_1'] > row['gbm_prob_team_2'] else row['team_2']
-            picked_odds = int(row['best_book_odds_team_1']) if row['gbm_prob_team_1'] > row['gbm_prob_team_2'] else int(row['best_book_odds_team_2'])
+    for row in data:
+        is_underdog = row['betting_rule'].startswith('Dog')
 
-            decimal_odds_list.append(american_to_decimal(picked_odds))
-
-            stake = 100
-            total_wagered += stake
-
-            if picked_team == row['winning_team']:
-                decimal_odds = american_to_decimal(picked_odds)
-                profit = stake * (decimal_odds - 1)
-                total_profit += profit
+        if is_underdog:
+            if row['gbm_prob_team_1'] <= row['gbm_prob_team_2']:
+                picked_team = row['team_1']
+                picked_odds = int(row['best_book_odds_team_1'])
             else:
-                total_profit -= stake
+                picked_team = row['team_2']
+                picked_odds = int(row['best_book_odds_team_2'])
+        else:
+            if row['gbm_prob_team_1'] > row['gbm_prob_team_2']:
+                picked_team = row['team_1']
+                picked_odds = int(row['best_book_odds_team_1'])
+            else:
+                picked_team = row['team_2']
+                picked_odds = int(row['best_book_odds_team_2'])
 
+        won = picked_team == row['winning_team']
+        if won:
+            correct_picks += 1
+
+        decimal_odds_list.append(american_to_decimal(picked_odds))
+
+        stake = 100
+        total_wagered += stake
+
+        if won:
+            decimal_odds = american_to_decimal(picked_odds)
+            profit = stake * (decimal_odds - 1)
+            total_profit += profit
+        else:
+            total_profit -= stake
+
+    accuracy = round(correct_picks / total_picks * 100, 2) if total_picks > 0 else 0.0
     roi = round(total_profit / total_wagered * 100, 2) if total_wagered > 0 else 0.0
     avg_decimal_odds = sum(decimal_odds_list) / len(decimal_odds_list) if decimal_odds_list else 1.0
     avg_american_odds = decimal_to_american(avg_decimal_odds) if decimal_odds_list else 0
@@ -210,20 +207,26 @@ def get_pick_details(conn, date):
     pick = result[0]
     matchup = f"{pick['team_1']} vs {pick['team_2']}"
 
-    if pick['gbm_prob_team_1'] > pick['gbm_prob_team_2']:
-        picked_team = pick['team_1']
-        picked_odds = int(pick['best_book_odds_team_1']) if pick['best_book_odds_team_1'] else None
+    is_underdog = pick['betting_rule'].startswith('Dog')
+
+    if is_underdog:
+        if pick['gbm_prob_team_1'] <= pick['gbm_prob_team_2']:
+            picked_team = pick['team_1']
+            picked_odds = int(pick['best_book_odds_team_1']) if pick['best_book_odds_team_1'] else None
+        else:
+            picked_team = pick['team_2']
+            picked_odds = int(pick['best_book_odds_team_2']) if pick['best_book_odds_team_2'] else None
     else:
-        picked_team = pick['team_2']
-        picked_odds = int(pick['best_book_odds_team_2']) if pick['best_book_odds_team_2'] else None
+        if pick['gbm_prob_team_1'] > pick['gbm_prob_team_2']:
+            picked_team = pick['team_1']
+            picked_odds = int(pick['best_book_odds_team_1']) if pick['best_book_odds_team_1'] else None
+        else:
+            picked_team = pick['team_2']
+            picked_odds = int(pick['best_book_odds_team_2']) if pick['best_book_odds_team_2'] else None
 
     outcome = None
     if pick['winning_team']:
-        if pick['gbm_prob_team_1'] > pick['gbm_prob_team_2']:
-            won = pick['winning_team'] == pick['team_1']
-        else:
-            won = pick['winning_team'] == pick['team_2']
-        outcome = 'W' if won else 'L'
+        outcome = 'W' if pick['winning_team'] == picked_team else 'L'
 
     return matchup, picked_team, picked_odds, outcome
 
