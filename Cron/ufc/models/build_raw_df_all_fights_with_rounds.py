@@ -457,9 +457,17 @@ def enrich_with_fight_totals(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
         ])
     )
 
+    # Get fighter's stats and opponent's stats for each prior fight
+    # Join with fighter's stats (where fighter_id in totals = fighter1_id from main fight)
+    prior_f1_with_fighter_stats = prior_f1_base.join(
+        fight_totals_df.rename({"fighter_id": "fighter1_id"}),
+        on=["fight_id", "fighter1_id"],
+        how="left"
+    )
+
+    # Join with opponent's stats
     prior_f1_with_stats = (
-        prior_f1_base
-        .join(fight_totals_df.rename({"fighter_id": "fighter1_id"}), on=["fight_id", "fighter1_id"], how="left")
+        prior_f1_with_fighter_stats
         .join(fight_totals_df.rename({
             "fighter_id": "opponent_id",
             "body_attempts": "opp_body_attempts", "body_landed": "opp_body_landed",
@@ -473,6 +481,7 @@ def enrich_with_fight_totals(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
             "td_landed": "opp_td_landed", "total_str_attempts": "opp_total_str_attempts",
             "total_str_landed": "opp_total_str_landed"
         }), on=["fight_id", "opponent_id"], how="left")
+        .unique(subset=["_row_idx", "fight_id"])  # Deduplicate by row and fight
     )
 
     struct_list = [
@@ -524,9 +533,17 @@ def enrich_with_fight_totals(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
         ])
     )
 
+    # Get fighter's stats and opponent's stats for each prior fight
+    # Join with fighter's stats (where fighter_id in totals = fighter2_id from main fight)
+    prior_f2_with_fighter_stats = prior_f2_base.join(
+        fight_totals_df.rename({"fighter_id": "fighter2_id"}),
+        on=["fight_id", "fighter2_id"],
+        how="left"
+    )
+
+    # Join with opponent's stats
     prior_f2_with_stats = (
-        prior_f2_base
-        .join(fight_totals_df.rename({"fighter_id": "fighter2_id"}), on=["fight_id", "fighter2_id"], how="left")
+        prior_f2_with_fighter_stats
         .join(fight_totals_df.rename({
             "fighter_id": "opponent_id",
             "body_attempts": "opp_body_attempts", "body_landed": "opp_body_landed",
@@ -540,6 +557,7 @@ def enrich_with_fight_totals(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
             "td_landed": "opp_td_landed", "total_str_attempts": "opp_total_str_attempts",
             "total_str_landed": "opp_total_str_landed"
         }), on=["fight_id", "opponent_id"], how="left")
+        .unique(subset=["_row_idx", "fight_id"])  # Deduplicate by row and fight
     )
 
     struct_list_f2 = [
@@ -652,18 +670,19 @@ def enrich_with_round_data(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
         ])
     )
 
-    # Join fighter's round data
+    # Join fighter's round data - get ALL rounds for the fight (both fighters)
     prior_f1_with_rounds = (
         prior_f1_base
         .join(
-            fight_rounds_df.rename({"fighter_id": "fighter1_id"}),
-            on=["fight_id", "fighter1_id"],
+            fight_rounds_df,  # Don't rename - keep fighter_id to distinguish fighters
+            on="fight_id",    # Only join on fight_id to get both fighters' rounds
             how="left"
         )
     )
 
-    # Create round struct
+    # Create round struct - include fighter_id so we know whose stats these are
     round_struct_fields = [
+        pl.col("fighter_id"),  # Add fighter_id to identify whose stats these are
         pl.col("round_number"),
         pl.col("kd"),
         pl.col("sig_str_landed"), pl.col("sig_str_attempts"),
@@ -720,8 +739,8 @@ def enrich_with_round_data(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
     prior_f2_with_rounds = (
         prior_f2_base
         .join(
-            fight_rounds_df.rename({"fighter_id": "fighter2_id"}),
-            on=["fight_id", "fighter2_id"],
+            fight_rounds_df,  # Don't rename - keep fighter_id to distinguish fighters
+            on="fight_id",    # Only join on fight_id to get both fighters' rounds
             how="left"
         )
     )
