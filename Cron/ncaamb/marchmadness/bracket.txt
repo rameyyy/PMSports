@@ -1,0 +1,48 @@
+2026 NCAA Men's March Madness - All First Round Matchups
+Round, Region T1, Region T2, Team 1, T1 Seed, Team 2, T2 Seed
+
+=== FIRST FOUR (Dayton, 3/17-3/18) ===
+First Four, East, East, UMBC, 16, Howard, 16
+First Four, West, West, Texas, 11, NC State, 11
+First Four, South, South, Prairie View A&M, 16, Lehigh, 16
+First Four, Midwest, Midwest, Miami (OH), 11, SMU, 11
+
+=== FIRST ROUND - EAST REGION (3/19-3/20) ===
+First Round, East, East, Duke, 1, Siena, 16
+First Round, East, East, Ohio State, 8, TCU, 9
+First Round, East, East, St. John's, 5, Northern Iowa, 12
+First Round, East, East, Kansas, 4, Cal Baptist, 13
+First Round, East, East, Louisville, 6, South Florida, 11
+First Round, East, East, Michigan State, 3, North Dakota State, 14
+First Round, East, East, UCLA, 7, UCF, 10
+First Round, East, East, UConn, 2, Furman, 15
+
+=== FIRST ROUND - SOUTH REGION (3/19-3/20) ===
+First Round, South, South, Florida, 1, Lehigh/Prairie View A&M, 16
+First Round, South, South, Clemson, 8, Iowa, 9
+First Round, South, South, Vanderbilt, 5, McNeese, 12
+First Round, South, South, Nebraska, 4, Troy, 13
+First Round, South, South, North Carolina, 6, VCU, 11
+First Round, South, South, Illinois, 3, Penn, 14
+First Round, South, South, Saint Mary's, 7, Texas A&M, 10
+First Round, South, South, Houston, 2, Idaho, 15
+
+=== FIRST ROUND - WEST REGION (3/19-3/20) ===
+First Round, West, West, Arizona, 1, Long Island, 16
+First Round, West, West, Villanova, 8, Utah State, 9
+First Round, West, West, Wisconsin, 5, High Point, 12
+First Round, West, West, Arkansas, 4, Hawaii, 13
+First Round, West, West, BYU, 6, NC State/Texas, 11
+First Round, West, West, Gonzaga, 3, Kennesaw State, 14
+First Round, West, West, Miami (FL), 7, Missouri, 10
+First Round, West, West, Purdue, 2, Queens (NC), 15
+
+=== FIRST ROUND - MIDWEST REGION (3/19-3/20) ===
+First Round, Midwest, Midwest, Michigan, 1, Howard/UMBC, 16
+First Round, Midwest, Midwest, Georgia, 8, Saint Louis, 9
+First Round, Midwest, Midwest, Texas Tech, 5, Akron, 12
+First Round, Midwest, Midwest, Alabama, 4, Hofstra, 13
+First Round, Midwest, Midwest, Tennessee, 6, SMU/Miami (OH), 11
+First Round, Midwest, Midwest, Virginia, 3, Wright State, 14
+First Round, Midwest, Midwest, Kentucky, 7, Santa Clara, 10
+First Round, Midwest, Midwest, Iowa State, 2, Tennessee State, 15

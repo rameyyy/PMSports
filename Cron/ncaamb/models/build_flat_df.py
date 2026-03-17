@@ -348,7 +348,8 @@ def build_flat_df(season: Optional[int] = None, limit: Optional[int] = None, tar
         flattened_rows.append(flat_row)
 
     # Convert to Polars DataFrame
-    df = pl.DataFrame(flattened_rows)
+    # infer_schema_length=None scans all rows to handle schema variance across seasons
+    df = pl.DataFrame(flattened_rows, infer_schema_length=None)
     return df
 
 

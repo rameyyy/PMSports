@@ -59,6 +59,47 @@ def get_homepage_stats():
     }
 
 
+def get_bracket_predictions(year=2026):
+    """Get all bracket predictions for a given year."""
+    query = """
+        SELECT id, bracket_slot, round, region,
+               pred_team_1, pred_team_1_seed, pred_team_2, pred_team_2_seed,
+               prob_lgb, prob_xgb, prob_logistic, prob_ensemble,
+               predicted_winner, predicted_winner_seed,
+               game_id, actual_team_1, actual_team_2, actual_winner, correct
+        FROM bracket_predictions
+        WHERE bracket_year = %s
+        ORDER BY id
+    """
+    rows = execute_query(query, (year,), database='ncaamb')
+    if not rows:
+        return []
+    result = []
+    for r in rows:
+        result.append({
+            'id': r['id'],
+            'bracket_slot': r['bracket_slot'],
+            'round': r['round'],
+            'region': r['region'],
+            'pred_team_1': r['pred_team_1'],
+            'pred_team_1_seed': r['pred_team_1_seed'],
+            'pred_team_2': r['pred_team_2'],
+            'pred_team_2_seed': r['pred_team_2_seed'],
+            'prob_lgb': float(r['prob_lgb']) if r['prob_lgb'] is not None else None,
+            'prob_xgb': float(r['prob_xgb']) if r['prob_xgb'] is not None else None,
+            'prob_logistic': float(r['prob_logistic']) if r['prob_logistic'] is not None else None,
+            'prob_ensemble': float(r['prob_ensemble']) if r['prob_ensemble'] is not None else None,
+            'predicted_winner': r['predicted_winner'],
+            'predicted_winner_seed': r['predicted_winner_seed'],
+            'game_id': r['game_id'],
+            'actual_team_1': r['actual_team_1'],
+            'actual_team_2': r['actual_team_2'],
+            'actual_winner': r['actual_winner'],
+            'correct': r['correct'],
+        })
+    return result
+
+
 def get_games_by_date(date_str):
     """Get all games for a given date from ui_games table"""
     query = """

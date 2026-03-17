@@ -1,0 +1,14 @@
+March Madness Logistic Regression — features2021-2026
+==================================================
+
+Target:         P(team_1 wins)
+Training games: 28766
+Feature count:  275
+
+C: 0.0010
+
+Train LogLoss:  0.5535
+Test  LogLoss:  0.5436
+Train Accuracy: 0.7102
+Test  Accuracy: 0.7171
+AUC:            0.7865

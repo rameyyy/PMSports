@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from models.ncaamb_models import get_homepage_stats, get_games_by_date, get_model_performance
+from models.ncaamb_models import get_homepage_stats, get_games_by_date, get_model_performance, get_bracket_predictions
 
 ncaamb_bp = Blueprint('ncaamb', __name__, url_prefix='/api/ncaamb')
 
@@ -27,3 +27,10 @@ def performance():
     if data is None:
         return jsonify({'error': 'No performance data available'}), 404
     return jsonify(data)
+
+
+@ncaamb_bp.route('/bracket', methods=['GET'])
+def bracket():
+    year = request.args.get('year', 2026, type=int)
+    games = get_bracket_predictions(year)
+    return jsonify({'year': year, 'games': games, 'count': len(games)})

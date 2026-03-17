@@ -84,3 +84,37 @@ export async function fetchPerformance(): Promise<PerformanceResponse> {
   if (!res.ok) throw new Error('Failed to fetch performance');
   return res.json();
 }
+
+export interface BracketGame {
+  id: number;
+  bracket_slot: string;
+  round: string;
+  region: string | null;
+  pred_team_1: string;
+  pred_team_1_seed: number | null;
+  pred_team_2: string;
+  pred_team_2_seed: number | null;
+  prob_lgb: number | null;
+  prob_xgb: number | null;
+  prob_logistic: number | null;
+  prob_ensemble: number | null;
+  predicted_winner: string;
+  predicted_winner_seed: number | null;
+  game_id: string | null;
+  actual_team_1: string | null;
+  actual_team_2: string | null;
+  actual_winner: string | null;
+  correct: number | null;
+}
+
+export interface BracketResponse {
+  year: number;
+  games: BracketGame[];
+  count: number;
+}
+
+export async function fetchBracket(year = 2026): Promise<BracketResponse> {
+  const res = await fetch(`/api/ncaamb/bracket?year=${year}`);
+  if (!res.ok) throw new Error('Failed to fetch bracket');
+  return res.json();
+}

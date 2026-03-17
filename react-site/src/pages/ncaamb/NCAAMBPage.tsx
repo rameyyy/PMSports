@@ -4,12 +4,13 @@ import DateSelector from './components/DateSelector';
 import DayStats from './components/DayStats';
 import GamesTable from './components/GamesTable';
 import ModelPerformance from './components/ModelPerformance';
+import BracketView from './components/BracketView';
 import { fetchGamesByDate, type Game } from '../../api/ncaamb';
 
 const TABS = [
   { id: 'games', label: 'Games' },
   { id: 'performance', label: 'Model Performance' },
-  { id: 'leaderboard', label: 'Leaderboard' },
+  { id: 'bracket', label: 'Bracket' },
 ];
 
 function getDefaultDate() {
@@ -37,9 +38,26 @@ export default function NCAAMBPage() {
       .finally(() => setLoading(false));
   }, [selectedDate]);
 
+  // Auto-fallback: top25 → top50 → all if no games match
+  useEffect(() => {
+    if (loading) return;
+    const has25 = games.some(g =>
+      (g.team_1_rank !== null && g.team_1_rank <= 25) ||
+      (g.team_2_rank !== null && g.team_2_rank <= 25)
+    );
+    const has50 = games.some(g =>
+      (g.team_1_rank !== null && g.team_1_rank <= 50) ||
+      (g.team_2_rank !== null && g.team_2_rank <= 50)
+    );
+    if (rankFilter === 'top25' && !has25) {
+      setRankFilter(has50 ? 'top50' : 'all');
+    } else if (rankFilter === 'top50' && !has50) {
+      setRankFilter('all');
+    }
+  }, [games, loading]);
+
   const isToday = selectedDate.toDateString() === new Date().toDateString();
 
-  // Filter games
   const filteredGames = games.filter(g => {
     if (rankFilter === 'top25' && !(g.team_1_rank !== null && g.team_1_rank <= 25 || g.team_2_rank !== null && g.team_2_rank <= 25)) return false;
     if (rankFilter === 'top50' && !(g.team_1_rank !== null && g.team_1_rank <= 50 || g.team_2_rank !== null && g.team_2_rank <= 50)) return false;
@@ -81,10 +99,10 @@ export default function NCAAMBPage() {
 
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-2 mb-3">
-              {['all', 'top25', 'top50'].map((val) => (
+              {(['all', 'top25', 'top50'] as const).map((val) => (
                 <button
                   key={val}
-                  onClick={() => setRankFilter(val as typeof rankFilter)}
+                  onClick={() => setRankFilter(val)}
                   className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
                     rankFilter === val
                       ? 'bg-orange-500 text-white'
@@ -126,13 +144,8 @@ export default function NCAAMBPage() {
         {/* Model Performance Tab */}
         {activeTab === 'performance' && <ModelPerformance />}
 
-        {/* Leaderboard Tab */}
-        {activeTab === 'leaderboard' && (
-          <div className="text-center text-slate-400 py-12">
-            <h2 className="text-xl font-semibold text-white mb-2">Leaderboard</h2>
-            <p>Coming soon...</p>
-          </div>
-        )}
+        {/* Bracket Tab */}
+        {activeTab === 'bracket' && <BracketView />}
       </div>
     </div>
   );

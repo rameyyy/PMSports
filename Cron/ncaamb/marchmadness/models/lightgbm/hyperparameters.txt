@@ -1,0 +1,21 @@
+March Madness LightGBM — features2021-2026
+==================================================
+
+Target:         P(team_1 wins)
+Training games: 28766
+Feature count:  275
+Best opt score: 0.5535
+
+max_depth: 3
+learning_rate: 0.013717651055722205
+n_estimators: 540
+num_leaves: 106
+subsample: 0.5
+colsample_bytree: 1.0
+reg_alpha: 0.0
+reg_lambda: 0.0
+min_child_samples: 5
+
+Final Log Loss: 0.5432
+Final Accuracy: 0.7163
+Final AUC:      0.7964

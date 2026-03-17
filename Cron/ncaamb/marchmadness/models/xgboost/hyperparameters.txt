@@ -1,0 +1,20 @@
+March Madness XGBoost — features2021-2026
+==================================================
+
+Target:         P(team_1 wins)
+Training games: 28766
+Feature count:  275
+Best opt score: 0.5537
+
+max_depth: 3
+learning_rate: 0.07491234332583703
+n_estimators: 100
+min_child_weight: 10.0
+subsample: 1.0
+colsample_bytree: 1.0
+reg_alpha: 0.0
+reg_lambda: 0.0
+
+Final Log Loss: 0.5431
+Final Accuracy: 0.7171
+Final AUC:      0.7965
