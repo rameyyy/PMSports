@@ -16,17 +16,18 @@ const TOTAL_H        = REGION_BLOCK_H * 2 + DIVIDER_H;             // 1152px
 // Center card positions — where each card's vertical center should land
 const FF1_CENTER   = REGION_LABEL_H + ROUND_HDR_H + REGION_H / 2;
 const FF2_CENTER   = REGION_BLOCK_H + DIVIDER_H + REGION_LABEL_H + ROUND_HDR_H + REGION_H / 2;
-const CHAMP_CENTER = (FF1_CENTER + FF2_CENTER) / 2;
+// Championship sits on the divider line between the two region pairs
+const CHAMP_CENTER = REGION_BLOCK_H + DIVIDER_H / 2;
 
-// Each absolute wrapper contains: label (CENTER_LABEL_H) + BracketSlot with roundIndex=0
-// BracketSlot roundIndex=0: slotHeight=SLOT_H_BASE, padV=(SLOT_H_BASE-CARD_H)/2
-// So card center is CENTER_LABEL_H + padV + CARD_H/2 below the wrapper top
-const CENTER_LABEL_H  = 16;                              // text-[10px] + mb-1 ≈ 16px
+// Label is rendered BELOW the card, so card center = wrapper top + padV + CARD_H/2
 const CENTER_PAD_V    = (SLOT_H_BASE - CARD_H) / 2;     // 8px
-const CENTER_CARD_OFF = CENTER_LABEL_H + CENTER_PAD_V + CARD_H / 2; // 40px
+const CENTER_CARD_OFF = CENTER_PAD_V + CARD_H / 2;      // 32px
+
+const CHAMP_CARD_H  = 64;                                // taller championship card
+const CHAMP_CARD_OFF = CHAMP_CARD_H / 2;                 // padV=0 since cardH=SLOT_H_BASE
 
 const FF1_TOP   = FF1_CENTER   - CENTER_CARD_OFF;
-const CHAMP_TOP = CHAMP_CENTER - CENTER_CARD_OFF;
+const CHAMP_TOP = CHAMP_CENTER - CHAMP_CARD_OFF;
 const FF2_TOP   = FF2_CENTER   - CENTER_CARD_OFF;
 
 // ── DragScroll ────────────────────────────────────────────────────────────────
@@ -55,30 +56,43 @@ function DragScroll({ children }: { children: React.ReactNode }) {
     drag.current = null;
   }, []);
 
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    const t = e.touches[0];
+    drag.current = { x: t.clientX, y: t.clientY, sl: el.scrollLeft, st: el.scrollTop };
+  }, []);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!drag.current || !ref.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - drag.current.x;
+    const dy = t.clientY - drag.current.y;
+    ref.current.scrollLeft = drag.current.sl - dx;
+    ref.current.scrollTop  = drag.current.st - dy;
+  }, []);
+
   return (
     <div
       ref={ref}
       className="overflow-scroll pb-4 select-none no-scrollbar"
-      style={{ cursor: 'grab', maxHeight: '80vh' }}
+      style={{ cursor: 'grab', maxHeight: '85vh', touchAction: 'none' }}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
       onMouseUp={stopDrag}
       onMouseLeave={stopDrag}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={stopDrag}
     >
       {children}
     </div>
   );
 }
 
-// ── E8↔FF horizontal connector column ────────────────────────────────────────
-// Renders two horizontal tick lines aligned with FF_G1 and FF_G2 card centers
+// ── E8↔FF spacer column ───────────────────────────────────────────────────────
 function FFConnector() {
-  return (
-    <div className="relative shrink-0" style={{ width: 14, height: TOTAL_H }}>
-      <div className="absolute w-full border-t border-slate-500" style={{ top: FF1_CENTER }} />
-      <div className="absolute w-full border-t border-slate-500" style={{ top: FF2_CENTER }} />
-    </div>
-  );
+  return <div className="shrink-0" style={{ width: 14, height: TOTAL_H }} />;
 }
 
 // ── CenterColumn ──────────────────────────────────────────────────────────────
@@ -92,27 +106,21 @@ function CenterColumn({ games }: CenterProps) {
   return (
     <div className="shrink-0 flex flex-col items-center" style={{ width: 148 }}>
       <div className="relative w-full" style={{ height: TOTAL_H }}>
-        {/* Vertical line connecting FF_G1 → Championship → FF_G2 */}
-        <div
-          className="absolute border-l border-slate-500"
-          style={{ left: '50%', top: FF1_CENTER, height: FF2_CENTER - FF1_CENTER }}
-        />
         {ffG1 && (
-          <div className="absolute w-full px-1" style={{ top: FF1_TOP }}>
-            <div className="text-[10px] font-semibold text-slate-400 text-center mb-1">Final Four</div>
+          <div className="absolute w-full px-1 flex flex-col items-center" style={{ top: FF1_TOP }}>
             <BracketSlot game={ffG1} slotIndex={0} roundIndex={0} isLastRound compact />
+            <div className="text-[10px] font-semibold text-slate-400 text-center mt-0.5">Final Four</div>
           </div>
         )}
         {champ && (
-          <div className="absolute w-full px-1" style={{ top: CHAMP_TOP }}>
-            <div className="text-[10px] font-semibold text-orange-400 text-center mb-1">Championship</div>
-            <BracketSlot game={champ} slotIndex={0} roundIndex={0} isLastRound compact />
+          <div className="absolute w-full px-1 flex flex-col items-center" style={{ top: CHAMP_TOP }}>
+            <BracketSlot game={champ} slotIndex={0} roundIndex={0} isLastRound compact cardH={CHAMP_CARD_H} />
           </div>
         )}
         {ffG2 && (
-          <div className="absolute w-full px-1" style={{ top: FF2_TOP }}>
-            <div className="text-[10px] font-semibold text-slate-400 text-center mb-1">Final Four</div>
+          <div className="absolute w-full px-1 flex flex-col items-center" style={{ top: FF2_TOP }}>
             <BracketSlot game={ffG2} slotIndex={0} roundIndex={0} isLastRound compact />
+            <div className="text-[10px] font-semibold text-slate-400 text-center mt-0.5">Final Four</div>
           </div>
         )}
       </div>
@@ -132,28 +140,27 @@ export default function BracketDesktop({ games }: Props) {
 
   return (
     <div>
-      {/* First Four strip */}
-      {firstFour.length > 0 && (
-        <div className="mb-5">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            First Four Play-In Games
-          </p>
-          <div className="flex flex-wrap gap-3">
-            {firstFour.map(g => (
-              <BracketSlot key={g.bracket_slot} game={g} slotIndex={0} roundIndex={0} isLastRound compact />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Full bracket — drag to pan */}
       <DragScroll>
+        {/* First Four strip */}
+        {firstFour.length > 0 && (
+          <div className="mb-5 px-2">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              First Four Play-In Games
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {firstFour.map(g => (
+                <BracketSlot key={g.bracket_slot} game={g} slotIndex={0} roundIndex={0} isLastRound compact />
+              ))}
+            </div>
+          </div>
+        )}
         <div className="min-w-full flex justify-center py-2">
         <div className="flex w-fit">
           {/* Left: East (top) + South (bottom) */}
           <div className="shrink-0 flex flex-col">
             <div
-              className="text-sm font-extrabold text-white uppercase tracking-widest pl-1 flex items-center"
+              className="text-sm font-extrabold text-white uppercase tracking-widest flex items-center justify-center"
               style={{ height: REGION_LABEL_H }}
             >
               East
@@ -161,12 +168,12 @@ export default function BracketDesktop({ games }: Props) {
             <BracketTree games={regionGames('East')} compact />
             <div className="border-t border-slate-700/50" style={{ marginTop: DIVIDER_H / 2, marginBottom: DIVIDER_H / 2 }} />
             <div
-              className="text-sm font-extrabold text-white uppercase tracking-widest pl-1 flex items-center"
+              className="text-sm font-extrabold text-white uppercase tracking-widest flex items-center justify-center"
               style={{ height: REGION_LABEL_H }}
             >
               South
             </div>
-            <BracketTree games={regionGames('South')} compact />
+            <BracketTree games={regionGames('South')} compact hideHeaders />
           </div>
 
           {/* E8 → FF connector */}
@@ -181,7 +188,7 @@ export default function BracketDesktop({ games }: Props) {
           {/* Right: West (top, mirrored) + Midwest (bottom, mirrored) */}
           <div className="shrink-0 flex flex-col">
             <div
-              className="text-sm font-extrabold text-white uppercase tracking-widest pl-1 flex items-center"
+              className="text-sm font-extrabold text-white uppercase tracking-widest flex items-center justify-center"
               style={{ height: REGION_LABEL_H }}
             >
               West
@@ -189,12 +196,12 @@ export default function BracketDesktop({ games }: Props) {
             <BracketTree games={regionGames('West')} mirrored compact />
             <div className="border-t border-slate-700/50" style={{ marginTop: DIVIDER_H / 2, marginBottom: DIVIDER_H / 2 }} />
             <div
-              className="text-sm font-extrabold text-white uppercase tracking-widest pl-1 flex items-center"
+              className="text-sm font-extrabold text-white uppercase tracking-widest flex items-center justify-center"
               style={{ height: REGION_LABEL_H }}
             >
               Midwest
             </div>
-            <BracketTree games={regionGames('Midwest')} mirrored compact />
+            <BracketTree games={regionGames('Midwest')} mirrored compact hideHeaders />
           </div>
         </div>
         </div>

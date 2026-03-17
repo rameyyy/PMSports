@@ -18,9 +18,10 @@ interface Props {
   games: BracketGame[];
   mirrored?: boolean;
   compact?: boolean;
+  hideHeaders?: boolean;
 }
 
-export default function BracketTree({ games, mirrored = false, compact = false }: Props) {
+export default function BracketTree({ games, mirrored = false, compact = false, hideHeaders = false }: Props) {
   const roundOrder = mirrored ? MIRRORED_ROUNDS : FORWARD_ROUNDS;
   const numRounds  = roundOrder.length;
 
@@ -38,7 +39,7 @@ export default function BracketTree({ games, mirrored = false, compact = false }
   const cardW = compact ? 'w-32' : 'w-44';
 
   return (
-    <div className="flex">
+    <div className="flex gap-2">
       {columns.map((col, ci) => {
         // For mirrored, E8 is displayed first (ci=0) but should have no connector —
         // an explicit horizontal connector is drawn in BracketDesktop instead.
@@ -50,9 +51,11 @@ export default function BracketTree({ games, mirrored = false, compact = false }
               className={`${cardW} flex items-center justify-center px-1`}
               style={{ height: ROUND_HDR_H }}
             >
-              <span className="text-xs font-semibold text-white tracking-wide">
-                {ROUND_LABELS[col.round] ?? col.round}
-              </span>
+              {!hideHeaders && (
+                <span className="text-xs font-semibold text-white tracking-wide">
+                  {ROUND_LABELS[col.round] ?? col.round}
+                </span>
+              )}
             </div>
             {/* Game slots */}
             {col.games.map((game, gi) => (

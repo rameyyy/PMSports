@@ -1,5 +1,25 @@
 import { useState, useEffect } from 'react';
 import { fetchBracket, type BracketGame } from '../../../api/ncaamb';
+
+const ROUND_POINTS: Record<string, number> = {
+  'First Round':  10,
+  'Second Round': 20,
+  'Sweet 16':     40,
+  'Elite 8':      80,
+  'Final Four':   160,
+  'Championship': 320,
+};
+const MAX_SCORE = 1920;
+
+function espnScore(games: BracketGame[]) {
+  return games.filter(g => g.correct === 1).reduce((sum, g) => sum + (ROUND_POINTS[g.round] ?? 0), 0);
+}
+
+function maxRemaining(games: BracketGame[]) {
+  return games.filter(g => g.correct === null).reduce((sum, g) => sum + (ROUND_POINTS[g.round] ?? 0), 0);
+}
+
+
 import BracketSlot from './BracketSlot';
 import BracketTree from './BracketTree';
 import BracketDesktop from './BracketDesktop';
@@ -11,7 +31,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'South',      label: 'South' },
   { id: 'West',       label: 'West' },
   { id: 'Midwest',    label: 'Midwest' },
-  { id: 'Final Four', label: '🏆 Final Four' },
+  { id: 'Final Four', label: 'Final Four' },
 ];
 
 function RecordPill({ games }: { games: BracketGame[] }) {
@@ -126,15 +146,33 @@ export default function BracketView() {
 
   const allPlayed  = games.filter(g => g.correct !== null).length;
   const allCorrect = games.filter(g => g.correct === 1).length;
+  const score      = espnScore(games);
+  const remaining  = maxRemaining(games);
 
   return (
     <div>
       {allPlayed > 0 && (
-        <div className="mb-4 flex items-center gap-2">
-          <span className="text-sm text-slate-400">Record:</span>
-          <span className={`text-sm font-semibold ${allCorrect / allPlayed >= 0.6 ? 'text-green-400' : 'text-orange-400'}`}>
-            {allCorrect}/{allPlayed} ({Math.round(allCorrect / allPlayed * 100)}%)
-          </span>
+        <div className="mb-5 flex flex-wrap gap-6">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">ESPN Score</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-bold text-white">{score}</span>
+              <span className="text-sm text-slate-500">/ {MAX_SCORE}</span>
+            </div>
+          </div>
+          {remaining > 0 && (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Max Possible</span>
+              <span className="text-2xl font-bold text-white">{score + remaining}</span>
+            </div>
+          )}
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Picks Correct</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-bold text-white">{allCorrect}/{allPlayed}</span>
+              <span className="text-sm text-slate-500">{Math.round(allCorrect / allPlayed * 100)}%</span>
+            </div>
+          </div>
         </div>
       )}
 
