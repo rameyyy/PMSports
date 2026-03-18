@@ -10,6 +10,7 @@ Run from ncaamb/ directory:
     python marchmadness/update_bracket_results.py
 """
 
+import csv
 import sys
 from pathlib import Path
 from datetime import date
@@ -20,19 +21,38 @@ sys.path.insert(0, str(ncaamb_dir))
 from scrapes.sqlconn import create_connection, fetch as sql_fetch
 
 BRACKET_YEAR = 2026
+MAPPINGS_CSV = Path(__file__).parent / "bracket_team_mappings.csv"
 
 
-def fetch_tournament_games(conn) -> list:
-    """Fetch all NCAA Tournament games from March/April 2026."""
-    query = """
-        SELECT game_id, date, team_1, team_2, team_1_score, team_2_score, game_type
-        FROM games
+def load_team_mappings() -> dict:
+    """Load bracket_name -> my_team_name mapping from CSV."""
+    mapping = {}
+    with open(MAPPINGS_CSV, newline="") as f:
+        for row in csv.DictReader(f):
+            bracket_name = row["bracket_name"].strip()
+            my_team_name = row["my_team_name"].strip()
+            if bracket_name and my_team_name:
+                mapping[bracket_name] = my_team_name
+    return mapping
+
+
+def fetch_tournament_games(conn, ml_team_names: set) -> list:
+    """Fetch moneyline rows where either team is a tournament team."""
+    placeholders = ", ".join(["%s"] * len(ml_team_names))
+    names_list = list(ml_team_names)
+    query = f"""
+        SELECT game_id, game_date AS date,
+               team_1, team_2,
+               actual_score_team_1 AS team_1_score,
+               actual_score_team_2 AS team_2_score,
+               winning_team
+        FROM moneyline
         WHERE season = %s
-          AND game_type = 'NCAA Tournament'
-          AND date BETWEEN '2026-03-17' AND '2026-04-10'
-        ORDER BY date
+          AND game_date BETWEEN '2026-03-17' AND '2026-04-10'
+          AND (team_1 IN ({placeholders}) OR team_2 IN ({placeholders}))
+        ORDER BY game_date
     """
-    return sql_fetch(conn, query, (BRACKET_YEAR,))
+    return sql_fetch(conn, query, tuple([BRACKET_YEAR] + names_list + names_list))
 
 
 def fetch_pending_predictions(conn) -> list:
@@ -53,10 +73,10 @@ def teams_match(pred_team: str, actual_team: str) -> bool:
     return pred_team.strip().lower() == actual_team.strip().lower()
 
 
-def find_matching_game(pred: dict, tournament_games: list) -> dict | None:
+def find_matching_game(pred: dict, tournament_games: list, mapping: dict) -> dict | None:
     """
     Find the actual game that matches a prediction row.
-    Matches if both teams appear (in either order).
+    pred_team values are already my_team_names, same as moneyline team names.
     """
     t1 = pred["pred_team_1"]
     t2 = pred["pred_team_2"]
@@ -69,17 +89,17 @@ def find_matching_game(pred: dict, tournament_games: list) -> dict | None:
     return None
 
 
-def update_result(conn, pred_id: int, game: dict, predicted_winner: str):
+def update_result(conn, pred_id: int, game: dict, predicted_winner: str, mapping: dict):
     """Fill in actual result columns and set correct flag."""
-    if game["team_1_score"] is None or game["team_2_score"] is None:
-        # Game scraped but no result yet
-        return False
-
-    if game["team_1_score"] > game["team_2_score"]:
-        actual_winner = game["team_1"]
+    # Use winning_team if available, fall back to computing from scores
+    if game.get("winning_team"):
+        actual_winner = game["winning_team"]
+    elif game["team_1_score"] is not None and game["team_2_score"] is not None:
+        actual_winner = game["team_1"] if game["team_1_score"] > game["team_2_score"] else game["team_2"]
     else:
-        actual_winner = game["team_2"]
+        return False  # no result yet
 
+    # predicted_winner is already a my_team_name — compare directly
     correct = 1 if teams_match(predicted_winner, actual_winner) else 0
 
     sql = """
@@ -117,9 +137,13 @@ def main():
         print("ERROR: could not connect to database")
         sys.exit(1)
 
-    print("Fetching tournament games from DB...")
-    tournament_games = fetch_tournament_games(conn)
-    print(f"  Found {len(tournament_games)} NCAA Tournament games\n")
+    mapping = load_team_mappings()
+    ml_team_names = set(mapping.values())
+    print(f"Loaded {len(mapping)} team mappings from CSV\n")
+
+    print("Fetching tournament games from moneyline table...")
+    tournament_games = fetch_tournament_games(conn, ml_team_names)
+    print(f"  Found {len(tournament_games)} tournament games\n")
 
     print("Fetching pending predictions...")
     pending = fetch_pending_predictions(conn)
@@ -136,23 +160,22 @@ def main():
     unmatched = []
 
     for pred in pending:
-        game = find_matching_game(pred, tournament_games)
+        game = find_matching_game(pred, tournament_games, mapping)
         if game is None:
             unmatched.append(pred["bracket_slot"])
             continue
 
         matched += 1
-        result_saved = update_result(conn, pred["id"], game, pred["predicted_winner"])
+        result_saved = update_result(conn, pred["id"], game, pred["predicted_winner"], mapping)
         if result_saved:
             updated += 1
-            correct_str = "✅" if (
-                pred["predicted_winner"].strip().lower() ==
-                (game["team_1"] if (game["team_1_score"] or 0) > (game["team_2_score"] or 0)
-                 else game["team_2"]).strip().lower()
-            ) else "❌"
+            actual_winner = (game.get("winning_team") or
+                             (game["team_1"] if (game["team_1_score"] or 0) > (game["team_2_score"] or 0)
+                              else game["team_2"]))
+            correct_str = "✅" if teams_match(pred["predicted_winner"], actual_winner) else "❌"
             print(f"  {pred['bracket_slot']:25s}  "
                   f"{game['team_1']} vs {game['team_2']}  →  "
-                  f"actual winner: {game['team_1'] if game['team_1_score'] > game['team_2_score'] else game['team_2']}  "
+                  f"actual winner: {actual_winner}  "
                   f"{correct_str}")
         else:
             no_result += 1
@@ -197,11 +220,12 @@ def print_standings(conn):
     total_correct = 0
     total_played  = 0
     for r in rows:
-        pct = (r["correct_picks"] / r["played"] * 100) if r["played"] else 0
-        print(f"  {r['round']:15s}  {r['correct_picks']:2d}/{r['played']:2d} played  "
-              f"({pct:.0f}%)")
-        total_correct += r["correct_picks"]
-        total_played  += r["played"]
+        correct = int(r["correct_picks"] or 0)
+        played  = int(r["played"] or 0)
+        pct = (correct / played * 100) if played else 0
+        print(f"  {str(r['round']):15s}  {correct:2d}/{played:2d} played  ({pct:.0f}%)")
+        total_correct += correct
+        total_played  += played
 
     overall = (total_correct / total_played * 100) if total_played else 0
     print(f"  {'OVERALL':15s}  {total_correct:2d}/{total_played:2d} played  ({overall:.0f}%)")
