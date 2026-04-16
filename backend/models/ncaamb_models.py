@@ -48,7 +48,7 @@ def get_homepage_stats():
         'pick_of_day_correct': result['pick_of_day_correct'] or 0,
         'pick_of_day_total': result['pick_of_day_total'] or 0,
         'pod_avg_odds': result['pod_avg_odds'] or 0,
-        'pod_roi': float(result['pod_roi'] or 0),
+        'pod_units': float(result['pod_units'] or 0) if 'pod_units' in result and result['pod_units'] is not None else 0.0,
         'pod_td_matchup': result['pod_td_matchup'],
         'pod_td_pick': result['pod_td_pick'],
         'pod_td_odds': result['pod_td_odds'],

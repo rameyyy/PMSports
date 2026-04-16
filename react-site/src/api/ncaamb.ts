@@ -10,7 +10,7 @@ export interface HomepageStats {
   pick_of_day_correct: number;
   pick_of_day_total: number;
   pod_avg_odds: number;
-  pod_roi: number;
+  pod_units: number;
   pod_td_matchup: string | null;
   pod_td_pick: string | null;
   pod_td_odds: number | null;

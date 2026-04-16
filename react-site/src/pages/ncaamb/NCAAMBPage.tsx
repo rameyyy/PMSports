@@ -5,7 +5,7 @@ import DayStats from './components/DayStats';
 import GamesTable from './components/GamesTable';
 import ModelPerformance from './components/ModelPerformance';
 import BracketView from './components/BracketView';
-import { fetchGamesByDate, type Game } from '../../api/ncaamb';
+import { fetchGamesByDate, fetchHomepageStats, type Game } from '../../api/ncaamb';
 
 const TABS = [
   { id: 'games', label: 'Games' },
@@ -22,21 +22,51 @@ function getDefaultDate() {
 }
 
 export default function NCAAMBPage() {
-  const [activeTab, setActiveTab] = useState('games');
+  const [isSeasonOver, setIsSeasonOver] = useState<boolean | null>(null);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(getDefaultDate);
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [rankFilter, setRankFilter] = useState<'all' | 'top25' | 'top50'>('top25');
   const [confFilter, setConfFilter] = useState<string>('all');
 
+  // Check if season is over
   useEffect(() => {
+    fetchHomepageStats()
+      .then(data => {
+        const seasonOver = data.todays_games_count === -1;
+        setIsSeasonOver(seasonOver);
+        // Set default tab based on season status
+        if (seasonOver) {
+          setActiveTab('performance');
+        } else {
+          setActiveTab('games');
+        }
+      })
+      .catch(() => {
+        setIsSeasonOver(false);
+        setActiveTab('games');
+      });
+  }, []);
+
+  // When season is over and games tab is first opened, set date to last games date
+  useEffect(() => {
+    if (isSeasonOver && activeTab === 'games' && selectedDate.toDateString() === getDefaultDate().toDateString()) {
+      // Set to April 7, 2026 (championship game date)
+      const lastGamesDate = new Date('2026-04-07');
+      setSelectedDate(lastGamesDate);
+    }
+  }, [isSeasonOver, activeTab]);
+
+  useEffect(() => {
+    if (activeTab === null) return; // Wait for initial tab to be set
     const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
     setLoading(true);
     fetchGamesByDate(dateStr)
       .then((data) => setGames(data.games))
       .catch(() => setGames([]))
       .finally(() => setLoading(false));
-  }, [selectedDate]);
+  }, [selectedDate, activeTab]);
 
   // Auto-fallback: top25 → top50 → all if no games match
   useEffect(() => {
@@ -88,7 +118,7 @@ export default function NCAAMBPage() {
       </nav>
 
       {/* Tab Navigation */}
-      <TabNav tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />
+      {activeTab && <TabNav tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />}
 
       {/* Main Content */}
       <div className="max-w-[90rem] mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6">

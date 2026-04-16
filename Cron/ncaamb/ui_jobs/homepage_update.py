@@ -108,7 +108,7 @@ def decimal_to_american(decimal_odds):
 
 
 def get_pick_of_day_record(conn, before_date):
-    """Get pick of day accuracy, ROI, and avg odds for PODs before given date"""
+    """Get pick of day accuracy, units, and avg odds for PODs before given date"""
     query = """
         SELECT
             mp.betting_rule,
@@ -135,21 +135,24 @@ def get_pick_of_day_record(conn, before_date):
 
     total_picks = len(data)
     correct_picks = 0
-    total_wagered = 0
-    total_profit = 0
+    total_units = 0
     decimal_odds_list = []
 
     for row in data:
-        is_underdog = row['betting_rule'].startswith('Dog')
+        is_underdog = row['betting_rule'] and 'DOG' in row['betting_rule'].upper()
 
         if is_underdog:
-            if row['gbm_prob_team_1'] <= row['gbm_prob_team_2']:
+            # Betting on underdog (positive odds)
+            if row['best_book_odds_team_1'] and row['best_book_odds_team_1'] > 0:
                 picked_team = row['team_1']
                 picked_odds = int(row['best_book_odds_team_1'])
-            else:
+            elif row['best_book_odds_team_2'] and row['best_book_odds_team_2'] > 0:
                 picked_team = row['team_2']
                 picked_odds = int(row['best_book_odds_team_2'])
+            else:
+                continue
         else:
+            # Betting on predicted winner (favorite)
             if row['gbm_prob_team_1'] > row['gbm_prob_team_2']:
                 picked_team = row['team_1']
                 picked_odds = int(row['best_book_odds_team_1'])
@@ -163,22 +166,19 @@ def get_pick_of_day_record(conn, before_date):
 
         decimal_odds_list.append(american_to_decimal(picked_odds))
 
-        stake = 100
-        total_wagered += stake
-
+        # Calculate units (1 unit per bet)
         if won:
             decimal_odds = american_to_decimal(picked_odds)
-            profit = stake * (decimal_odds - 1)
-            total_profit += profit
+            profit = 1 * (decimal_odds - 1)
+            total_units += profit
         else:
-            total_profit -= stake
+            total_units -= 1
 
     accuracy = round(correct_picks / total_picks * 100, 2) if total_picks > 0 else 0.0
-    roi = round(total_profit / total_wagered * 100, 2) if total_wagered > 0 else 0.0
     avg_decimal_odds = sum(decimal_odds_list) / len(decimal_odds_list) if decimal_odds_list else 1.0
     avg_american_odds = decimal_to_american(avg_decimal_odds) if decimal_odds_list else 0
 
-    return accuracy, correct_picks, total_picks, avg_american_odds, roi
+    return accuracy, correct_picks, total_picks, avg_american_odds, total_units
 
 
 def get_pick_details(conn, date):
@@ -238,7 +238,7 @@ def insert_homepage_stats(conn, stats):
             date, todays_games_count, my_accuracy, vegas_accuracy,
             my_total_correct, vegas_total_correct, total_complete_matches,
             pick_of_day_acc, pick_of_day_correct, pick_of_day_total,
-            pod_avg_odds, pod_roi,
+            pod_avg_odds, pod_units,
             pod_td_matchup, pod_td_pick, pod_td_odds,
             pod_yd_matchup, pod_yd_pick, pod_yd_odds, pod_yd_outcome
         ) VALUES (
@@ -255,7 +255,7 @@ def insert_homepage_stats(conn, stats):
             pick_of_day_correct = VALUES(pick_of_day_correct),
             pick_of_day_total = VALUES(pick_of_day_total),
             pod_avg_odds = VALUES(pod_avg_odds),
-            pod_roi = VALUES(pod_roi),
+            pod_units = VALUES(pod_units),
             pod_td_matchup = VALUES(pod_td_matchup),
             pod_td_pick = VALUES(pod_td_pick),
             pod_td_odds = VALUES(pod_td_odds),
@@ -277,7 +277,7 @@ def insert_homepage_stats(conn, stats):
         stats['pick_of_day_correct'],
         stats['pick_of_day_total'],
         stats['pod_avg_odds'],
-        stats['pod_roi'],
+        stats['pod_units'],
         stats['pod_td_matchup'],
         stats['pod_td_pick'],
         stats['pod_td_odds'],
@@ -313,7 +313,7 @@ def main():
         todays_games = get_todays_games_count(conn, today)
         my_acc, my_correct, my_total = get_model_accuracy(conn, today)
         vegas_acc, vegas_correct, vegas_total = get_vegas_accuracy(conn, today)
-        pod_acc, pod_correct, pod_total, pod_avg_odds, pod_roi = get_pick_of_day_record(conn, today)
+        pod_acc, pod_correct, pod_total, pod_avg_odds, pod_units = get_pick_of_day_record(conn, today)
 
         td_matchup, td_pick, td_odds, _ = get_pick_details(conn, today)
         yd_matchup, yd_pick, yd_odds, yd_outcome = get_pick_details(conn, yesterday)
@@ -330,7 +330,7 @@ def main():
             'pick_of_day_correct': pod_correct,
             'pick_of_day_total': pod_total,
             'pod_avg_odds': pod_avg_odds,
-            'pod_roi': pod_roi,
+            'pod_units': pod_units,
             'pod_td_matchup': td_matchup,
             'pod_td_pick': td_pick,
             'pod_td_odds': td_odds,
@@ -345,7 +345,7 @@ def main():
         print(f"Vegas accuracy: {vegas_acc}% ({vegas_correct}/{vegas_total})")
         print(f"POD record: {pod_acc}% ({pod_correct}/{pod_total})")
         print(f"POD avg odds: {pod_avg_odds}")
-        print(f"POD ROI: {pod_roi}%")
+        print(f"POD Units: {pod_units:+.2f}")
         print(f"Today's POD: {td_pick} ({td_matchup}) @ {td_odds}")
         print(f"Yesterday's POD: {yd_pick} ({yd_matchup}) @ {yd_odds} -> {yd_outcome}")
 

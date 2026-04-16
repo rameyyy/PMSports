@@ -4,6 +4,7 @@ interface AccuracyData {
   winRate: string;
   record: string;
   totalPicks: number;
+  label?: string;
 }
 
 interface EventData {
@@ -17,7 +18,7 @@ interface PickData {
   record: string;
   winRate: string;
   avgOdds?: string;
-  roi?: string;
+  units?: string;
   todayPick?: {
     title: string;
     subtitle?: string;
@@ -33,6 +34,7 @@ interface PickData {
     result: 'correct' | 'incorrect' | null;
   } | null;
   pickLabel: string;
+  seasonLabel?: string;
 }
 
 interface SportSectionProps {
@@ -116,14 +118,18 @@ export default function SportSection({
 
         {/* Model Accuracy */}
         <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">My Model</p>
+          <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
+            My Model{modelAccuracy.label && ` (${modelAccuracy.label})`}
+          </p>
           <p className="text-2xl font-bold text-white">{modelAccuracy.winRate}</p>
           <p className="text-sm text-slate-400">{modelAccuracy.record}</p>
         </div>
 
         {/* Vegas Accuracy */}
         <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Vegas Favorites</p>
+          <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
+            Vegas Favorites{vegasAccuracy.label && ` (${vegasAccuracy.label})`}
+          </p>
           <p className="text-2xl font-bold text-white">{vegasAccuracy.winRate}</p>
           <p className="text-sm text-slate-400">{vegasAccuracy.record}</p>
         </div>
@@ -141,62 +147,97 @@ export default function SportSection({
       {pick && pickTitle && (
         <div className="mt-6 pl-0 md:pl-14">
           <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-700/50">
-            <div className="mb-3 flex items-start justify-between">
+            {/* Season Over - Analytical Summary Layout */}
+            {pick.seasonLabel && !pick.todayPick ? (
               <div>
-                <p className="text-sm font-semibold text-white">{pickTitle}</p>
-                <p className="text-xs text-slate-400">{pick.record} ({pick.winRate})</p>
-              </div>
-              {(pick.avgOdds || pick.roi) && (
-                <div className="text-right">
+                <p className="text-sm font-semibold text-white mb-3">{pickTitle}</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Record</p>
+                    <p className="text-lg font-bold text-white">{pick.record}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Win Rate</p>
+                    <p className="text-lg font-bold text-white">{pick.winRate}</p>
+                  </div>
                   {pick.avgOdds && (
-                    <p className="text-xs text-slate-400">Avg Odds: <span className="text-white font-medium">{pick.avgOdds}</span></p>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Avg Odds</p>
+                      <p className="text-lg font-bold text-white">{pick.avgOdds}</p>
+                    </div>
                   )}
-                  {pick.roi && (
-                    <p className={`text-xs font-semibold ${parseFloat(pick.roi) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      ROI: {pick.roi}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {pick.todayPick && (
-              <div className="mb-4 pb-4 border-b border-slate-700/50">
-                <p className="text-xs text-slate-500 mb-1">Today's Pick</p>
-                <p className="text-white font-medium text-sm mb-0.5">{pick.todayPick.title}</p>
-                {pick.todayPick.subtitle && (
-                  <p className="text-xs text-slate-400 mb-1">{pick.todayPick.subtitle}</p>
-                )}
-                <div className="flex items-center gap-2">
-                  <p className="text-xs text-slate-300">Picked: {pick.todayPick.prediction}</p>
-                  {pick.todayPick.odds && (
-                    <span className="text-xs text-orange-400 font-medium">({pick.todayPick.odds})</span>
+                  {pick.units && (
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Units</p>
+                      <p className={`text-lg font-bold ${pick.units.startsWith('+') ? 'text-green-400' : pick.units.startsWith('-') ? 'text-red-400' : 'text-slate-400'}`}>
+                        {pick.units}
+                      </p>
+                    </div>
                   )}
                 </div>
+                <p className="text-xs text-slate-400 text-center">{pick.seasonLabel}</p>
               </div>
-            )}
-
-            {pick.lastPick && (
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500 mb-1">{pick.pickLabel}</p>
-                  <p className="text-white font-medium text-sm mb-0.5">{pick.lastPick.title}</p>
-                  {pick.lastPick.subtitle && (
-                    <p className="text-xs text-slate-400 mb-1">{pick.lastPick.subtitle}</p>
+            ) : (
+              /* Active Season Layout */
+              <>
+                <div className="mb-3 flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{pickTitle}</p>
+                    <p className="text-xs text-slate-400">{pick.record} ({pick.winRate})</p>
+                  </div>
+                  {(pick.avgOdds || pick.units) && (
+                    <div className="text-right">
+                      {pick.avgOdds && (
+                        <p className="text-xs text-slate-400">Avg Odds: <span className="text-white font-medium">{pick.avgOdds}</span></p>
+                      )}
+                      {pick.units && (
+                        <p className={`text-xs font-semibold ${pick.units.startsWith('+') ? 'text-green-400' : pick.units.startsWith('-') ? 'text-red-400' : 'text-slate-400'}`}>
+                          Units: {pick.units}
+                        </p>
+                      )}
+                    </div>
                   )}
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs text-slate-300">Picked: {pick.lastPick.prediction}</p>
-                    {pick.lastPick.odds && (
-                      <span className="text-xs text-orange-400 font-medium">({pick.lastPick.odds})</span>
+                </div>
+
+                {pick.todayPick && (
+                  <div className="mb-4 pb-4 border-b border-slate-700/50">
+                    <p className="text-xs text-slate-500 mb-1">Today's Pick</p>
+                    <p className="text-white font-medium text-sm mb-0.5">{pick.todayPick.title}</p>
+                    {pick.todayPick.subtitle && (
+                      <p className="text-xs text-slate-400 mb-1">{pick.todayPick.subtitle}</p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-slate-300">Picked: {pick.todayPick.prediction}</p>
+                      {pick.todayPick.odds && (
+                        <span className="text-xs text-orange-400 font-medium">({pick.todayPick.odds})</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {pick.lastPick && (
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-500 mb-1">{pick.pickLabel}</p>
+                      <p className="text-white font-medium text-sm mb-0.5">{pick.lastPick.title}</p>
+                      {pick.lastPick.subtitle && (
+                        <p className="text-xs text-slate-400 mb-1">{pick.lastPick.subtitle}</p>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-slate-300">Picked: {pick.lastPick.prediction}</p>
+                        {pick.lastPick.odds && (
+                          <span className="text-xs text-orange-400 font-medium">({pick.lastPick.odds})</span>
+                        )}
+                      </div>
+                    </div>
+                    {pick.lastPick.result && (
+                      <div className="flex-shrink-0 ml-3">
+                        <ResultIcon result={pick.lastPick.result} />
+                      </div>
                     )}
                   </div>
-                </div>
-                {pick.lastPick.result && (
-                  <div className="flex-shrink-0 ml-3">
-                    <ResultIcon result={pick.lastPick.result} />
-                  </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         </div>

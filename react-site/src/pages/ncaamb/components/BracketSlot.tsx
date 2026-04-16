@@ -1,6 +1,6 @@
 import type { BracketGame } from '../../../api/ncaamb';
 
-export const SLOT_H_BASE = 64;
+export const SLOT_H_BASE = 96;
 export const CARD_H = 48;
 
 export function slotHeight(roundIndex: number) {
@@ -23,46 +23,71 @@ export default function BracketSlot({
   const sH   = slotHeight(roundIndex);
   const padV = (sH - cardH) / 2;
 
-  const t1IsPick   = game.predicted_winner === game.pred_team_1;
-  const t2IsPick   = game.predicted_winner === game.pred_team_2;
-  const hasResult  = game.actual_winner !== null;
-  const correct    = game.correct;
-  const t1Won      = hasResult && game.actual_winner === game.pred_team_1;
-  const t2Won      = hasResult && game.actual_winner === game.pred_team_2;
+  const hasResult = game.actual_winner !== null;
+  const correct = game.correct;
+
+  // Use actual teams if available, otherwise use predictions
+  const team1 = hasResult && game.actual_team_1 ? game.actual_team_1 : game.pred_team_1;
+  const team2 = hasResult && game.actual_team_2 ? game.actual_team_2 : game.pred_team_2;
+
+  // Determine if each team won
+  const t1Won = hasResult && game.actual_winner === team1;
+  const t2Won = hasResult && game.actual_winner === team2;
+
+  // Check if predicted winner was in this game
+  const pickWasInGame = game.predicted_winner === team1 || game.predicted_winner === team2;
 
   const p1 = game.prob_ensemble ?? 0.5;
   const p2 = 1 - p1;
 
-  // Per-row background
-  function rowBg(isPick: boolean, isWon: boolean) {
-    if (!hasResult) return isPick ? 'bg-orange-500/20' : '';
-    if (isPick && correct === 1) return 'bg-green-500/25';
-    if (isPick && correct === 0) return 'bg-red-500/20';
-    if (isWon)                   return 'bg-green-500/25';
+  // Per-row background - highlight winner in green
+  function rowBg(isWon: boolean) {
+    if (!hasResult) return '';
+    if (isWon) return 'bg-green-500/25';
     return '';
   }
 
   // Team name color
-  function nameColor(isPick: boolean, isWon: boolean) {
-    if (!hasResult) return isPick ? 'text-white font-semibold' : 'text-slate-200';
-    if (isPick && correct === 1) return 'text-green-300 font-semibold';
-    if (isPick && correct === 0) return 'text-red-300 font-semibold';
-    if (isWon)                   return 'text-green-300 font-semibold';
+  function nameColor(isWon: boolean) {
+    if (!hasResult) return 'text-slate-200';
+    if (isWon) return 'text-green-300 font-semibold';
     return 'text-slate-300';
   }
 
-  // Small badge shown after team name
-  function badge(isPick: boolean, isWon: boolean) {
+  // Pick indicator badge
+  function pickBadge() {
     if (!hasResult) {
-      if (isPick) return <span className="text-[8px] font-bold uppercase tracking-wide text-orange-400 shrink-0">PICK</span>;
-      return null;
+      return (
+        <div className="text-[9px] text-slate-400 mt-0.5">
+          Pick: <span className="text-orange-400 font-semibold">{game.predicted_winner}</span>
+        </div>
+      );
     }
-    if (isPick && correct === 1)
-      return <span className="text-[8px] font-bold uppercase tracking-wide text-green-400 shrink-0">PICK</span>;
-    if (isPick && correct === 0)
-      return <span className="text-[8px] font-bold uppercase tracking-wide text-red-400 shrink-0">PICK</span>;
-    if (isWon)
-      return <span className="text-[8px] font-bold uppercase tracking-wide text-green-400 shrink-0">WON</span>;
+
+    if (correct === 1) {
+      return (
+        <div className="text-[9px] text-slate-400 mt-0.5">
+          Pick: <span className="text-green-400 font-semibold">{game.predicted_winner}</span> ✓
+        </div>
+      );
+    }
+
+    if (correct === 0 && pickWasInGame) {
+      return (
+        <div className="text-[9px] text-slate-400 mt-0.5">
+          Pick: <span className="text-red-400 font-semibold">{game.predicted_winner}</span> ✗
+        </div>
+      );
+    }
+
+    if (correct === 0 && !pickWasInGame) {
+      return (
+        <div className="text-[9px] text-slate-400 mt-0.5">
+          Pick: <span className="text-slate-500 font-semibold">{game.predicted_winner}</span> (out)
+        </div>
+      );
+    }
+
     return null;
   }
 
@@ -71,39 +96,49 @@ export default function BracketSlot({
     ? 'border-l-2 border-l-slate-600'
     : correct === 1
       ? 'border-l-2 border-l-green-500'
-      : 'border-l-2 border-l-red-500';
+      : correct === 0 && pickWasInGame
+        ? 'border-l-2 border-l-red-500'
+        : 'border-l-2 border-l-slate-500';
 
   const cardW = compact ? 'w-32' : 'w-44';
 
   const card = (
     <div style={{ paddingTop: padV, paddingBottom: padV }} className={`${cardW} shrink-0`}>
-      <div style={{ height: cardH }} className={`flex flex-col border border-slate-700 rounded overflow-hidden bg-slate-800 ${leftAccent}`}>
-        {/* Team 1 */}
-        <div className={`flex items-center gap-1 px-1.5 flex-1 border-b border-slate-700 ${rowBg(t1IsPick, t1Won)}`}>
-          <span className="text-[10px] font-bold text-slate-300 w-4 text-center shrink-0">
-            {game.pred_team_1_seed ?? '?'}
-          </span>
-          <span className={`text-[11px] truncate flex-1 leading-tight ${nameColor(t1IsPick, t1Won)}`}>
-            {game.pred_team_1}
-          </span>
-          {badge(t1IsPick, t1Won)}
-          <span className="text-[10px] font-mono text-slate-300 shrink-0 ml-0.5">
-            {(p1 * 100).toFixed(0)}%
-          </span>
+      <div className={`border border-slate-700 rounded overflow-hidden bg-slate-800 ${leftAccent}`}>
+        <div style={{ minHeight: cardH }} className="flex flex-col">
+          {/* Team 1 */}
+          <div className={`flex items-center gap-1 px-1.5 py-1 border-b border-slate-700 ${rowBg(t1Won)}`}>
+            <span className="text-[10px] font-bold text-slate-300 w-4 text-center shrink-0">
+              {game.pred_team_1_seed ?? '?'}
+            </span>
+            <span className={`text-[11px] truncate flex-1 leading-tight ${nameColor(t1Won)}`}>
+              {team1}
+            </span>
+            {t1Won && <span className="text-[8px] font-bold uppercase tracking-wide text-green-400 shrink-0">WON</span>}
+            <span className="text-[10px] font-mono text-slate-300 shrink-0 ml-0.5">
+              {(p1 * 100).toFixed(0)}%
+            </span>
+          </div>
+          {/* Team 2 */}
+          <div className={`flex items-center gap-1 px-1.5 py-1 ${rowBg(t2Won)}`}>
+            <span className="text-[10px] font-bold text-slate-300 w-4 text-center shrink-0">
+              {game.pred_team_2_seed ?? '?'}
+            </span>
+            <span className={`text-[11px] truncate flex-1 leading-tight ${nameColor(t2Won)}`}>
+              {team2}
+            </span>
+            {t2Won && <span className="text-[8px] font-bold uppercase tracking-wide text-green-400 shrink-0">WON</span>}
+            <span className="text-[10px] font-mono text-slate-300 shrink-0 ml-0.5">
+              {(p2 * 100).toFixed(0)}%
+            </span>
+          </div>
         </div>
-        {/* Team 2 */}
-        <div className={`flex items-center gap-1 px-1.5 flex-1 ${rowBg(t2IsPick, t2Won)}`}>
-          <span className="text-[10px] font-bold text-slate-300 w-4 text-center shrink-0">
-            {game.pred_team_2_seed ?? '?'}
-          </span>
-          <span className={`text-[11px] truncate flex-1 leading-tight ${nameColor(t2IsPick, t2Won)}`}>
-            {game.pred_team_2}
-          </span>
-          {badge(t2IsPick, t2Won)}
-          <span className="text-[10px] font-mono text-slate-300 shrink-0 ml-0.5">
-            {(p2 * 100).toFixed(0)}%
-          </span>
-        </div>
+        {/* Pick indicator */}
+        {hasResult && (
+          <div className="px-1.5 py-1 border-t border-slate-700/50 bg-slate-900/50">
+            {pickBadge()}
+          </div>
+        )}
       </div>
     </div>
   );

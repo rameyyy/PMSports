@@ -31,40 +31,47 @@ export default function HomePage() {
     return odds > 0 ? `+${odds}` : `${odds}`;
   };
 
-  const edge = stats ? stats.my_accuracy - stats.vegas_accuracy : 0;
+  // Calculate edge from rounded values (to match what's displayed)
+  const myModelRounded = stats ? Math.round(stats.my_accuracy * 10) / 10 : 0;
+  const vegasRounded = stats ? Math.round(stats.vegas_accuracy * 10) / 10 : 0;
+  const edge = myModelRounded - vegasRounded;
+
+  const isSeasonOver = stats?.todays_games_count === -1;
 
   const basketballData = {
     name: "Men's Basketball",
-    subtitle: "Daily games (Nov - Apr)",
+    subtitle: isSeasonOver ? "2026 Season Complete" : "Daily games (Nov - Apr)",
     logo: "/logo/ncaa-logo.png",
     path: "/ncaamb",
     available: true,
-    nextEvent: {                                                                                                                                                                           
-      name: stats?.todays_games_count === -1 ? "-" : "Today's Games",
-    // nextEvent: stats?.todays_games_count !== -1 ? {
-    //   name: "Today's Games",
+    nextEvent: isSeasonOver ? {
+      name: "Season Over",
+      date: "Returns November 2026",
+      gamesCount: 0
+    } : {
+      name: "Today's Games",
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      gamesCount: stats?.todays_games_count === -1 ? 0 : (stats?.todays_games_count || 0)                                                                                                  
-    },  
-    //   gamesCount: stats?.todays_games_count || 0
-    // } : null,
+      gamesCount: stats?.todays_games_count || 0
+    },
     modelAccuracy: {
       winRate: loading ? "-.-%%" : `${stats?.my_accuracy.toFixed(1)}%`,
       record: loading ? "-/-" : `${stats?.my_total_correct}-${stats?.total_complete_matches}`,
-      totalPicks: stats?.total_complete_matches || 0
+      totalPicks: stats?.total_complete_matches || 0,
+      label: isSeasonOver ? "2026 Season" : undefined
     },
     vegasAccuracy: {
       winRate: loading ? "-.-%%" : `${stats?.vegas_accuracy.toFixed(1)}%`,
       record: loading ? "-/-" : `${stats?.vegas_total_correct}-${stats?.total_complete_matches}`,
-      totalPicks: stats?.total_complete_matches || 0
+      totalPicks: stats?.total_complete_matches || 0,
+      label: isSeasonOver ? "2026 Season" : undefined
     },
     edge: loading ? "-.-%%" : `${edge >= 0 ? '+' : ''}${edge.toFixed(1)}%`,
     pick: {
       record: loading ? "-/-" : `${stats?.pick_of_day_correct}-${stats?.pick_of_day_total}`,
       winRate: loading ? "-.-%%" : `${stats?.pick_of_day_acc.toFixed(1)}%`,
       avgOdds: loading ? "-" : formatOdds(stats?.pod_avg_odds || 0),
-      roi: loading ? "-.-%%" : `${(stats?.pod_roi || 0) >= 0 ? '+' : ''}${stats?.pod_roi.toFixed(1)}%`,
-      todayPick: (stats?.pod_td_matchup && stats?.pod_td_pick && stats?.todays_games_count !== -1) ? {
+      units: loading ? "-" : `${(stats?.pod_units || 0) >= 0 ? '+' : ''}${stats?.pod_units.toFixed(2)}u`,
+      todayPick: (stats?.pod_td_matchup && stats?.pod_td_pick && !isSeasonOver) ? {
         title: stats.pod_td_matchup,
         prediction: stats.pod_td_pick,
         odds: formatOdds(stats.pod_td_odds),
@@ -78,7 +85,8 @@ export default function HomePage() {
                 stats.pod_yd_outcome === 'L' ? "incorrect" as const :
                 null
       } : null,
-      pickLabel: "Yesterday's Pick"
+      pickLabel: "Yesterday's Pick",
+      seasonLabel: isSeasonOver ? "2026 Season Stats" : undefined
     },
     pickTitle: "Pick of the Day"
   };
@@ -119,6 +127,11 @@ export default function HomePage() {
     pickTitle: "Pick of the Week"
   };
 
+  // Reorder sports based on season status
+  const orderedSports = isSeasonOver
+    ? [ufcData, basketballData]
+    : [basketballData, ufcData];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div>
@@ -128,8 +141,9 @@ export default function HomePage() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="space-y-12">
-          <SportSection {...basketballData} />
-          <SportSection {...ufcData} />
+          {orderedSports.map((sport) => (
+            <SportSection key={sport.name} {...sport} />
+          ))}
         </div>
       </div>
     </div>
