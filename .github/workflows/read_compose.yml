@@ -1,11 +1,74 @@
-name: Read Compose File
+name: Add Restart Policy
 
 on:
   workflow_dispatch:
 
 jobs:
-  read:
+  patch:
     runs-on: self-hosted
     steps:
-      - name: Show compose.yml
-        run: cat /home/caramey/prod/compose.yml
+      - name: Write updated compose.yml
+        run: |
+          cat > /home/caramey/prod/compose.yml << 'EOF'
+          version: '3.8'
+
+          services:
+            api:
+              image: backend:latest
+              container_name: api
+              restart: unless-stopped
+              ports:
+                - "5000:5000"
+              env_file:
+                - backend.env
+              networks:
+                - app-network
+
+            ui:
+              image: react-site:latest
+              container_name: ui
+              restart: unless-stopped
+              ports:
+                - "3030:3000"
+              networks:
+                - app-network
+
+            cloudflared:
+              image: cloudflare/cloudflared:2025.9.1
+              container_name: cloudflared
+              restart: unless-stopped
+              command: tunnel run
+              env_file:
+                - cloudflared.env
+              networks:
+                - app-network
+
+            nginx:
+              image: nginx:alpine
+              container_name: nginx
+              restart: unless-stopped
+              ports:
+                - "80:80"
+              volumes:
+                - ./nginx.conf:/etc/nginx/nginx.conf:ro
+              depends_on:
+                - api
+                - ui
+              networks:
+                - app-network
+
+          networks:
+            app-network:
+              driver: bridge
+          EOF
+
+      - name: Verify and apply
+        run: |
+          echo "=== NEW COMPOSE FILE ==="
+          cat /home/caramey/prod/compose.yml
+          echo ""
+          echo "=== RECREATING CONTAINERS WITH RESTART POLICY ==="
+          cd /home/caramey/prod
+          docker-compose up -d 2>/dev/null || docker compose up -d
+          sleep 5
+          docker-compose ps 2>/dev/null || docker compose ps
