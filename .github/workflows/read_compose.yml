@@ -7,11 +7,5 @@ jobs:
   read:
     runs-on: self-hosted
     steps:
-      - name: Find and show compose file
-        run: |
-          echo "=== LOOKING IN /home/caramey/prod ==="
-          ls -la /home/caramey/prod/
-          echo "=== SEARCHING FOR COMPOSE FILES ==="
-          find /home/caramey -name "docker-compose*" -o -name "compose.yml" -o -name "compose.yaml" 2>/dev/null
-          echo "=== CHECKING RUNNING COMPOSE PROJECT ==="
-          docker inspect --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' cloudflared 2>/dev/null || echo "no label found"
+      - name: Show compose.yml
+        run: cat /home/caramey/prod/compose.yml
