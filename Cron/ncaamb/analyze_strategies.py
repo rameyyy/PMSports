@@ -45,7 +45,7 @@ def calculate_roi(bets_df):
     return roi
 
 def get_predicted_info(row):
-    """Get predicted team and its EV/odds"""
+    """Get predicted team and its EV/odds."""
     if row['gbm_prob_team_1'] > row['gbm_prob_team_2']:
         return {
             'predicted_team': row['team_1'],
