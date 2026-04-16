@@ -1,0 +1,11 @@
+name: Read Compose File
+
+on:
+  workflow_dispatch:
+
+jobs:
+  read:
+    runs-on: self-hosted
+    steps:
+      - name: Show docker-compose.yml
+        run: cat /home/caramey/prod/docker-compose.yml
