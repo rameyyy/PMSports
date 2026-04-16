@@ -26,6 +26,7 @@ jobs:
       - name: Restart containers with new images
         run: |
           cd /home/caramey/prod
+          docker-compose down
           docker-compose up -d
           sleep 5
           echo "=== CONTAINER STATUS ==="
