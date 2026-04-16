@@ -10,10 +10,10 @@ jobs:
       - name: Restart docker-compose
         run: |
           cd /home/caramey/prod
-          docker-compose up -d 2>/dev/null || docker compose up -d
+          docker-compose up -d
           sleep 5
           echo "=== CONTAINER STATUS ==="
-          docker-compose ps 2>/dev/null || docker compose ps
+          docker-compose ps
           echo "=== QUICK HEALTH CHECK ==="
           curl -s -o /dev/null -w "ui (port 3030): HTTP %{http_code}\n" http://localhost:3030 || echo "ui not responding"
           curl -s -o /dev/null -w "api (port 5000): HTTP %{http_code}\n" http://localhost:5000 || echo "api not responding"

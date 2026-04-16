@@ -69,6 +69,6 @@ jobs:
           echo ""
           echo "=== RECREATING CONTAINERS WITH RESTART POLICY ==="
           cd /home/caramey/prod
-          docker-compose up -d 2>/dev/null || docker compose up -d
+          docker-compose up -d
           sleep 5
-          docker-compose ps 2>/dev/null || docker compose ps
+          docker-compose ps
