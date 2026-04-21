@@ -1,0 +1,33 @@
+name: Check Docker Network
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: self-hosted
+    steps:
+      - name: Find host IP from cloudflared container
+        run: |
+          echo "=== DOCKER NETWORK ==="
+          docker network ls
+
+          echo ""
+          echo "=== CLOUDFLARED CONTAINER NETWORK ==="
+          docker inspect cloudflared --format '{{json .NetworkSettings.Networks}}' | python3 -m json.tool 2>/dev/null || docker inspect cloudflared --format '{{json .NetworkSettings.Networks}}'
+
+          echo ""
+          echo "=== HOST GATEWAY ==="
+          docker inspect cloudflared --format '{{range .NetworkSettings.Networks}}Gateway: {{.Gateway}}{{end}}'
+
+          echo ""
+          echo "=== TEST SSH FROM INSIDE CLOUDFLARED CONTAINER ==="
+          GATEWAY=$(docker inspect cloudflared --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}')
+          echo "Gateway IP: $GATEWAY"
+          docker exec cloudflared nc -zv "$GATEWAY" 22 2>&1 || echo "Cannot reach SSH via gateway"
+          docker exec cloudflared nc -zv host.docker.internal 22 2>&1 || echo "Cannot reach SSH via host.docker.internal"
+          docker exec cloudflared nc -zv 172.17.0.1 22 2>&1 || echo "Cannot reach SSH via 172.17.0.1"
+
+          echo ""
+          echo "=== HOST SSH LISTENING ==="
+          ss -tlnp | grep :22
