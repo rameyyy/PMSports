@@ -7,61 +7,39 @@ jobs:
   restart-cloudflared:
     runs-on: self-hosted
     steps:
-      - name: Check current cloudflared status
+      - name: Check and start SSH service
         run: |
-          echo "=== CLOUDFLARED PROCESS ==="
-          pgrep -a cloudflared || echo "cloudflared not running"
-          echo "=== SYSTEMD SERVICE ==="
-          systemctl is-active cloudflared 2>/dev/null || echo "no active systemd service"
-          echo "=== DOCKER CONTAINERS ==="
-          docker ps -a --filter "name=cloudflare" --format "{{.Names}} {{.Status}}" || echo "no cloudflared containers"
+          echo "=== SSH SERVICE STATUS ==="
+          systemctl is-active sshd 2>/dev/null || systemctl is-active ssh 2>/dev/null || echo "SSH service not active"
 
-      - name: Start cloudflared
+          echo "=== STARTING SSH ==="
+          systemctl start sshd 2>/dev/null || systemctl start ssh 2>/dev/null || echo "Could not start SSH service (may need sudo)"
+
+          echo "=== SSH LISTENING? ==="
+          ss -tlnp | grep -E ':22\s' || echo "Nothing listening on port 22"
+
+      - name: Check cloudflared tunnel config
         run: |
-          # Try systemd first (no sudo needed for user services)
-          if systemctl is-enabled cloudflared 2>/dev/null; then
-            echo "Found systemd service, starting..."
-            systemctl start cloudflared 2>/dev/null && echo "Started via systemd" && exit 0
-          fi
+          echo "=== CLOUDFLARED DOCKER LOGS (last 50 lines) ==="
+          docker logs --tail 50 cloudflared 2>&1
 
-          # Try docker container restart
-          CONTAINER=$(docker ps -a --filter "name=cloudflare" --format "{{.Names}}" | head -1)
-          if [ -n "$CONTAINER" ]; then
-            echo "Found docker container: $CONTAINER, restarting..."
-            docker restart "$CONTAINER"
-            docker update --restart unless-stopped "$CONTAINER"
-            echo "Restarted and set auto-restart policy"
-            exit 0
-          fi
+          echo ""
+          echo "=== CLOUDFLARED CONFIG ==="
+          cat /etc/cloudflared/config.yml 2>/dev/null || cat /home/caramey/.cloudflared/config.yml 2>/dev/null || echo "No config.yml found"
 
-          # Check if there's a cloudflared config and start a new container
-          if [ -f /home/caramey/.cloudflared/cert.pem ] || [ -f /etc/cloudflared/config.yml ]; then
-            echo "Found cloudflared config, checking for token..."
-            if [ -f /etc/cloudflared/config.yml ]; then
-              CONFIG_PATH="/etc/cloudflared"
-            else
-              CONFIG_PATH="/home/caramey/.cloudflared"
-            fi
-            echo "Config path: $CONFIG_PATH"
-            echo "Config contents:"
-            cat "$CONFIG_PATH/config.yml" 2>/dev/null || echo "No config.yml found"
-            ls -la "$CONFIG_PATH/" 2>/dev/null
-            echo ""
-            echo "=== MANUAL ACTION NEEDED ==="
-            echo "cloudflared config exists but no running service or container found."
-            echo "You may need to re-create the tunnel container or install the service."
-            exit 1
-          fi
+          echo ""
+          echo "=== TESTING LOCAL SSH CONNECTIVITY ==="
+          curl -s -o /dev/null -w "SSH port 22: %{http_code}\n" http://localhost:22 2>/dev/null; true
+          nc -zv localhost 22 2>&1 || echo "Cannot connect to localhost:22"
 
-          echo "=== NO CLOUDFLARED FOUND ==="
-          echo "No systemd service, no docker container, and no config files found."
-          echo "You may need to set up cloudflared from scratch."
-          exit 1
-
-      - name: Verify cloudflared is running
+      - name: Restart cloudflared container
         run: |
+          echo "=== RESTARTING CLOUDFLARED ==="
+          docker restart cloudflared
+          docker update --restart unless-stopped cloudflared
           sleep 3
-          echo "=== PROCESS CHECK ==="
+          echo "=== FINAL STATUS ==="
+          docker ps --filter "name=cloudflare" --format "{{.Names}} {{.Status}}"
           pgrep -a cloudflared || echo "cloudflared process not found"
-          echo "=== DOCKER CHECK ==="
-          docker ps --filter "name=cloudflare" --format "{{.Names}} {{.Status}}" || true
+          echo "=== SSH CHECK ==="
+          ss -tlnp | grep -E ':22\s' || echo "Nothing listening on port 22"
