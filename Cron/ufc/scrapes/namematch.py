@@ -1,5 +1,6 @@
 import re, unicodedata
 from functools import lru_cache
+from .claude_match import match_names_batch as _claude_batch
 
 
 # --- ultra-fast normalization ---
@@ -72,7 +73,7 @@ def compare_names(name_a: str, name_b: str) -> float:
 
 class EventNameIndex:
     """Build once per event; reuse for many lookups."""
-    __slots__ = ("fighters", "cands_norm", "cands_init")
+    __slots__ = ("fighters", "cands_norm", "cands_init", "_cache")
 
     def __init__(self, event_json):
         # collect candidate fighter dicts once
@@ -107,11 +108,35 @@ class EventNameIndex:
         self.fighters = fighters
         self.cands_norm = [_norm(f["fighter_name"]) for f in fighters]
         self.cands_init = [_initials_variant(n) for n in self.cands_norm]
+        self._cache: dict[str, str | None] = {}
+
+    def preload(self, target_names: list[str]) -> None:
+        """
+        One Claude batch call for all target names at once.
+        Filters out exact matches and already-cached names first.
+        Call this once per event before the push loop.
+        """
+        if not self.fighters or not target_names:
+            return
+        candidate_names = [f["fighter_name"] for f in self.fighters]
+        needs_llm = []
+        for t in set(target_names):
+            if t in self._cache:
+                continue
+            if any(_norm(t) == n for n in self.cands_norm):
+                continue  # exact match, no need
+            needs_llm.append(t)
+        if not needs_llm:
+            return
+        print(f"  [Claude preload] {len(needs_llm)} names -> 1 batch call")
+        results = _claude_batch(needs_llm, candidate_names)
+        self._cache.update(results)
 
     def find(self, target_name: str, threshold: float = 0.82):
         """
-        Returns (matched_name, score, fighter_dict)
-        fighter_dict contains keys like fighter_name, img_link, nickname, etc.
+        Returns (matched_name, score, fighter_dict).
+        Checks exact match then preloaded cache — no per-name LLM calls.
+        Call preload() before the push loop to populate the cache.
         """
         if not self.fighters:
             return None, 0.0, None
@@ -120,26 +145,17 @@ class EventNameIndex:
         if not t_norm:
             return None, 0.0, None
 
-        # --- ultra-cheap early exits ---
+        # Exact match
         for f, nrm in zip(self.fighters, self.cands_norm):
             if nrm == t_norm:
                 return f["fighter_name"], 1.0, f
-        for f, nrm in zip(self.fighters, self.cands_norm):
-            if nrm.startswith(t_norm) or t_norm.startswith(nrm):
-                return f["fighter_name"], 0.92, f
 
-        # initials variant once
-        t_init = _initials_variant(t_norm)
+        # Cache (populated by preload)
+        if target_name in self._cache:
+            matched_name = self._cache[target_name]
+            if matched_name:
+                matched_f = next((f for f in self.fighters if f["fighter_name"] == matched_name), None)
+                if matched_f:
+                    return matched_f["fighter_name"], 1.0, matched_f
 
-        best_f, best_score = None, 0.0
-        for f, nrm, init in zip(self.fighters, self.cands_norm, self.cands_init):
-            s = _score(t_norm, nrm)
-            s = max(s, _score(t_init, nrm), _score(t_norm, init))
-            if s > best_score:
-                best_f, best_score = f, s
-                if best_score >= 0.97:
-                    break
-
-        if best_f and best_score >= threshold:
-            return best_f["fighter_name"], best_score, best_f
-        return None, best_score, None
+        return None, 0.0, None

@@ -9,7 +9,7 @@ BASE = "https://api.the-odds-api.com/v4"
 
 def get_mma_odds(
     regions=("us",),
-    markets=("h2h",),
+    markets=("h2h", "totals"),
     odds_format="american"
 ):
     params = {

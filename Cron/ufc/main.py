@@ -15,14 +15,14 @@ if __name__ == "__main__":
     #############################
 
     ### ML MODEL PROCESSES ###
-    update_predictions_winners(conn=conn)
-    update_prediction_simplified(conn=conn)
-    update_accuracies()
-    update_bets(conn=conn)
-    make_predictions(conn=conn)
-    update_bookmakers()
-    make_bets_upcoming_events(conn=conn)
-    update_bet_analytics(conn=conn)
+    # update_predictions_winners(conn=conn)
+    # update_prediction_simplified(conn=conn)
+    # update_accuracies()
+    # update_bets(conn=conn)
+    # make_predictions(conn=conn)
+    # update_bookmakers()
+    # make_bets_upcoming_events(conn=conn)
+    # update_bet_analytics(conn=conn)
     ##########################
 
     end_time = time.time()

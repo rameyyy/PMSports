@@ -1,14 +1,37 @@
-import requests
+import cloudscraper
+import time
 from bs4 import BeautifulSoup, NavigableString
 from datetime import datetime
 import re
+from requests.exceptions import ConnectionError as ReqConnectionError
 from .utils import parse_fight_type
 from difflib import SequenceMatcher
 from .sqlpush import fetch_query, create_connection
 
 
 BASE_URL = "https://www.tapology.com"
-HEADERS = {"User-Agent": "Mozilla/5.0"}
+_scraper = cloudscraper.create_scraper()
+
+
+def _get(url, max_retries=4, base_wait=20, timeout=30):
+    """GET with exponential backoff on connection errors or rate limiting."""
+    for attempt in range(max_retries):
+        try:
+            resp = _scraper.get(url, timeout=timeout)
+            if resp.status_code == 429:
+                wait = base_wait * (2 ** attempt)
+                print(f"  Rate limited (429), waiting {wait}s...")
+                time.sleep(wait)
+                continue
+            return resp
+        except (ReqConnectionError, Exception) as e:
+            if attempt < max_retries - 1:
+                wait = base_wait * (2 ** attempt)
+                print(f"  Connection error ({e.__class__.__name__}), retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                raise
+    return _scraper.get(url, timeout=timeout)  # final attempt
 
 
 ### Grab ufc-stats link from Tapology ufc fighter stats page response soup:
@@ -536,32 +559,6 @@ def _normalize_date(date_text: str) -> str | None:
     return None
 
 
-def _normalize_date(date_text: str) -> str | None:
-    """Return MM-DD-YYYY or None."""
-    if not date_text:
-        return None
-    s = date_text.replace("\xa0", " ").strip()
-    # Try common UFCStats formats first
-    for fmt in ("%b %d, %Y", "%b. %d, %Y", "%B %d, %Y"):
-        try:
-            return datetime.strptime(s, fmt).strftime("%m-%d-%Y")
-        except ValueError:
-            pass
-    # Fallback regex (handles 'Oct. 26, 2024' or 'Oct 26, 2024')
-    m = re.search(r'([A-Za-z]{3,})\.?\s+(\d{1,2}),\s*(\d{4})', s)
-    if m:
-        month_map = {
-            'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,
-            'July':7,'August':8,'September':9,'Sept':9,'October':10,'November':11,'December':12,
-            'Jan':1,'Feb':2,'Mar':3,'Apr':4,'Jun':6,'Jul':7,'Aug':8,'Sep':9,'Oct':10,'Nov':11,'Dec':12
-        }
-        mon = m.group(1).title()
-        month_num = month_map.get(mon)
-        if month_num:
-            return f"{month_num:02d}-{int(m.group(2)):02d}-{m.group(3)}"
-    return None
-
-
 def get_fight_links(soup: BeautifulSoup):
     """
     Returns a list of {'link': <fight-details url>, 'date': 'MM-DD-YYYY' or None}.
@@ -617,7 +614,7 @@ def least_similar(given: str, candidates: list[str]) -> str:
 ### Scrape Requests
     
 def get_single_fight_stats(url: str, date, og_link, fname):
-    response = requests.get(url, headers=HEADERS)
+    response = _get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
     resp_code = response.status_code
     
@@ -627,7 +624,7 @@ def get_single_fight_stats(url: str, date, og_link, fname):
     for link in fighter_links:
         if link != og_link:
             ops_url = link
-    ops_resp = requests.get(ops_url, headers=HEADERS)
+    ops_resp = _get(ops_url)
     ops_soup = BeautifulSoup(ops_resp.text, 'html.parser')
 
     ops_career_stats = extract_career_stats(ops_soup)
@@ -658,7 +655,7 @@ def get_single_fight_stats(url: str, date, og_link, fname):
 
 
 def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname, conn):
-    response = requests.get(fighters_url_ufcstats, headers=HEADERS)
+    response = _get(fighters_url_ufcstats)
     soup = BeautifulSoup(response.text, "html.parser")
     data = extract_career_stats(soup = soup)
     fight_links = get_fight_links(soup)
@@ -688,7 +685,7 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname, conn):
         except ValueError as e:
             # Only catch the int conversion error you mentioned
             if "invalid literal for int()" in str(e):
-                response_ = requests.get(i['link'], headers=HEADERS)
+                response_ = _get(i['link'])
                 soup_ = BeautifulSoup(response_.text, "html.parser")
                 links = get_fighter_links(soup_)
                 if links:
@@ -696,7 +693,7 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname, conn):
                         if fid not in link:
                             fight_idt = i['link'].rstrip("/").split("/")[-1]
                             opp_fid = link.rstrip("/").split("/")[-1]
-                            response_1 = requests.get(link, headers=HEADERS)
+                            response_1 = _get(link)
                             soup_1 = BeautifulSoup(response_1.text, "html.parser")
                             f2_careerstats = extract_career_stats(soup_1)
                             f2_careerstats = clean_fighter_stats(f2_careerstats)
@@ -712,7 +709,7 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname, conn):
 
 
 def get_fighter_data(fighters_url: str, fname):
-    response = requests.get(fighters_url, headers=HEADERS)
+    response = _get(fighters_url)
     soup = BeautifulSoup(response.text, "html.parser")
     link=get_ufcstats_link(soup_or_html=soup)
     if link:

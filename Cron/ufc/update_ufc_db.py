@@ -13,60 +13,89 @@ def get_new_upcoming_events(conn):
         if data is not None:
             push_events(data, conn)
 
-def event_update_loop(event_urls, conn, old_data):
+def event_update_loop(event_urls, conn, old_data, prefetched=None):
+    """
+    prefetched: optional dict mapping event_url -> already-fetched event data,
+    so Tapology doesn't get re-hit for the event page.
+    """
     for event_url in event_urls:
-        data = get_event_data(event_url, getting_old_data=old_data)
+        if prefetched and event_url in prefetched:
+            data = prefetched[event_url]
+        else:
+            data = get_event_data(event_url, getting_old_data=old_data)
         if data is None:
             print(f'No data found for event with URL: {event_url}')
             continue
+
         idx = EventNameIndex(data)
-        for i in range(0, len(data['fights'])):
-            fighter1s_url = data['fights'][i]['fighter1']['link']
-            fighter2s_url = data['fights'][i]['fighter2']['link']
-            if not fighter1s_url or not fighter2s_url: # this could be there first fight so they wont have data
+
+        # --- Phase 1: fetch all fighter data, collect UFCStats names ---
+        fetched_bouts = []
+        all_ufc_names = []
+        for bout in data['fights']:
+            f1_url = bout['fighter1']['link']
+            f2_url = bout['fighter2']['link']
+            if not f1_url or not f2_url:
+                fetched_bouts.append(None)
                 continue
-            fighter1, fighter2 = data['fights'][i]['fighter1']['fighter_name'], data['fights'][i]['fighter2']['fighter_name']
-            fighter1_career_stats, fights_arr1, upcoming1, resp_code1 = get_fighter_data(fighter1s_url, fighter1)
-            fighter2_career_stats, fights_arr2, upcoming2, resp_code2 = get_fighter_data(fighter2s_url, fighter2)
-            if upcoming1:
-                for dict_data in upcoming1:
-                    push_fighter(idx, dict_data['fighter2_careerstats'], conn)
-                    push_fights_upcoming(idx, dict_data, conn)
-            if upcoming2:
-                for dict_data in upcoming2:
-                    push_fighter(idx, dict_data['fighter2_careerstats'], conn)
-                    push_fights_upcoming(idx, dict_data, conn)
-            if resp_code1 == 200 and resp_code2 == 200:
-                pass
-            else:
-                print(f"over requesting server, responses stopped. resp codes: {resp_code1}, {resp_code2}\nstopping program on event_url = '{event_url}'")
+            f1_name = bout['fighter1']['fighter_name']
+            f2_name = bout['fighter2']['fighter_name']
+            cs1, arr1, up1, rc1 = get_fighter_data(f1_url, f1_name)
+            cs2, arr2, up2, rc2 = get_fighter_data(f2_url, f2_name)
+            fetched_bouts.append((cs1, arr1, up1, rc1, cs2, arr2, up2, rc2))
+            # collect every UFCStats name we'll need to match
+            for cs in (cs1, cs2):
+                if cs and cs.get('fighter_name'):
+                    all_ufc_names.append(cs['fighter_name'])
+            for arr in (arr1 or [], arr2 or []):
+                for fight in arr:
+                    ops = fight.get('ops_careerstats') or {}
+                    if ops.get('fighter_name'):
+                        all_ufc_names.append(ops['fighter_name'])
+            if rc1 != 200 or rc2 != 200:
+                print(f"over requesting server, resp codes: {rc1}, {rc2}\nstopping on '{event_url}'")
                 time.sleep(20)
-            if not fighter1_career_stats or not fighter2_career_stats or not fights_arr1 or not fights_arr2: # fighter has not faught for ufc yet (debut)
+
+        # --- One Claude batch call for entire event ---
+        idx.preload(all_ufc_names)
+
+        # --- Phase 2: push using cached matches ---
+        for bout_data, fetched in zip(data['fights'], fetched_bouts):
+            if fetched is None:
                 continue
-            push_fighter(idx, fighter1_career_stats, conn)
-            push_fighter(idx, fighter2_career_stats, conn)
-            if fights_arr1:
-                for i in fights_arr1:
-                    random_career_stats = i.get('ops_careerstats')
-                    if random_career_stats:
-                        push_fighter(idx, random_career_stats, conn)
-                    if not i['winner_loser']['winner'] or not i['winner_loser']['loser']:
-                        i['winner_loser']['winner'] = 'draw'
-                        i['winner_loser']['loser'] = 'draw'
-                    push_fights(idx, i, fighter1_career_stats, conn)
-                    push_totals(i, fighter1_career_stats, conn)
-                    push_rounds(i, fighter1_career_stats, conn)
-            if fights_arr2:
-                for i in fights_arr2:
-                    random_career_stats = i.get('ops_careerstats')
-                    if random_career_stats:
-                        push_fighter(idx, random_career_stats, conn)
-                    if not i['winner_loser']['winner'] or not i['winner_loser']['loser']:
-                        i['winner_loser']['winner'] = 'draw'
-                        i['winner_loser']['loser'] = 'draw'
-                    push_fights(idx, i, fighter2_career_stats, conn)
-                    push_totals(i, fighter2_career_stats, conn)
-                    push_rounds(i, fighter2_career_stats, conn)
+            cs1, arr1, up1, rc1, cs2, arr2, up2, rc2 = fetched
+            if up1:
+                for dict_data in up1:
+                    push_fighter(idx, dict_data['fighter2_careerstats'], conn)
+                    push_fights_upcoming(idx, dict_data, conn)
+            if up2:
+                for dict_data in up2:
+                    push_fighter(idx, dict_data['fighter2_careerstats'], conn)
+                    push_fights_upcoming(idx, dict_data, conn)
+            if not cs1 or not cs2 or not arr1 or not arr2:
+                continue
+            push_fighter(idx, cs1, conn)
+            push_fighter(idx, cs2, conn)
+            for fight in arr1:
+                ops = fight.get('ops_careerstats')
+                if ops:
+                    push_fighter(idx, ops, conn)
+                if not fight['winner_loser']['winner'] or not fight['winner_loser']['loser']:
+                    fight['winner_loser']['winner'] = 'draw'
+                    fight['winner_loser']['loser'] = 'draw'
+                push_fights(idx, fight, cs1, conn)
+                push_totals(fight, cs1, conn)
+                push_rounds(fight, cs1, conn)
+            for fight in arr2:
+                ops = fight.get('ops_careerstats')
+                if ops:
+                    push_fighter(idx, ops, conn)
+                if not fight['winner_loser']['winner'] or not fight['winner_loser']['loser']:
+                    fight['winner_loser']['winner'] = 'draw'
+                    fight['winner_loser']['loser'] = 'draw'
+                push_fights(idx, fight, cs2, conn)
+                push_totals(fight, cs2, conn)
+                push_rounds(fight, cs2, conn)
 
 def update_scrapes_for_upcoming_events(conn):
     upcoming_event_urls = get_future_event_urls(conn)

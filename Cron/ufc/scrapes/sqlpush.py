@@ -239,21 +239,21 @@ def push_fights(idx, dataset, career_stats, conn):
             %(fight_format)s, %(fight_type)s, %(referee)s, %(end_time)s, %(weight_class)s
         )
         ON DUPLICATE KEY UPDATE
-            event_id      = VALUES(event_id),
-            fighter1_id   = VALUES(fighter1_id),
-            fighter2_id   = VALUES(fighter2_id),
-            winner_id     = VALUES(winner_id),
-            loser_id      = VALUES(loser_id),
-            fighter1_name = VALUES(fighter1_name),
-            fighter2_name = VALUES(fighter2_name),
-            fight_date    = VALUES(fight_date),
-            fight_link    = VALUES(fight_link),
-            method        = VALUES(method),
-            fight_format  = VALUES(fight_format),
-            fight_type    = VALUES(fight_type),
-            referee       = VALUES(referee),
-            end_time      = VALUES(end_time),
-            weight_class  = VALUES(weight_class)
+            event_id      = IF(VALUES(event_id)      IS NULL, event_id,      VALUES(event_id)),
+            fighter1_id   = IF(VALUES(fighter1_id)   IS NULL, fighter1_id,   VALUES(fighter1_id)),
+            fighter2_id   = IF(VALUES(fighter2_id)   IS NULL, fighter2_id,   VALUES(fighter2_id)),
+            winner_id     = IF(VALUES(winner_id)     IS NULL, winner_id,     VALUES(winner_id)),
+            loser_id      = IF(VALUES(loser_id)      IS NULL, loser_id,      VALUES(loser_id)),
+            fighter1_name = IF(VALUES(fighter1_name) IS NULL, fighter1_name, VALUES(fighter1_name)),
+            fighter2_name = IF(VALUES(fighter2_name) IS NULL, fighter2_name, VALUES(fighter2_name)),
+            fight_date    = IF(VALUES(fight_date)    IS NULL, fight_date,    VALUES(fight_date)),
+            fight_link    = IF(VALUES(fight_link)    IS NULL, fight_link,    VALUES(fight_link)),
+            method        = IF(VALUES(method)        IS NULL, method,        VALUES(method)),
+            fight_format  = IF(VALUES(fight_format)  IS NULL, fight_format,  VALUES(fight_format)),
+            fight_type    = IF(VALUES(fight_type)    IS NULL, fight_type,    VALUES(fight_type)),
+            referee       = IF(VALUES(referee)       IS NULL, referee,       VALUES(referee)),
+            end_time      = IF(VALUES(end_time)      IS NULL, end_time,      VALUES(end_time)),
+            weight_class  = IF(VALUES(weight_class)  IS NULL, weight_class,  VALUES(weight_class))
     """
     params = {
         "fight_id":     dataset.get("fight_id"),
@@ -399,16 +399,14 @@ def push_totals(dataset, careerstats, conn):
     rows = []
     for i in range(2):
         fname = normalize_name(fighters[i])
-        if compare_names(fname, f1_name) > .88:
+        s1 = compare_names(fname, f1_name)
+        s2 = compare_names(fname, f2_name)
+        if s1 >= s2:
             fid = f1_id
             fighter_nameZ = f1_name
-        elif compare_names(fname, f2_name) > .88:
+        else:
             fid = f2_id
             fighter_nameZ = f2_name
-        else:
-            print('no name to fid match')
-            print(f'{fname} != {f1_name}, {f2_name}')
-            return False # No real data
         rows.append({
             "fight_id": fight_id,
             "fighter_id": fid,
@@ -593,15 +591,14 @@ def push_rounds(dataset, careerstats, conn):
 
         for i, raw_name in enumerate(fighters):
             fname = normalize_name(raw_name)
-            if compare_names(fname, f1_name) > .88:
+            s1 = compare_names(fname, f1_name)
+            s2 = compare_names(fname, f2_name)
+            if s1 >= s2:
                 fid = f1_id
                 fighter_nameZ = f1_name
-            elif compare_names(fname, f2_name) > .88:
+            else:
                 fid = f2_id
                 fighter_nameZ = f2_name
-            else:
-                print(f"no name→id match for {fname} != {f1_name}, {f2_name}")
-                return False
 
             row = {
                 "fight_id": fight_id,
