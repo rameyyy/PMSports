@@ -1,0 +1,23 @@
+name: Restart Cloudflared Tunnel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restart-cloudflared:
+    runs-on: self-hosted
+    steps:
+      - name: Start and enable cloudflared
+        run: |
+          echo "=== CURRENT STATUS ==="
+          sudo systemctl status cloudflared --no-pager || echo "cloudflared service not found as systemd unit"
+
+          echo "=== STARTING CLOUDFLARED ==="
+          sudo systemctl start cloudflared
+
+          echo "=== ENABLING AUTO-START ON BOOT ==="
+          sudo systemctl enable cloudflared
+
+          sleep 3
+          echo "=== FINAL STATUS ==="
+          sudo systemctl status cloudflared --no-pager
