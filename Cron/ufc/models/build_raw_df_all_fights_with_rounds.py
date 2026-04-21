@@ -779,7 +779,7 @@ def enrich_with_round_data(enriched_df: pl.DataFrame, conn) -> pl.DataFrame:
         .drop("_row_idx")
     )
 
-    print(f"✅ Round-by-round data added to {len(enriched_df)} fight snapshots")
+    print(f"Round-by-round data added to {len(enriched_df)} fight snapshots")
     print("="*80 + "\n")
 
     return enriched_df
@@ -811,64 +811,50 @@ def run(min_prior_fights: int = 1):
     # Step 1: Get all fights
     print("Step 1: Loading all fights from database...")
     all_fights = get_all_fights(conn)
-    print(f"   ✅ Loaded {len(all_fights)} total fights")
+    print(f"   Loaded {len(all_fights)} total fights")
 
     if all_fights.is_empty():
-        print("❌ No fights found in database")
+        print("No fights found in database")
         return pl.DataFrame()
 
     # Step 2: Get all related fights for complete history
     print("\nStep 2: Loading complete fight history...")
     allRelatedFights = get_all_related_fights(conn, all_fights)
-    print(f"   ✅ Loaded {len(allRelatedFights)} fights for complete history")
+    print(f"   Loaded {len(allRelatedFights)} fights for complete history")
 
     # Step 3: Build pre-fight snapshots
     print(f"\nStep 3: Building pre-fight snapshots (min {min_prior_fights} prior fights)...")
     snapshotsDf = build_pre_fight_snapshots(all_fights, allRelatedFights, min_prior_fights)
-    print(f"   ✅ Created {len(snapshotsDf)} fight snapshots")
+    print(f"   Created {len(snapshotsDf)} fight snapshots")
 
     if snapshotsDf.is_empty():
-        print(f"❌ No fights remain after requiring {min_prior_fights}+ prior fights")
+        print(f"No fights remain after requiring {min_prior_fights}+ prior fights")
         return pl.DataFrame()
 
     # Step 4: Enrich with fighter stats
     print("\nStep 4: Enriching with fighter statistics...")
     enrichedDfFightersData = enrich_with_fighter_stats(snapshotsDf, conn)
-    print(f"   ✅ Added fighter stats (height, reach, stance, career stats, etc.)")
+    print(f"   Added fighter stats")
 
     # Step 5: Enrich with fight totals
     print("\nStep 5: Enriching with fight totals (aggregated stats)...")
     enrichedDfFightTotals = enrich_with_fight_totals(enrichedDfFightersData, conn)
-    print(f"   ✅ Added fight totals (strikes, TDs, KDs, etc.)")
+    print(f"   Added fight totals")
 
-    # Step 6: Enrich with round-by-round data (NEW!)
+    # Step 6: Enrich with round-by-round data
     print("\nStep 6: Enriching with round-by-round data...")
     enrichedDfWithRounds = enrich_with_round_data(enrichedDfFightTotals, conn)
-    print(f"   ✅ Added round-by-round statistics")
+    print(f"   Added round-by-round statistics")
 
     # Step 7: Save as parquet
     output_file = "fight_snapshots_all_with_rounds.parquet"
     print(f"\nStep 7: Saving to {output_file}...")
     enrichedDfWithRounds.write_parquet(output_file)
-    print(f"   ✅ Saved {len(enrichedDfWithRounds)} fight snapshots")
+    print(f"   Saved {len(enrichedDfWithRounds)} fight snapshots")
 
-    # Summary
-    print("\n" + "="*80)
-    print("✅ COMPLETE - RAW DATAFRAME BUILT SUCCESSFULLY")
-    print("="*80)
-    print(f"\n📊 Summary:")
-    print(f"   - Total fights in database: {len(all_fights)}")
-    print(f"   - Fights with {min_prior_fights}+ prior fights: {len(enrichedDfWithRounds)}")
-    print(f"   - Output file: {output_file}")
-    print(f"   - File size: {enrichedDfWithRounds.estimated_size() / 1024 / 1024:.2f} MB (estimated)")
-    print(f"\n🎯 Features included:")
-    print(f"   ✓ Fight metadata (date, fighters, outcome)")
-    print(f"   ✓ Fighter attributes (height, reach, stance, DOB)")
-    print(f"   ✓ Career statistics (W-L record, overall averages)")
-    print(f"   ✓ Complete fight history (prior_f1, prior_f2)")
-    print(f"   ✓ Fight totals for each historical fight")
-    print(f"   ✓ Round-by-round data for each historical fight")
-    print(f"\n🔥 Ready for advanced feature engineering!\n")
+    print("\nCOMPLETE - RAW DATAFRAME BUILT SUCCESSFULLY")
+    print(f"   Total fights in database: {len(all_fights)}")
+    print(f"   Fights with {min_prior_fights}+ prior fights: {len(enrichedDfWithRounds)}")
 
     conn.close()
     return enrichedDfWithRounds

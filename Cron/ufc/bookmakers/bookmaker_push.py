@@ -64,6 +64,20 @@ def _push_rounds(conn, fight_id: str, bookmaker: str,
           round(_implied(under_price) * 100, 2)))
 
 
+PREFERRED_BOOKS = ["draftkings", "fanduel", "betmgm", "bovada", "williamhill_us"]
+
+
+def _update_prediction_odds(conn, fight_id: str, f1_odds: int, f2_odds: int) -> None:
+    """Set f1_odds/f2_odds on prediction_simplified only if currently NULL — never overwrites."""
+    run_query(conn, """
+        UPDATE prediction_simplified
+        SET f1_odds = %s, f2_odds = %s
+        WHERE fight_id = %s
+          AND f1_odds IS NULL
+          AND f2_odds IS NULL
+    """, (f1_odds, f2_odds, fight_id))
+
+
 def process_odds(conn, data: list) -> None:
     processed = skipped = errors = 0
 
@@ -83,14 +97,20 @@ def process_odds(conn, data: list) -> None:
         f2_id    = fight["fighter2_id"]
         f1_name  = (fight["fighter1_name"] or "").lower()
 
-        for bm in event.get("bookmakers", []):
-            bm_key = bm["key"]
+        # Track best h2h odds for prediction_simplified (preferred book first)
+        pred_f1_odds = pred_f2_odds = None
+        bookmakers_by_key = {bm["key"]: bm for bm in event.get("bookmakers", [])}
+        book_order = PREFERRED_BOOKS + [k for k in bookmakers_by_key if k not in PREFERRED_BOOKS]
+
+        for bm_key in book_order:
+            bm = bookmakers_by_key.get(bm_key)
+            if not bm:
+                continue
             for market in bm.get("markets", []):
                 outcomes = {o["name"]: o for o in market.get("outcomes", [])}
 
                 if market["key"] == "h2h" and len(outcomes) == 2:
                     names = list(outcomes.keys())
-                    # assign fighter1/fighter2 by matching DB name
                     if names[0].split()[-1].lower() in f1_name or f1_name in names[0].lower():
                         f1_odds = outcomes[names[0]]["price"]
                         f2_odds = outcomes[names[1]]["price"]
@@ -98,12 +118,18 @@ def process_odds(conn, data: list) -> None:
                         f1_odds = outcomes[names[1]]["price"]
                         f2_odds = outcomes[names[0]]["price"]
                     _push_moneyline(conn, fight_id, bm_key, f1_id, f2_id, f1_odds, f2_odds)
+                    # capture first (preferred) book for prediction_simplified
+                    if pred_f1_odds is None:
+                        pred_f1_odds, pred_f2_odds = f1_odds, f2_odds
 
                 elif market["key"] == "totals" and "Over" in outcomes and "Under" in outcomes:
                     line        = outcomes["Over"]["point"]
                     over_price  = outcomes["Over"]["price"]
                     under_price = outcomes["Under"]["price"]
                     _push_rounds(conn, fight_id, bm_key, line, over_price, under_price)
+
+        if pred_f1_odds is not None:
+            _update_prediction_odds(conn, fight_id, pred_f1_odds, pred_f2_odds)
 
         processed += 1
 

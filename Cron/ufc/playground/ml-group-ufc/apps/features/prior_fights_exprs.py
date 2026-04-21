@@ -1,0 +1,855 @@
+import polars as pl
+
+
+def build_duration_features(prior_fights: pl.DataFrame) -> pl.DataFrame:
+    end_time_s = (
+        pl.col("end_time").str.split(":").list.get(0).cast(pl.Int32) * 60
+        + pl.col("end_time").str.split(":").list.get(1).cast(pl.Int32)
+    )
+
+    pf = prior_fights.with_columns(end_time_s.alias("end_time_s"))
+
+    return (
+        pf
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg([
+            pl.col("end_time_s").sort_by("fight_date", descending=True).first().alias("last_fight_end_time_s"),
+            pl.col("end_time_s").sort_by("fight_date", descending=True).head(3).mean().alias("last_3_avg_end_time_s"),
+            pl.col("end_time_s").mean().alias("avg_end_time_s"),
+            pl.col("end_time_s").sum().alias("total_time_fought_s"),
+        ])
+    )
+
+
+def build_format_experience(prior_fights: pl.DataFrame) -> pl.DataFrame:
+    win = pl.col("result") == "win"
+    loss = pl.col("result") == "loss"
+    r3 = pl.col("fight_format") == 3
+    r5 = pl.col("fight_format") == 5
+
+    return (
+        prior_fights
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg([
+            (r3 & win).sum().alias("3rd_wins"),
+            (r3 & loss).sum().alias("3rd_losses"),
+            r5.sum().alias("5rd_fights"),
+            (r5 & win).sum().alias("5rd_wins"),
+            (r5 & loss).sum().alias("5rd_losses"),
+        ])
+    )
+
+
+def build_years_since_last_fight(prior_fights: pl.DataFrame, root_dates: pl.DataFrame) -> pl.DataFrame:
+    return (
+        prior_fights
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg(pl.col("fight_date").max().alias("last_fight_date"))
+        .join(root_dates, on="root_fight_id")
+        .with_columns(
+            ((pl.col("root_fight_date") - pl.col("last_fight_date")).dt.total_days() / 365.25)
+            .cast(pl.Float32)
+            .alias("years_since_last_fight")
+        )
+        .select(["root_fight_id", "fighter_role", "years_since_last_fight"])
+    )
+
+
+def build_activity(prior_fights: pl.DataFrame, root_dates: pl.DataFrame) -> pl.DataFrame:
+    return (
+        prior_fights
+        .join(root_dates, on="root_fight_id")
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg([
+            pl.col("fight_date").min().alias("first_fight_date"),
+            pl.col("fight_date").count().alias("total_fights"),
+            pl.col("root_fight_date").first(),
+            pl.col("fight_date").filter(
+                pl.col("fight_date") >= (pl.col("root_fight_date") - pl.duration(days=365))
+            ).count().alias("fights_this_year"),
+            pl.col("fight_date").filter(
+                pl.col("fight_date") >= (pl.col("root_fight_date") - pl.duration(days=1095))
+            ).count().alias("fights_last_3yrs"),
+        ])
+        .with_columns(
+            (
+                pl.col("total_fights").cast(pl.Float32) /
+                ((pl.col("root_fight_date") - pl.col("first_fight_date")).dt.total_days() / 365.25)
+            ).alias("avg_fights_per_year")
+        )
+        .select(["root_fight_id", "fighter_role", "avg_fights_per_year", "fights_this_year", "fights_last_3yrs"])
+    )
+
+
+def build_method_counts(prior_fights: pl.DataFrame) -> pl.DataFrame:
+    win = pl.col("result") == "win"
+    loss = pl.col("result") == "loss"
+    ko = pl.col("method") == "kotko"
+    sub = pl.col("method") == "sub"
+    dec = pl.col("method").is_in(["d_unan", "d_maj", "d_split"])
+
+    return (
+        prior_fights
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg([
+            (win & ko).sum().alias("ko_wins"),
+            (win & sub).sum().alias("sub_wins"),
+            (win & dec).sum().alias("dec_wins"),
+            (loss & ko).sum().alias("ko_losses"),
+            (loss & sub).sum().alias("sub_losses"),
+            (loss & dec).sum().alias("dec_losses"),
+            win.sum().alias("total_wins"),
+            loss.sum().alias("total_losses"),
+        ])
+        .with_columns([
+            (pl.col("ko_wins").cast(pl.Float32) / pl.col("total_wins").cast(pl.Float32)).fill_nan(0.0).alias("ko_win_rate"),
+            (pl.col("sub_wins").cast(pl.Float32) / pl.col("total_wins").cast(pl.Float32)).fill_nan(0.0).alias("sub_win_rate"),
+            (pl.col("ko_losses").cast(pl.Float32) / pl.col("total_losses").cast(pl.Float32)).fill_nan(0.0).alias("ko_loss_rate"),
+            (pl.col("sub_losses").cast(pl.Float32) / pl.col("total_losses").cast(pl.Float32)).fill_nan(0.0).alias("sub_loss_rate"),
+        ])
+        .drop(["ko_wins", "sub_wins", "dec_wins", "ko_losses", "sub_losses", "dec_losses", "total_wins", "total_losses"])
+    )
+
+
+def build_striking_stats(prior_fights: pl.DataFrame) -> pl.DataFrame:
+    end_time_s = (
+        pl.col("end_time").str.split(":").list.get(0).cast(pl.Float32) * 60
+        + pl.col("end_time").str.split(":").list.get(1).cast(pl.Float32)
+    )
+
+    pf = prior_fights.with_columns(end_time_s.alias("end_time_s"))
+
+    # Raw numerators/denominators needed for each window
+    agg_cols = [
+        "sig_str_landed", "sig_str_attempts",
+        "opp_sig_str_landed", "opp_sig_str_attempts",
+        "td_landed", "td_attempts",
+        "opp_td_landed", "opp_td_attempts",
+        "sub_att", "end_time_s",
+    ]
+
+    last_fight_aggs = [
+        pl.col(c).sort_by("fight_date", descending=True).first().alias(f"lf_{c}")
+        for c in agg_cols
+    ]
+    last_3_aggs = [
+        pl.col(c).sort_by("fight_date", descending=True).head(3).sum().alias(f"l3_{c}")
+        for c in agg_cols
+    ]
+    career_aggs = [
+        pl.col(c).sum().alias(f"ca_{c}")
+        for c in agg_cols
+    ]
+
+    def stat_exprs(col_p: str, alias_p: str) -> list:
+        mins = pl.col(f"{col_p}_end_time_s") / 60.0
+        a = f"{alias_p}_" if alias_p else ""
+
+        def safe(expr, alias):
+            return (
+                pl.when(expr.is_nan() | expr.is_infinite())
+                .then(pl.lit(0.0))
+                .otherwise(expr)
+                .alias(alias)
+            )
+
+        return [
+            safe(pl.col(f"{col_p}_sig_str_landed") / mins, f"{a}slpm"),
+            safe(pl.col(f"{col_p}_sig_str_landed") / pl.col(f"{col_p}_sig_str_attempts"), f"{a}str_acc"),
+            safe(pl.col(f"{col_p}_opp_sig_str_landed") / mins, f"{a}sapm"),
+            safe(1 - pl.col(f"{col_p}_opp_sig_str_landed") / pl.col(f"{col_p}_opp_sig_str_attempts"), f"{a}str_def"),
+            safe(pl.col(f"{col_p}_td_landed") / mins * 15, f"{a}td_avg"),
+            safe(pl.col(f"{col_p}_td_landed") / pl.col(f"{col_p}_td_attempts"), f"{a}td_acc"),
+            safe(1 - pl.col(f"{col_p}_opp_td_landed") / pl.col(f"{col_p}_opp_td_attempts"), f"{a}td_def"),
+            safe(pl.col(f"{col_p}_sub_att") / mins * 15, f"{a}sub_avg"),
+        ]
+
+    stats = ["slpm", "str_acc", "sapm", "str_def", "td_avg", "td_acc", "td_def", "sub_avg"]
+
+    # Trend: last_3 / career — > 1 = improving, < 1 = declining
+    # Clipped to [0, 3] to avoid runaway ratios on small samples; fill 0/0 = 1 (neutral)
+    trend_exprs = [
+        pl.when((pl.col(f"last_3_{s}") / pl.col(s)).is_nan() | (pl.col(f"last_3_{s}") / pl.col(s)).is_infinite())
+        .then(pl.lit(1.0))
+        .otherwise((pl.col(f"last_3_{s}") / pl.col(s)).clip(0.0, 3.0))
+        .alias(f"{s}_trend")
+        for s in stats
+    ]
+
+    output_cols = (
+        ["root_fight_id", "fighter_role"]
+        + [f"last_fight_{s}" for s in stats]
+        + [f"last_3_{s}" for s in stats]
+        + stats
+        + [f"{s}_trend" for s in stats]
+    )
+
+    return (
+        pf
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg(last_fight_aggs + last_3_aggs + career_aggs)
+        .with_columns(stat_exprs("lf", "last_fight") + stat_exprs("l3", "last_3") + stat_exprs("ca", ""))
+        .with_columns(trend_exprs)
+        .select(output_cols)
+    )
+
+
+def build_advanced_stats(prior_fights: pl.DataFrame) -> pl.DataFrame:
+    end_time_s = (
+        pl.col("end_time").str.split(":").list.get(0).cast(pl.Float32) * 60
+        + pl.col("end_time").str.split(":").list.get(1).cast(pl.Float32)
+    )
+
+    pf = prior_fights.with_columns(end_time_s.alias("end_time_s"))
+
+    raw_cols = [
+        "kd", "sig_str_landed",
+        "ctrl_time_s", "opp_ctrl_time_s", "end_time_s",
+        "head_landed", "body_landed", "leg_landed",
+        "distance_landed", "clinch_landed", "ground_landed",
+        "opp_kd", "opp_sig_str_landed",
+        "rev", "opp_sub_att", "opp_td_landed",
+        "total_str_landed",
+    ]
+
+    last_fight_aggs = [
+        pl.col(c).sort_by("fight_date", descending=True).first().alias(f"lf_{c}")
+        for c in raw_cols
+    ]
+    last_3_aggs = [
+        pl.col(c).sort_by("fight_date", descending=True).head(3).sum().alias(f"l3_{c}")
+        for c in raw_cols
+    ]
+    career_aggs = [
+        pl.col(c).sum().alias(f"ca_{c}")
+        for c in raw_cols
+    ]
+
+    def derived(col_p: str, alias_p: str) -> list:
+        a = f"{alias_p}_" if alias_p else ""
+        ctrl_mins = pl.col(f"{col_p}_ctrl_time_s") / 60.0
+        opp_ctrl_mins = pl.col(f"{col_p}_opp_ctrl_time_s") / 60.0
+        def safe(expr, alias):
+            return (
+                pl.when(expr.is_nan() | expr.is_infinite())
+                .then(pl.lit(0.0))
+                .otherwise(expr)
+                .alias(alias)
+            )
+
+        return [
+            safe(pl.col(f"{col_p}_kd") / pl.col(f"{col_p}_sig_str_landed"), f"{a}kd_rate"),
+            safe((pl.col(f"{col_p}_ctrl_time_s") - pl.col(f"{col_p}_opp_ctrl_time_s")) / pl.col(f"{col_p}_end_time_s"), f"{a}net_ctrl_pct"),
+            safe(pl.col(f"{col_p}_opp_ctrl_time_s") / pl.col(f"{col_p}_end_time_s"), f"{a}defensive_ctrl_pct"),
+            safe(pl.col(f"{col_p}_head_landed") / pl.col(f"{col_p}_sig_str_landed"), f"{a}head_str_pct"),
+            safe(pl.col(f"{col_p}_body_landed") / pl.col(f"{col_p}_sig_str_landed"), f"{a}body_str_pct"),
+            safe(pl.col(f"{col_p}_leg_landed") / pl.col(f"{col_p}_sig_str_landed"), f"{a}leg_str_pct"),
+            safe(pl.col(f"{col_p}_distance_landed") / pl.col(f"{col_p}_sig_str_landed"), f"{a}distance_str_pct"),
+            safe(pl.col(f"{col_p}_clinch_landed") / pl.col(f"{col_p}_sig_str_landed"), f"{a}clinch_str_pct"),
+            safe(pl.col(f"{col_p}_ground_landed") / pl.col(f"{col_p}_sig_str_landed"), f"{a}ground_str_pct"),
+            safe(pl.col(f"{col_p}_ground_landed") / ctrl_mins, f"{a}gnp_rate"),
+            safe(pl.col(f"{col_p}_opp_kd") / pl.col(f"{col_p}_opp_sig_str_landed"), f"{a}chin_score"),
+            safe(pl.col(f"{col_p}_rev") / opp_ctrl_mins, f"{a}reversal_rate"),
+            safe(pl.col(f"{col_p}_opp_sub_att") / pl.col(f"{col_p}_opp_td_landed"), f"{a}def_sub_exposure"),
+            safe(pl.col(f"{col_p}_sig_str_landed") / pl.col(f"{col_p}_total_str_landed"), f"{a}sig_to_total_ratio"),
+        ]
+
+    # KD rate and sig_to_total: 3 windows; net_ctrl_pct: last 3 + career; style profile: career only
+    output_cols = (
+        ["root_fight_id", "fighter_role"]
+        + ["last_fight_kd_rate", "last_3_kd_rate", "kd_rate"]
+        + ["last_3_net_ctrl_pct", "net_ctrl_pct"]
+        + ["last_3_defensive_ctrl_pct", "defensive_ctrl_pct"]
+        + ["last_3_sig_to_total_ratio", "sig_to_total_ratio"]
+        + ["body_str_pct", "leg_str_pct"]
+        + ["clinch_str_pct", "ground_str_pct"]
+        + ["gnp_rate", "chin_score", "reversal_rate", "def_sub_exposure"]
+    )
+
+    return (
+        pf
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg(last_fight_aggs + last_3_aggs + career_aggs)
+        .with_columns(derived("lf", "last_fight") + derived("l3", "last_3") + derived("ca", ""))
+        .select(output_cols)
+    )
+
+
+def build_weight_class_fight_count(prior_fights: pl.DataFrame, fights: pl.DataFrame) -> pl.DataFrame:
+    root_wc = fights.select(["root_fight_id", pl.col("weight_class").alias("root_weight_class")])
+
+    at_wc = pl.col("weight_class") == pl.col("root_weight_class")
+    win = pl.col("result") == "win"
+    loss = pl.col("result") == "loss"
+    ko = pl.col("method") == "kotko"
+    sub = pl.col("method") == "sub"
+    dec = pl.col("method").is_in(["d_unan", "d_maj", "d_split"])
+
+    return (
+        prior_fights
+        .join(root_wc, on="root_fight_id")
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg([
+            at_wc.sum().alias("fights_at_weight"),
+            (at_wc & win & ko).sum().alias("ko_wins_at_weight"),
+            (at_wc & win & sub).sum().alias("sub_wins_at_weight"),
+            (at_wc & win & dec).sum().alias("dec_wins_at_weight"),
+            (at_wc & loss & ko).sum().alias("ko_losses_at_weight"),
+            (at_wc & loss & sub).sum().alias("sub_losses_at_weight"),
+            (at_wc & loss & dec).sum().alias("dec_losses_at_weight"),
+        ])
+    )
+
+
+def build_round_features(prior_rounds: pl.DataFrame, prior_fights: pl.DataFrame) -> pl.DataFrame:
+    # Bring in opponent_id and fight_date from prior_fights (rounds df has neither)
+    fight_meta = prior_fights.select(["root_fight_id", "prior_fight_id", "fighter_role", "opponent_id", "fight_date"])
+    rounds = prior_rounds.join(fight_meta, on=["root_fight_id", "prior_fight_id", "fighter_role"], how="left")
+
+    own = rounds.filter(pl.col("fighter_id") != pl.col("opponent_id"))
+    opp = rounds.filter(pl.col("fighter_id") == pl.col("opponent_id"))
+
+    # Last 3 prior fights per (root_fight_id, fighter_role) by recency — computed once, reused for all windows
+    top3 = (
+        own.select(["root_fight_id", "fighter_role", "prior_fight_id", "fight_date"])
+        .unique(["root_fight_id", "fighter_role", "prior_fight_id"])
+        .with_columns(
+            pl.col("fight_date").rank(method="ordinal", descending=True)
+            .over(["root_fight_id", "fighter_role"])
+            .alias("fight_rank")
+        )
+        .filter(pl.col("fight_rank") <= 3)
+        .select(["root_fight_id", "fighter_role", "prior_fight_id"])
+    )
+
+    own_l3 = own.join(top3, on=["root_fight_id", "fighter_role", "prior_fight_id"], how="inner")
+    opp_l3 = opp.join(top3, on=["root_fight_id", "fighter_role", "prior_fight_id"], how="inner")
+
+    # Per-round comparison view: own vs opp in same round — used for dominance, last-round diff, post-KD
+    def make_per_round(own_df, opp_df):
+        max_rds = (
+            own_df.group_by(["root_fight_id", "fighter_role", "prior_fight_id"])
+            .agg(pl.col("round_number").max().alias("max_round"))
+        )
+        return (
+            own_df.select(["root_fight_id", "fighter_role", "prior_fight_id", "round_number",
+                           "sig_str_landed", "sig_str_attempts", "kd"])
+            .rename({"sig_str_landed": "own_sig", "sig_str_attempts": "own_sig_att", "kd": "own_kd"})
+            .join(
+                opp_df.select(["root_fight_id", "fighter_role", "prior_fight_id", "round_number", "sig_str_landed", "kd"])
+                .rename({"sig_str_landed": "opp_sig", "kd": "opp_kd"}),
+                on=["root_fight_id", "fighter_role", "prior_fight_id", "round_number"],
+                how="left"
+            )
+            .with_columns([
+                pl.col("opp_sig").fill_null(0),
+                pl.col("opp_kd").fill_null(0),
+            ])
+            .join(max_rds, on=["root_fight_id", "fighter_role", "prior_fight_id"], how="left")
+            .with_columns([
+                (pl.col("own_sig") > pl.col("opp_sig")).cast(pl.Float32).alias("rd_win"),
+                (pl.col("own_sig") - pl.col("opp_sig")).cast(pl.Float32).alias("str_diff"),
+            ])
+        )
+
+    per_round    = make_per_round(own, opp)
+    per_round_l3 = make_per_round(own_l3, opp_l3)
+
+    # Post-KD response: join each round with the previous round's opp_kd to flag "round after taking a KD"
+    def make_post_kd(prd_df):
+        prev = (
+            prd_df.select(["root_fight_id", "fighter_role", "prior_fight_id", "round_number", "opp_kd"])
+            .with_columns((pl.col("round_number") + 1).alias("round_number"))  # shift: this row becomes "next round"
+            .rename({"opp_kd": "prev_opp_kd"})
+        )
+        return (
+            prd_df.join(prev, on=["root_fight_id", "fighter_role", "prior_fight_id", "round_number"], how="left")
+            .with_columns(pl.col("prev_opp_kd").fill_null(0))
+            .filter(pl.col("prev_opp_kd") > 0)  # rounds immediately after being knocked down
+        )
+
+    post_kd    = make_post_kd(per_round)
+    post_kd_l3 = make_post_kd(per_round_l3)
+
+    r1    = pl.col("round_number") == 1
+    early = pl.col("round_number") <= 2
+    late  = pl.col("round_number") >= 3
+    is_last = pl.col("round_number") == pl.col("max_round")
+
+    def safe(expr):
+        return pl.when(expr.is_nan() | expr.is_infinite()).then(pl.lit(0.0)).otherwise(expr)
+
+    def pace_ratio(late_col, early_col, late_den, early_den):
+        """(late_col/late_den) / (early_col/early_den) — neutral 1.0 if 0/0, 0.0 if n/0"""
+        ratio = (pl.col(late_col).cast(pl.Float32) / pl.col(late_den).cast(pl.Float32)) \
+              / (pl.col(early_col).cast(pl.Float32) / pl.col(early_den).cast(pl.Float32))
+        return (
+            pl.when(ratio.is_nan()).then(pl.lit(1.0))
+            .when(ratio.is_infinite()).then(pl.lit(0.0))
+            .otherwise(ratio)
+        )
+
+    def agg_own(df, s=""):
+        p = f"_{s}" if s else ""
+        return df.group_by(["root_fight_id", "fighter_role"]).agg([
+            pl.col("sig_str_landed").filter(r1).sum().alias(f"r1_sig{p}"),
+            pl.col("round_number").filter(r1).count().alias(f"r1_rds{p}"),
+            pl.col("kd").filter(r1).sum().alias(f"r1_kd{p}"),
+            pl.col("sig_str_landed").filter(early).sum().alias(f"early_sig{p}"),
+            pl.col("sig_str_attempts").filter(early).sum().alias(f"early_sig_att{p}"),
+            pl.col("body_landed").filter(early).sum().alias(f"early_body{p}"),
+            pl.col("round_number").filter(early).count().alias(f"early_rds{p}"),
+            pl.col("sig_str_landed").filter(late).sum().alias(f"late_sig{p}"),
+            pl.col("sig_str_attempts").filter(late).sum().alias(f"late_sig_att{p}"),
+            pl.col("body_landed").filter(late).sum().alias(f"late_body{p}"),
+            pl.col("round_number").filter(late).count().alias(f"late_rds{p}"),
+            pl.col("ctrl_time_s").filter(late).sum().alias(f"late_ctrl{p}"),
+            pl.col("prior_fight_id").filter(late).n_unique().alias(f"fights_w_late{p}"),
+            pl.col("td_landed").filter(late).sum().alias(f"late_td_l{p}"),
+            pl.col("td_attempts").filter(late).sum().alias(f"late_td_a{p}"),
+            pl.col("sub_att").filter(late).sum().alias(f"late_sub{p}"),
+        ])
+
+    def agg_opp(df, s=""):
+        p = f"_{s}" if s else ""
+        return df.group_by(["root_fight_id", "fighter_role"]).agg([
+            pl.col("sig_str_landed").filter(early).sum().alias(f"opp_early_sig{p}"),
+            pl.col("round_number").filter(early).count().alias(f"opp_early_rds{p}"),
+            pl.col("sig_str_landed").filter(late).sum().alias(f"opp_late_sig{p}"),
+            pl.col("round_number").filter(late).count().alias(f"opp_late_rds{p}"),
+        ])
+
+    def agg_prd(df, s=""):
+        pfx = "last_3_" if s == "l3" else ""
+        return df.group_by(["root_fight_id", "fighter_role"]).agg([
+            pl.col("rd_win").mean().fill_nan(0.5).alias(f"{pfx}rd_dom_rate"),
+            pl.col("str_diff").filter(is_last).mean().fill_nan(0.0).alias(f"{pfx}last_rd_str_diff"),
+        ])
+
+    def agg_post_kd(df, s=""):
+        pfx = "last_3_" if s == "l3" else ""
+        # own_sig in rounds after taking a KD vs career avg own_sig per round
+        return df.group_by(["root_fight_id", "fighter_role"]).agg([
+            pl.col("own_sig").sum().alias(f"{pfx}post_kd_sig"),
+            pl.col("round_number").count().alias(f"{pfx}post_kd_rds"),
+        ])
+
+    own_agg_ca   = agg_own(own)
+    own_agg_l3   = agg_own(own_l3, "l3")
+    opp_agg_ca   = agg_opp(opp)
+    opp_agg_l3   = agg_opp(opp_l3, "l3")
+    prd_ca       = agg_prd(per_round)
+    prd_l3       = agg_prd(per_round_l3, "l3")
+    pkd_ca       = agg_post_kd(post_kd)
+    pkd_l3       = agg_post_kd(post_kd_l3, "l3")
+
+    # Career avg sig per round (for post-KD ratio denominator)
+    career_avg = (
+        own.group_by(["root_fight_id", "fighter_role"])
+        .agg(pl.col("sig_str_landed").mean().alias("career_sig_per_round"))
+    )
+
+    combined = (
+        own_agg_ca
+        .join(own_agg_l3,  on=["root_fight_id", "fighter_role"], how="left")
+        .join(opp_agg_ca,  on=["root_fight_id", "fighter_role"], how="left")
+        .join(opp_agg_l3,  on=["root_fight_id", "fighter_role"], how="left")
+        .join(prd_ca,      on=["root_fight_id", "fighter_role"], how="left")
+        .join(prd_l3,      on=["root_fight_id", "fighter_role"], how="left")
+        .join(pkd_ca,      on=["root_fight_id", "fighter_role"], how="left")
+        .join(pkd_l3,      on=["root_fight_id", "fighter_role"], how="left")
+        .join(career_avg,  on=["root_fight_id", "fighter_role"], how="left")
+    )
+
+    output_cols = [
+        "root_fight_id", "fighter_role",
+        # Career
+        "r1_sig_per_fight", "r1_kd_rate",
+        "slpm_pace_ratio", "sapm_pace_ratio",
+        "str_acc_degradation", "body_escalation",
+        "late_ctrl_per_fight", "late_td_acc", "late_sub_per_round",
+        "rd_dom_rate", "last_rd_str_diff",
+        "post_kd_response",
+        # Last 3
+        "last_3_r1_sig_per_fight",
+        "last_3_slpm_pace_ratio", "last_3_sapm_pace_ratio",
+        "last_3_str_acc_degradation",
+        "last_3_rd_dom_rate", "last_3_last_rd_str_diff",
+        "last_3_post_kd_response",
+    ]
+
+    return (
+        combined
+        .with_columns([
+            # --- Career ---
+            safe(pl.col("r1_sig").cast(pl.Float32) / pl.col("r1_rds").cast(pl.Float32)).alias("r1_sig_per_fight"),
+            safe(pl.col("r1_kd").cast(pl.Float32) / pl.col("r1_sig").cast(pl.Float32)).alias("r1_kd_rate"),
+            pace_ratio("late_sig", "early_sig", "late_rds", "early_rds").alias("slpm_pace_ratio"),
+            pace_ratio("opp_late_sig", "opp_early_sig", "opp_late_rds", "opp_early_rds").alias("sapm_pace_ratio"),
+            pace_ratio("late_sig", "early_sig", "late_sig_att", "early_sig_att").alias("str_acc_degradation"),
+            pace_ratio("late_body", "early_body", "late_rds", "early_rds").alias("body_escalation"),
+            safe(pl.col("late_ctrl").cast(pl.Float32) / pl.col("fights_w_late").cast(pl.Float32)).alias("late_ctrl_per_fight"),
+            safe(pl.col("late_td_l").cast(pl.Float32) / pl.col("late_td_a").cast(pl.Float32)).alias("late_td_acc"),
+            safe(pl.col("late_sub").cast(pl.Float32) / pl.col("late_rds").cast(pl.Float32)).alias("late_sub_per_round"),
+            # post_kd_response: avg sig per post-KD round / career avg sig per round — > 1 = bounces back
+            safe(
+                (pl.col("post_kd_sig").cast(pl.Float32) / pl.col("post_kd_rds").cast(pl.Float32))
+                / pl.col("career_sig_per_round")
+            ).alias("post_kd_response"),
+            # --- Last 3 ---
+            safe(pl.col("r1_sig_l3").cast(pl.Float32) / pl.col("r1_rds_l3").cast(pl.Float32)).alias("last_3_r1_sig_per_fight"),
+            pace_ratio("late_sig_l3", "early_sig_l3", "late_rds_l3", "early_rds_l3").alias("last_3_slpm_pace_ratio"),
+            pace_ratio("opp_late_sig_l3", "opp_early_sig_l3", "opp_late_rds_l3", "opp_early_rds_l3").alias("last_3_sapm_pace_ratio"),
+            pace_ratio("late_sig_l3", "early_sig_l3", "late_sig_att_l3", "early_sig_att_l3").alias("last_3_str_acc_degradation"),
+            safe(
+                (pl.col("last_3_post_kd_sig").cast(pl.Float32) / pl.col("last_3_post_kd_rds").cast(pl.Float32))
+                / pl.col("career_sig_per_round")
+            ).alias("last_3_post_kd_response"),
+        ])
+        .select(output_cols)
+    )
+
+
+def build_streak(prior_fights: pl.DataFrame) -> pl.DataFrame:
+    """Current consecutive win/loss streak for each fighter.
+
+    Sorts fights most-recent-first, then uses cumulative sums to identify
+    the unbroken run at the head of the sequence:
+      - win_streak  = wins before the first loss
+      - loss_streak = losses before the first win
+    """
+    is_win = (pl.col("result") == "win").cast(pl.Int32)
+    is_loss = (pl.col("result") == "loss").cast(pl.Int32)
+
+    pf = (
+        prior_fights
+        .sort(["root_fight_id", "fighter_role", "fight_date"], descending=[False, False, True])
+        .with_columns([
+            is_win.alias("is_win"),
+            is_loss.alias("is_loss"),
+        ])
+        .with_columns([
+            pl.col("is_loss").cum_sum().over(["root_fight_id", "fighter_role"]).alias("cumsum_loss"),
+            pl.col("is_win").cum_sum().over(["root_fight_id", "fighter_role"]).alias("cumsum_win"),
+        ])
+    )
+
+    return (
+        pf.group_by(["root_fight_id", "fighter_role"])
+        .agg([
+            pl.col("is_win").filter(pl.col("cumsum_loss") == 0).sum().cast(pl.Int16).alias("win_streak"),
+            pl.col("is_loss").filter(pl.col("cumsum_win") == 0).sum().cast(pl.Int16).alias("loss_streak"),
+        ])
+    )
+
+
+def build_damage_features(prior_fights: pl.DataFrame) -> pl.DataFrame:
+    """Accumulated punishment received over a fighter's career.
+
+    career_sig_str_absorbed  — total sig strikes absorbed (chin erosion proxy)
+    career_head_str_absorbed — total head strikes absorbed specifically
+    career_kd_absorbed       — total times knocked down
+    career_ko_losses         — total KO/TKO losses
+    fights_since_last_ko_loss — how many fights since the last KO loss (99 = never)
+    ko_losses_last_3         — KO losses among last 3 fights
+    """
+    ko_loss = (pl.col("method") == "kotko") & (pl.col("result") == "loss")
+
+    # Last 3 fights by date (most recent first)
+    top3_ids = (
+        prior_fights
+        .with_columns(
+            pl.col("fight_date").rank(method="ordinal", descending=True)
+            .over(["root_fight_id", "fighter_role"])
+            .alias("fight_rank_desc")
+        )
+        .filter(pl.col("fight_rank_desc") <= 3)
+        .select(["root_fight_id", "fighter_role", "prior_fight_id"])
+    )
+    pf_last3 = prior_fights.join(
+        top3_ids, on=["root_fight_id", "fighter_role", "prior_fight_id"], how="inner"
+    )
+
+    career_agg = (
+        prior_fights
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg([
+            pl.col("opp_sig_str_landed").sum().cast(pl.Float32).alias("career_sig_str_absorbed"),
+            pl.col("opp_head_landed").sum().cast(pl.Float32).alias("career_head_str_absorbed"),
+            pl.col("opp_kd").sum().cast(pl.Float32).alias("career_kd_absorbed"),
+            ko_loss.sum().cast(pl.Int16).alias("career_ko_losses"),
+        ])
+    )
+
+    last3_agg = (
+        pf_last3
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg([
+            ko_loss.sum().cast(pl.Int16).alias("ko_losses_last_3"),
+        ])
+    )
+
+    # fights_since_last_ko_loss: rank of last KO loss in descending date order
+    # (rank 1 = most recent fight) — then subtract 1 to get fights after it.
+    fights_since_ko = (
+        prior_fights
+        .with_columns([
+            ko_loss.alias("is_ko_loss"),
+            pl.col("fight_date").rank(method="ordinal", descending=True)
+            .over(["root_fight_id", "fighter_role"])
+            .alias("fight_rank_desc"),
+        ])
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg(
+            pl.col("fight_rank_desc").filter(pl.col("is_ko_loss")).min().alias("last_ko_loss_rank")
+        )
+        .with_columns(
+            (pl.col("last_ko_loss_rank") - 1).fill_null(99).cast(pl.Int16).alias("fights_since_last_ko_loss")
+        )
+        .select(["root_fight_id", "fighter_role", "fights_since_last_ko_loss"])
+    )
+
+    return (
+        career_agg
+        .join(last3_agg,     on=["root_fight_id", "fighter_role"], how="left")
+        .join(fights_since_ko, on=["root_fight_id", "fighter_role"], how="left")
+        .with_columns([
+            pl.col("ko_losses_last_3").fill_null(0),
+            pl.col("fights_since_last_ko_loss").fill_null(99),
+        ])
+    )
+
+
+def build_fight_tendency(prior_fights: pl.DataFrame) -> pl.DataFrame:
+    """How a fighter's fights typically end.
+
+    pct_fights_to_decision  — fraction of fights going to the judges
+    pct_fights_finished     — fraction of fights where this fighter finished the opponent
+    pct_fights_finished_by_opp — fraction of fights where opponent finished this fighter
+    """
+    decision     = pl.col("method").is_in(["d_unan", "d_maj", "d_split"])
+    won_by_finish = (pl.col("result") == "win")  & ~decision
+    lost_by_finish = (pl.col("result") == "loss") & ~decision
+
+    return (
+        prior_fights
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg([
+            pl.col("prior_fight_id").count().alias("total_fights"),
+            decision.sum().alias("decision_fights"),
+            won_by_finish.sum().alias("finish_wins"),
+            lost_by_finish.sum().alias("finish_losses"),
+        ])
+        .with_columns([
+            (pl.col("decision_fights").cast(pl.Float32) / pl.col("total_fights").cast(pl.Float32))
+            .fill_nan(0.0).alias("pct_fights_to_decision"),
+            (pl.col("finish_wins").cast(pl.Float32) / pl.col("total_fights").cast(pl.Float32))
+            .fill_nan(0.0).alias("pct_fights_finished"),
+            (pl.col("finish_losses").cast(pl.Float32) / pl.col("total_fights").cast(pl.Float32))
+            .fill_nan(0.0).alias("pct_fights_finished_by_opp"),
+        ])
+        .select([
+            "root_fight_id", "fighter_role",
+            "pct_fights_to_decision", "pct_fights_finished", "pct_fights_finished_by_opp",
+        ])
+    )
+
+
+def build_recency_weighted_stats(prior_fights: pl.DataFrame) -> pl.DataFrame:
+    """Exponentially decay-weighted versions of the 8 core striking/grappling stats.
+
+    Weight for a fight N positions back (0 = most recent) = 0.5^(N / HALF_LIFE).
+    Half-life of 3 fights means the most recent fight gets ~2× the weight of a
+    fight from 3 fights ago — gives a smooth recency signal without truncating
+    history entirely.
+
+    Output columns: rw_{stat} for stat in [slpm, str_acc, sapm, str_def,
+                                            td_avg, td_acc, td_def, sub_avg]
+    """
+    HALF_LIFE = 3.0
+
+    end_time_s = (
+        pl.col("end_time").str.split(":").list.get(0).cast(pl.Float32) * 60
+        + pl.col("end_time").str.split(":").list.get(1).cast(pl.Float32)
+    )
+
+    def safe(expr, alias):
+        return (
+            pl.when(expr.is_nan() | expr.is_infinite())
+            .then(pl.lit(0.0))
+            .otherwise(expr)
+            .alias(alias)
+        )
+
+    pf = (
+        prior_fights
+        .with_columns(end_time_s.alias("end_time_s"))
+        .with_columns(
+            pl.col("fight_date").rank(method="ordinal", descending=True)
+            .over(["root_fight_id", "fighter_role"])
+            .alias("fight_rank_desc")
+        )
+        .with_columns(
+            (pl.lit(0.5) ** ((pl.col("fight_rank_desc") - 1).cast(pl.Float32) / HALF_LIFE))
+            .alias("decay_weight")
+        )
+    )
+
+    mins = pl.col("end_time_s") / 60.0
+    pf = pf.with_columns([
+        safe(pl.col("sig_str_landed") / mins,                                    "fight_slpm"),
+        safe(pl.col("sig_str_landed") / pl.col("sig_str_attempts"),              "fight_str_acc"),
+        safe(pl.col("opp_sig_str_landed") / mins,                                "fight_sapm"),
+        safe(1 - pl.col("opp_sig_str_landed") / pl.col("opp_sig_str_attempts"),  "fight_str_def"),
+        safe(pl.col("td_landed") / mins * 15,                                    "fight_td_avg"),
+        safe(pl.col("td_landed") / pl.col("td_attempts"),                        "fight_td_acc"),
+        safe(1 - pl.col("opp_td_landed") / pl.col("opp_td_attempts"),            "fight_td_def"),
+        safe(pl.col("sub_att") / mins * 15,                                      "fight_sub_avg"),
+    ])
+
+    stats = ["slpm", "str_acc", "sapm", "str_def", "td_avg", "td_acc", "td_def", "sub_avg"]
+
+    weighted_agg = [
+        (pl.col(f"fight_{s}") * pl.col("decay_weight")).sum().alias(f"w_{s}_num")
+        for s in stats
+    ] + [pl.col("decay_weight").sum().alias("w_denom")]
+
+    output_exprs = [
+        safe(pl.col(f"w_{s}_num") / pl.col("w_denom"), f"rw_{s}").cast(pl.Float32)
+        for s in stats
+    ]
+
+    return (
+        pf
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg(weighted_agg)
+        .with_columns(output_exprs)
+        .select(["root_fight_id", "fighter_role"] + [f"rw_{s}" for s in stats])
+    )
+
+
+def build_style_features(prior_fights: pl.DataFrame) -> pl.DataFrame:
+    """Style matchup and big-fight performance features.
+
+    style_index       — 0=pure striker, 1=pure wrestler;
+                        wrestler_score = td_per_min * ctrl_per_min,
+                        striker_score  = slpm * str_acc;
+                        index = wrestler / (wrestler + striker), clipped [0, 1]
+    td_to_sub_conv    — sub_att / td_landed career; submission threat once on the mat
+    big_fight_slpm    — slpm in 5-round fights; falls back to career avg if none
+    big_fight_str_acc — str_acc in 5-round fights
+    big_fight_sapm    — sapm in 5-round fights
+    big_fight_str_def — str_def in 5-round fights
+    """
+    end_time_s_expr = (
+        pl.col("end_time").str.split(":").list.get(0).cast(pl.Float32) * 60
+        + pl.col("end_time").str.split(":").list.get(1).cast(pl.Float32)
+    )
+    pf = prior_fights.with_columns(end_time_s_expr.alias("end_time_s"))
+
+    def safe(expr):
+        return pl.when(expr.is_nan() | expr.is_infinite()).then(pl.lit(0.0)).otherwise(expr)
+
+    # --- Career aggregates ---
+    career = (
+        pf
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg([
+            pl.col("td_landed").sum().cast(pl.Float32).alias("ca_td"),
+            pl.col("ctrl_time_s").sum().cast(pl.Float32).alias("ca_ctrl"),
+            pl.col("sig_str_landed").sum().cast(pl.Float32).alias("ca_sig"),
+            pl.col("sig_str_attempts").sum().cast(pl.Float32).alias("ca_sig_att"),
+            pl.col("opp_sig_str_landed").sum().cast(pl.Float32).alias("ca_opp_sig"),
+            pl.col("opp_sig_str_attempts").sum().cast(pl.Float32).alias("ca_opp_sig_att"),
+            pl.col("end_time_s").sum().cast(pl.Float32).alias("ca_time"),
+            pl.col("sub_att").sum().cast(pl.Float32).alias("ca_sub"),
+        ])
+    )
+
+    # --- 5-round fight aggregates ---
+    big_fight = (
+        pf
+        .filter(pl.col("fight_format") == 5)
+        .group_by(["root_fight_id", "fighter_role"])
+        .agg([
+            pl.col("sig_str_landed").sum().cast(pl.Float32).alias("bf_sig"),
+            pl.col("sig_str_attempts").sum().cast(pl.Float32).alias("bf_sig_att"),
+            pl.col("opp_sig_str_landed").sum().cast(pl.Float32).alias("bf_opp_sig"),
+            pl.col("opp_sig_str_attempts").sum().cast(pl.Float32).alias("bf_opp_sig_att"),
+            pl.col("end_time_s").sum().cast(pl.Float32).alias("bf_time"),
+        ])
+    )
+
+    combined = career.join(big_fight, on=["root_fight_id", "fighter_role"], how="left")
+
+    ca_mins = pl.col("ca_time") / 60.0
+    bf_mins = pl.col("bf_time") / 60.0
+
+    return (
+        combined
+        # Step 1: career per-minute stats (style_index inputs + big-fight fallbacks)
+        .with_columns([
+            safe(pl.col("ca_td")      / ca_mins).alias("td_per_min"),
+            safe(pl.col("ca_ctrl")    / ca_mins).alias("ctrl_per_min"),
+            safe(pl.col("ca_sig")     / ca_mins).alias("ca_slpm"),
+            safe(pl.col("ca_sig")     / pl.col("ca_sig_att")).alias("ca_str_acc"),
+            safe(pl.col("ca_opp_sig") / ca_mins).alias("ca_sapm"),
+            safe(pl.lit(1.0) - pl.col("ca_opp_sig") / pl.col("ca_opp_sig_att")).alias("ca_str_def"),
+        ])
+        # Step 2: composite wrestler / striker scores
+        .with_columns([
+            safe(pl.col("td_per_min") * pl.col("ctrl_per_min")).alias("wrestler_score"),
+            safe(pl.col("ca_slpm")    * pl.col("ca_str_acc")).alias("striker_score"),
+        ])
+        # Step 3: final output features
+        .with_columns([
+            # style_index: 0 = pure striker, 1 = pure wrestler
+            pl.when((pl.col("wrestler_score") + pl.col("striker_score")) == 0)
+            .then(pl.lit(0.5))
+            .otherwise(
+                safe(pl.col("wrestler_score") / (pl.col("wrestler_score") + pl.col("striker_score")))
+                .clip(0.0, 1.0)
+            )
+            .cast(pl.Float32).alias("style_index"),
+
+            # td_to_sub: sub attempts per takedown landed
+            pl.when(pl.col("ca_td") == 0)
+            .then(pl.lit(0.0))
+            .otherwise(safe(pl.col("ca_sub") / pl.col("ca_td")))
+            .cast(pl.Float32).alias("td_to_sub_conv"),
+
+            # big fight stats — fall back to career avg when fighter has no 5-round history
+            pl.when(pl.col("bf_time").is_null() | (pl.col("bf_time") == 0))
+            .then(pl.col("ca_slpm"))
+            .otherwise(safe(pl.col("bf_sig") / bf_mins))
+            .cast(pl.Float32).alias("big_fight_slpm"),
+
+            pl.when(pl.col("bf_sig_att").is_null() | (pl.col("bf_sig_att") == 0))
+            .then(pl.col("ca_str_acc"))
+            .otherwise(safe(pl.col("bf_sig") / pl.col("bf_sig_att")))
+            .cast(pl.Float32).alias("big_fight_str_acc"),
+
+            pl.when(pl.col("bf_time").is_null() | (pl.col("bf_time") == 0))
+            .then(pl.col("ca_sapm"))
+            .otherwise(safe(pl.col("bf_opp_sig") / bf_mins))
+            .cast(pl.Float32).alias("big_fight_sapm"),
+
+            pl.when(pl.col("bf_opp_sig_att").is_null() | (pl.col("bf_opp_sig_att") == 0))
+            .then(pl.col("ca_str_def"))
+            .otherwise(safe(pl.lit(1.0) - pl.col("bf_opp_sig") / pl.col("bf_opp_sig_att")))
+            .cast(pl.Float32).alias("big_fight_str_def"),
+        ])
+        .select([
+            "root_fight_id", "fighter_role",
+            "style_index", "td_to_sub_conv",
+            "big_fight_slpm", "big_fight_str_acc", "big_fight_sapm", "big_fight_str_def",
+        ])
+    )
+
+
+def split_by_role(df: pl.DataFrame, role: str, prefix: str) -> pl.DataFrame:
+    return (
+        df.filter(pl.col("fighter_role") == role)
+        .drop("fighter_role")
+        .rename({col: f"{prefix}_{col}" for col in df.columns if col not in ("root_fight_id", "fighter_role")})
+    )
