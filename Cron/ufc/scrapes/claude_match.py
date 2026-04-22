@@ -36,18 +36,19 @@ def match_names_batch(targets: list[str], candidates: list[str]) -> dict[str, st
     print(f"  [Claude batch] {len(targets)} targets vs {len(candidates)} candidates")
     try:
         result = subprocess.run(
-            [CLAUDE_CMD, "-p", "--no-session-persistence"],
+            f'"{CLAUDE_CMD}" -p --no-session-persistence',
             input=prompt,
             capture_output=True, text=True, timeout=60,
+            encoding="utf-8", errors="replace",
             shell=True,
             cwd=os.path.expanduser("~"),
         )
-        text = result.stdout.strip()
+        text = (result.stdout or "").strip()
     except subprocess.TimeoutExpired:
         print("  [Claude batch] timeout")
         return {t: None for t in targets}
-    except FileNotFoundError:
-        print("  [Claude batch] claude CLI not found in PATH")
+    except Exception as e:
+        print(f"  [Claude batch] subprocess error: {e}")
         return {t: None for t in targets}
 
     if not text:

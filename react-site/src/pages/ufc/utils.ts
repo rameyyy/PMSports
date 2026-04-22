@@ -1,3 +1,8 @@
+export function capitalizeName(name: string | null | undefined): string {
+  if (!name) return '';
+  return name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
+
 export function formatDate(dateString: string): string {
   const date = new Date(dateString);
   const options: Intl.DateTimeFormatOptions = {
@@ -33,6 +38,19 @@ export function formatDateShort(dateString: string): string {
 
   const month = months[monthStr];
   return `${month}-${day.padStart(2, '0')}-${year}`;
+}
+
+export function formatMethod(method: string | null | undefined): string {
+  if (!method) return '';
+  const map: Record<string, string> = {
+    d_unan:  'Decision (Unanimous)',
+    d_split: 'Decision (Split)',
+    d_maj:   'Decision (Majority)',
+    kotko:   'KO/TKO',
+    sub:     'Submission',
+    unknown: '',
+  };
+  return map[method] ?? method;
 }
 
 export function formatOdds(odds: number): string {

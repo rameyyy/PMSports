@@ -3,22 +3,24 @@ import Navbar from './components/home/Navbar';
 import SportNavBar from './components/home/SportNavBar';
 import SportSection from './components/home/SportSection';
 import { fetchHomepageStats } from './api/ncaamb';
+import { fetchUFCHomepageStats } from './api/ufc';
 import type { HomepageStats } from './api/ncaamb';
+import type { UFCHomepageStats } from './api/ufc';
 
 export default function HomePage() {
   const [stats, setStats] = useState<HomepageStats | null>(null);
+  const [ufcStats, setUfcStats] = useState<UFCHomepageStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [ufcLoading, setUfcLoading] = useState(true);
 
   useEffect(() => {
     fetchHomepageStats()
-      .then(data => {
-        setStats(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to fetch data:', err);
-        setLoading(false);
-      });
+      .then(data => { setStats(data); setLoading(false); })
+      .catch(err => { console.error('Failed to fetch NCAAMB data:', err); setLoading(false); });
+
+    fetchUFCHomepageStats()
+      .then(data => { setUfcStats(data); setUfcLoading(false); })
+      .catch(err => { console.error('Failed to fetch UFC data:', err); setUfcLoading(false); });
   }, []);
 
   const sports = [
@@ -29,6 +31,14 @@ export default function HomePage() {
   const formatOdds = (odds: number | null) => {
     if (odds === null) return '-';
     return odds > 0 ? `+${odds}` : `${odds}`;
+  };
+
+  const capitalizeName = (name: string) =>
+    name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+
+  const capitalizeMatchup = (matchup: string | null | undefined) => {
+    if (!matchup) return matchup;
+    return matchup.split(/ vs\.? /i).map(capitalizeName).join(' vs. ');
   };
 
   // Calculate edge from rounded values (to match what's displayed)
@@ -91,6 +101,19 @@ export default function HomePage() {
     pickTitle: "Pick of the Day"
   };
 
+  const ufcModelAcc  = ufcStats?.model_accuracy;
+  const ufcVegasAcc  = ufcStats?.vegas_accuracy;
+  const ufcPOW       = ufcStats?.pick_of_week;
+  const ufcLastPick  = ufcStats?.last_pick;
+  const ufcNextPick  = ufcStats?.next_pick;
+  const ufcNextEvent = ufcStats?.next_event;
+
+  const ufcModelCorrect = ufcModelAcc ? ufcModelAcc.total - ufcModelAcc.correct : 0;
+  const ufcVegasCorrect = ufcVegasAcc ? ufcVegasAcc.total - ufcVegasAcc.correct : 0;
+  const ufcEdge = (ufcModelAcc && ufcVegasAcc)
+    ? ufcModelAcc.accuracy - ufcVegasAcc.accuracy
+    : null;
+
   const ufcData = {
     name: "MMA",
     subtitle: "Weekly events",
@@ -98,33 +121,50 @@ export default function HomePage() {
     path: "/ufc",
     available: true,
     nextEvent: {
-      name: "UFC 312: Makhachev vs. Moicano",
-      date: "Feb 8, 2025",
-      daysAway: 26
+      name: ufcNextEvent?.name ?? "—",
+      date: ufcNextEvent?.date
+        ? new Date(ufcNextEvent.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : "—",
+      daysAway: ufcNextEvent?.days_away ?? undefined,
     },
     modelAccuracy: {
-      winRate: "64.2%",
-      record: "82-46",
-      totalPicks: 128
+      winRate: ufcLoading ? "-.-%" : `${ufcModelAcc?.accuracy.toFixed(1)}%`,
+      record:  ufcLoading ? "-/-"  : `${ufcModelAcc?.correct}-${ufcModelCorrect}`,
+      totalPicks: ufcModelAcc?.total ?? 0,
     },
     vegasAccuracy: {
-      winRate: "58.3%",
-      record: "75-53",
-      totalPicks: 128
+      winRate: ufcLoading ? "-.-%" : `${ufcVegasAcc?.accuracy.toFixed(1)}%`,
+      record:  ufcLoading ? "-/-"  : `${ufcVegasAcc?.correct}-${ufcVegasCorrect}`,
+      totalPicks: ufcVegasAcc?.total ?? 0,
     },
-    edge: "+5.9%",
+    edge: ufcLoading || ufcEdge === null
+      ? "-.-%"
+      : `${ufcEdge >= 0 ? '+' : ''}${ufcEdge.toFixed(1)}%`,
     pick: {
-      record: "18-7",
-      winRate: "72.0%",
-      lastPick: {
-        title: "Makhachev vs. Tsarukyan",
-        subtitle: "UFC 311",
-        prediction: "Makhachev",
-        result: "correct" as const
-      },
-      pickLabel: "Last Week's Pick"
+      record:   ufcLoading ? "-/-"  : (ufcPOW?.record ?? "-/-"),
+      winRate:  ufcLoading ? "-.-%" : `${ufcPOW?.win_rate.toFixed(1)}%`,
+      avgOdds:  (!ufcLoading && ufcPOW?.avg_odds != null) ? formatOdds(ufcPOW.avg_odds) : undefined,
+      units:    (!ufcLoading && ufcPOW?.units != null) ? `${ufcPOW.units >= 0 ? '+' : ''}${ufcPOW.units.toFixed(2)}u` : undefined,
+      todayPick: (ufcNextPick && !ufcLoading) ? {
+        title:      capitalizeMatchup(ufcNextPick.matchup) ?? "",
+        subtitle:   ufcNextPick.event ?? undefined,
+        prediction: capitalizeName(ufcNextPick.prediction ?? ""),
+        odds:       ufcNextPick.odds != null ? formatOdds(ufcNextPick.odds) : undefined,
+        result:     null,
+      } : null,
+      todayPickLabel: "This Week's Pick",
+      lastPick: (ufcLastPick && !ufcLoading) ? {
+        title:      capitalizeMatchup(ufcLastPick.matchup) ?? "",
+        subtitle:   ufcLastPick.event ?? undefined,
+        prediction: capitalizeName(ufcLastPick.prediction ?? ""),
+        odds:       ufcLastPick.odds != null ? formatOdds(ufcLastPick.odds) : undefined,
+        result:     ufcLastPick.correct === true  ? "correct" as const
+                  : ufcLastPick.correct === false ? "incorrect" as const
+                  : null,
+      } : null,
+      pickLabel: "Last Week's Pick",
     },
-    pickTitle: "Pick of the Week"
+    pickTitle: "Pick of the Week",
   };
 
   // Reorder sports based on season status

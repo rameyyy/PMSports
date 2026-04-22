@@ -1,5 +1,98 @@
 from utils.db import execute_query
-from datetime import datetime
+from datetime import date
+
+def get_ufc_homepage_stats():
+    today = date.today()
+
+    # Latest homepage row (pre-computed weekly)
+    latest = execute_query("""
+        SELECT * FROM ufc.ufc_homepage
+        ORDER BY date_inserted DESC
+        LIMIT 1
+    """)
+    if not latest:
+        return None
+    row = latest[0]
+
+    # Days away + fight count for the next event
+    event_meta = execute_query("""
+        SELECT e.date, COUNT(f.fight_id) AS fight_count
+        FROM ufc.events e
+        JOIN ufc.fights f ON e.event_id = f.event_id
+        WHERE e.title = %s
+          AND f.fighter1_id IS NOT NULL
+          AND f.fighter2_id IS NOT NULL
+        GROUP BY e.event_id
+        LIMIT 1
+    """, (row['next_event_name'],))
+    meta = event_meta[0] if event_meta else None
+    days_away   = (meta['date'] - today).days if meta else None
+    fight_count = int(meta['fight_count'])    if meta else 0
+
+    # Last settled POW pick (most recent row with pow_correct not null)
+    last_pow = execute_query("""
+        SELECT uh.pow_f1_name, uh.pow_f2_name, uh.pow_pick,
+               uh.pow_odds, uh.pow_correct, uh.next_event_name
+        FROM ufc.ufc_homepage uh
+        WHERE uh.pow_no_pick = 0 AND uh.pow_correct IS NOT NULL
+        ORDER BY uh.date_inserted DESC
+        LIMIT 1
+    """)
+    lp = last_pow[0] if last_pow else None
+
+    model_correct = int(row['model_correct'] or 0)
+    model_total   = int(row['model_total']   or 0)
+    model_acc     = round(model_correct / model_total * 100, 1) if model_total else 0.0
+
+    vegas_correct = int(row['vegas_correct'] or 0)
+    vegas_total   = int(row['vegas_total']   or 0)
+    vegas_acc     = round(vegas_correct / vegas_total * 100, 1) if vegas_total else 0.0
+
+    pow_win  = int(row['pow_win']  or 0)
+    pow_loss = int(row['pow_loss'] or 0)
+    pow_total = pow_win + pow_loss
+    pow_acc   = round(pow_win / pow_total * 100, 1) if pow_total else 0.0
+
+    no_pick = bool(row['pow_no_pick'])
+
+    return {
+        'next_event': {
+            'name':        row['next_event_name'],
+            'date':        row['next_event_date'].isoformat() if row['next_event_date'] else None,
+            'days_away':   days_away,
+            'fight_count': fight_count,
+        },
+        'model_accuracy': {
+            'accuracy': model_acc,
+            'correct':  model_correct,
+            'total':    model_total,
+        },
+        'vegas_accuracy': {
+            'accuracy': vegas_acc,
+            'correct':  vegas_correct,
+            'total':    vegas_total,
+        },
+        'pick_of_week': {
+            'record':   f"{pow_win}-{pow_loss}",
+            'win_rate': pow_acc,
+            'total':    pow_total,
+            'avg_odds': int(row['pow_avg_odds']) if row['pow_avg_odds'] else None,
+            'units':    float(row['pow_units']) if row['pow_units'] is not None else None,
+        },
+        'last_pick': {
+            'matchup':    f"{lp['pow_f1_name']} vs {lp['pow_f2_name']}",
+            'event':      lp['next_event_name'],
+            'prediction': lp['pow_pick'],
+            'odds':       int(lp['pow_odds']) if lp['pow_odds'] else None,
+            'correct':    bool(lp['pow_correct']),
+        } if lp else None,
+        'next_pick': None if no_pick else {
+            'matchup':    f"{row['pow_f1_name']} vs {row['pow_f2_name']}",
+            'event':      row['next_event_name'],
+            'prediction': row['pow_pick'],
+            'odds':       int(row['pow_odds']) if row['pow_odds'] else None,
+        },
+    }
 
 def get_all_events():
     """Get all UFC events"""
@@ -235,46 +328,58 @@ def get_betting_stats():
     return execute_query(query, fetch_one=True)
 
 def get_upcoming_events():
-    """Get upcoming UFC events"""
+    """Get upcoming UFC events with more than 1 fight in prediction_simplified"""
     query = """
-        SELECT 
-            event_id,
-            event_url,
-            title,
-            event_datestr,
-            location,
-            date
-        FROM ufc.events
-        WHERE date >= CURDATE()
-        ORDER BY date ASC
+        SELECT
+            e.event_id,
+            e.event_url,
+            e.title,
+            e.event_datestr,
+            e.location,
+            e.date
+        FROM ufc.events e
+        WHERE e.date >= CURDATE()
+          AND (
+            SELECT COUNT(*) FROM ufc.prediction_simplified ps
+            WHERE ps.event_id = e.event_id
+          ) > 1
+        ORDER BY e.date ASC
     """
     return execute_query(query)
 
 def get_past_events(offset=0, limit=10):
-    """Get past UFC events with pagination (only events after 2025-10-03)"""
+    """Get past UFC events with fights in prediction_simplified after 2026-04-01"""
     query = """
         SELECT
-            event_id,
-            event_url,
-            title,
-            event_datestr,
-            location,
-            date
-        FROM ufc.events
-        WHERE date < CURDATE()
-          AND date > '2025-10-03'
-        ORDER BY date DESC
+            e.event_id,
+            e.event_url,
+            e.title,
+            e.event_datestr,
+            e.location,
+            e.date
+        FROM ufc.events e
+        WHERE e.date < CURDATE()
+          AND e.date > '2026-04-01'
+          AND EXISTS (
+            SELECT 1 FROM ufc.prediction_simplified ps
+            WHERE ps.event_id = e.event_id
+          )
+        ORDER BY e.date DESC
         LIMIT %s OFFSET %s
     """
     return execute_query(query, (limit, offset))
 
 def get_past_events_total_count():
-    """Get total count of past UFC events for pagination"""
+    """Get total count of past UFC events with prediction_simplified rows after 2026-04-01"""
     query = """
         SELECT COUNT(*) as total
-        FROM ufc.events
-        WHERE date < CURDATE()
-          AND date > '2025-10-03'
+        FROM ufc.events e
+        WHERE e.date < CURDATE()
+          AND e.date > '2026-04-01'
+          AND EXISTS (
+            SELECT 1 FROM ufc.prediction_simplified ps
+            WHERE ps.event_id = e.event_id
+          )
     """
     result = execute_query(query, fetch_one=True)
     return result['total'] if result else 0
@@ -297,7 +402,7 @@ def get_event_by_id(event_id):
 def get_fights_by_event(event_id):
     """Get all fights for a specific event from prediction_simplified"""
     query = """
-        SELECT 
+        SELECT
             fight_id,
             event_id,
             fighter1_id,
@@ -308,16 +413,16 @@ def get_fights_by_event(event_id):
             fighter2_nickname,
             fighter1_img_link,
             fighter2_img_link,
-            algopick_model,
-            algopick_prediction,
-            algopick_probability,
-            window_sample,
+            f1_probability,
+            predicted_winner_id,
             correct,
             date,
-            end_time,
             weight_class,
             fight_type,
-            win_method
+            f1_odds,
+            f2_odds,
+            win_method,
+            end_time
         FROM ufc.prediction_simplified
         WHERE event_id = %s
         ORDER BY date DESC

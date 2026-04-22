@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from models.ufc_models import (
+    get_ufc_homepage_stats,
     get_all_events,
     get_upcoming_events,
     get_past_events,
@@ -25,6 +26,13 @@ from models.ufc_models import (
 
 # CREATE THE BLUEPRINT FIRST
 ufc_bp = Blueprint('ufc', __name__, url_prefix='/api/ufc')
+
+@ufc_bp.route('/homepage-stats', methods=['GET'])
+def homepage_stats():
+    stats = get_ufc_homepage_stats()
+    if stats is None:
+        return jsonify({'error': 'No data available'}), 404
+    return jsonify(stats)
 
 @ufc_bp.route('/events', methods=['GET'])
 def get_events():

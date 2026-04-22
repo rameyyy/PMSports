@@ -33,6 +33,7 @@ interface PickData {
     odds?: string;
     result: 'correct' | 'incorrect' | null;
   } | null;
+  todayPickLabel?: string;
   pickLabel: string;
   seasonLabel?: string;
 }
@@ -201,7 +202,6 @@ export default function SportSection({
 
                 {pick.todayPick && (
                   <div className="mb-4 pb-4 border-b border-slate-700/50">
-                    <p className="text-xs text-slate-500 mb-1">Today's Pick</p>
                     <p className="text-white font-medium text-sm mb-0.5">{pick.todayPick.title}</p>
                     {pick.todayPick.subtitle && (
                       <p className="text-xs text-slate-400 mb-1">{pick.todayPick.subtitle}</p>

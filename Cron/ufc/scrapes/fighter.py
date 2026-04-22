@@ -665,6 +665,7 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname, conn):
     fighter_career_stats['fighter_id'] = fid
     fights_arr = []
     upcoming = []
+    resp_code = 200
     cmd = """
     SELECT *
     FROM ufc.fights
@@ -676,7 +677,7 @@ def get_fighter_data_ufc_stats(fighters_url_ufcstats: str, fname, conn):
             fightid = i['link'].rstrip("/").split("/")[-1]
             rows = fetch_query(conn, cmd, (fightid,))
             if rows:
-                if rows[0].get('winner_id') != None:
+                if rows[0].get('winner_id') is not None and rows[0].get('method') is not None:
                     skipped+=1
                     resp_code = 200
                     continue
