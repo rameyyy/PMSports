@@ -78,7 +78,7 @@ def get_underdog_info(row):
             'underdog_odds': int(row['best_book_odds_team_1']) if row['best_book_odds_team_1'] else None
         }
 
-# All strategies to test - script filters out negative ROI automatically
+# All strategies to test - script filters out negative ROI automatically #
 STRATEGY_DEFINITIONS = [
     # Favorite strategies: bet on the model's predicted winner
     {'name': '52-58% Implied + EV > 0%', 'min_implied': 52, 'max_implied': 58, 'min_ev': 0.01, 'side': 'favorite'},
