@@ -297,6 +297,12 @@ def main():
     print(f"  {next_event}")
 
     print("--- Inserting homepage row ---")
+    existing = fetch_query(conn, "SELECT id FROM ufc_homepage WHERE date_inserted = %s", (date.today(),))
+    if existing:
+        print(f"  Row for today already exists (id={existing[0]['id']}), skipping insert.")
+        conn.close()
+        return
+
     no_pick = 1 if pow_pick is None else 0
     run_query(conn, """
         INSERT INTO ufc_homepage (

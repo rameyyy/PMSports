@@ -242,12 +242,12 @@ def main():
 
     # Step 6: load models and predict
     print("\nLoading models...")
-    xgb_model = xgb.XGBClassifier()
+    xgb_model = xgb.Booster()
     xgb_model.load_model(str(MODEL_DIR / "model.ubj"))
 
     lgb_model = lgb.Booster(model_file=str(MODEL_DIR / "model_lgb.txt"))
 
-    xgb_proba    = xgb_model.predict_proba(X_pred)[:, 1]
+    xgb_proba    = xgb_model.predict(xgb.DMatrix(X_pred))
     lgb_proba    = lgb_model.predict(X_pred)
     ens_proba    = (xgb_proba + lgb_proba) / 2.0
 

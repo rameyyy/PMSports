@@ -32,7 +32,7 @@ def match_names_batch(targets: list[str], candidates: list[str]) -> dict[str, st
         "JSON output:"
     )
 
-    CLAUDE_CMD = r"C:\Users\crame\AppData\Roaming\npm\claude.cmd"
+    CLAUDE_CMD = "/home/caramey/.npm-global/bin/claude"
     print(f"  [Claude batch] {len(targets)} targets vs {len(candidates)} candidates")
     try:
         result = subprocess.run(
