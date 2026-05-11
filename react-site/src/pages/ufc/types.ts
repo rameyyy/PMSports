@@ -19,6 +19,7 @@ export type Fight = {
   f2_odds: number | null;
   win_method: string | null;
   end_time: string | null;
+  actual_winner_id: string | null;
 };
 
 export type Event = {

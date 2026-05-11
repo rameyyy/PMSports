@@ -403,29 +403,31 @@ def get_fights_by_event(event_id):
     """Get all fights for a specific event from prediction_simplified"""
     query = """
         SELECT
-            fight_id,
-            event_id,
-            fighter1_id,
-            fighter2_id,
-            fighter1_name,
-            fighter2_name,
-            fighter1_nickname,
-            fighter2_nickname,
-            fighter1_img_link,
-            fighter2_img_link,
-            f1_probability,
-            predicted_winner_id,
-            correct,
-            date,
-            weight_class,
-            fight_type,
-            f1_odds,
-            f2_odds,
-            win_method,
-            end_time
-        FROM ufc.prediction_simplified
-        WHERE event_id = %s
-        ORDER BY date DESC
+            ps.fight_id,
+            ps.event_id,
+            ps.fighter1_id,
+            ps.fighter2_id,
+            ps.fighter1_name,
+            ps.fighter2_name,
+            ps.fighter1_nickname,
+            ps.fighter2_nickname,
+            ps.fighter1_img_link,
+            ps.fighter2_img_link,
+            ps.f1_probability,
+            ps.predicted_winner_id,
+            ps.correct,
+            ps.date,
+            ps.weight_class,
+            ps.fight_type,
+            ps.f1_odds,
+            ps.f2_odds,
+            ps.win_method,
+            ps.end_time,
+            f.winner_id AS actual_winner_id
+        FROM ufc.prediction_simplified ps
+        LEFT JOIN ufc.fights f ON ps.fight_id = f.fight_id
+        WHERE ps.event_id = %s
+        ORDER BY ps.date DESC
     """
     return execute_query(query, (event_id,))
 

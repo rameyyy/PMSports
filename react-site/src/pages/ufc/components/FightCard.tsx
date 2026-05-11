@@ -14,14 +14,25 @@ export default function FightCard({ fight, isPast }: Props) {
   const pickedF1 = fight.predicted_winner_id === fight.fighter1_id;
   const pickedF2 = fight.predicted_winner_id === fight.fighter2_id;
 
-  const showResult = isPast && fight.correct !== null;
+  // Vegas pick derived from odds
+  const hasOdds = fight.f1_odds != null && fight.f2_odds != null;
+  const vegasPickF1 = hasOdds && fight.f1_odds! < fight.f2_odds!;
+  const vegasPickF2 = hasOdds && fight.f2_odds! < fight.f1_odds!;
+  const vegasDisagrees = hasPrediction && hasOdds && ((pickedF1 && vegasPickF2) || (pickedF2 && vegasPickF1));
+
+  // Draw / NC detection
+  const isDraw = fight.actual_winner_id === 'drawornc' || fight.actual_winner_id === 'draw';
+
+  // Settled = model has a result OR it's a draw/NC
+  const showResult = isPast && (fight.correct !== null || isDraw);
   const isCorrect = fight.correct === 1;
 
-  // Who actually won (for past incorrect picks)
-  const actualWinnerIsF1 = showResult && !isCorrect && pickedF2; // picked f2, lost → f1 won
-  const actualWinnerIsF2 = showResult && !isCorrect && pickedF1; // picked f1, lost → f2 won
+  // Who actually won — derived from actual_winner_id for the "WINNER" badge
+  const actualWinnerIsF1 = showResult && !isDraw && !isCorrect && pickedF2;
+  const actualWinnerIsF2 = showResult && !isDraw && !isCorrect && pickedF1;
 
   const imgClass = (picked: boolean, isActualWinner: boolean) => {
+    if (isDraw) return 'border-2 border-slate-500';
     if (showResult) {
       if (picked && isCorrect) return 'border-[3px] border-green-500';
       if (picked && !isCorrect) return 'border-[3px] border-red-500';
@@ -33,7 +44,7 @@ export default function FightCard({ fight, isPast }: Props) {
 
   const nameClass = (picked: boolean) => {
     if (!picked) return 'text-white';
-    if (!showResult) return 'text-orange-400';
+    if (!showResult || isDraw) return 'text-orange-400';
     return isCorrect ? 'text-green-400' : 'text-red-400';
   };
 
@@ -58,11 +69,21 @@ export default function FightCard({ fight, isPast }: Props) {
               MAIN EVENT
             </span>
           )}
-          {showResult && (
+          {isDraw && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-500/30 text-slate-300 border border-slate-500/40">
+              DRAW / NC
+            </span>
+          )}
+          {showResult && !isDraw && (
             <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
               isCorrect ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
             }`}>
               {isCorrect ? 'Correct' : 'Incorrect'}
+            </span>
+          )}
+          {!isPast && vegasDisagrees && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
+              SPLIT PICK
             </span>
           )}
         </div>
@@ -91,11 +112,22 @@ export default function FightCard({ fight, isPast }: Props) {
             <div className="flex gap-1.5 mt-1 flex-wrap">
               {pickedF1 && (
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                  showResult
+                  showResult && !isDraw
                     ? isCorrect ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
                     : 'bg-orange-500/20 text-orange-400'
                 }`}>
                   ALGO PICK
+                </span>
+              )}
+              {vegasPickF1 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                  !isPast || !showResult || isDraw
+                    ? vegasDisagrees ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-600/40 text-slate-400'
+                    : fight.actual_winner_id === fight.fighter1_id
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-red-500/20 text-red-400'
+                }`}>
+                  VEGAS
                 </span>
               )}
               {actualWinnerIsF1 && (
@@ -103,7 +135,7 @@ export default function FightCard({ fight, isPast }: Props) {
                   WINNER
                 </span>
               )}
-              {showResult && isCorrect && pickedF1 && (
+              {showResult && !isDraw && isCorrect && pickedF1 && (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
                   WINNER
                 </span>
@@ -127,11 +159,22 @@ export default function FightCard({ fight, isPast }: Props) {
             <div className="flex gap-1.5 mt-1 flex-wrap justify-end">
               {pickedF2 && (
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                  showResult
+                  showResult && !isDraw
                     ? isCorrect ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
                     : 'bg-orange-500/20 text-orange-400'
                 }`}>
                   ALGO PICK
+                </span>
+              )}
+              {vegasPickF2 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                  !isPast || !showResult || isDraw
+                    ? vegasDisagrees ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-600/40 text-slate-400'
+                    : fight.actual_winner_id === fight.fighter2_id
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-red-500/20 text-red-400'
+                }`}>
+                  VEGAS
                 </span>
               )}
               {actualWinnerIsF2 && (
@@ -139,7 +182,7 @@ export default function FightCard({ fight, isPast }: Props) {
                   WINNER
                 </span>
               )}
-              {showResult && isCorrect && pickedF2 && (
+              {showResult && !isDraw && isCorrect && pickedF2 && (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
                   WINNER
                 </span>
@@ -157,7 +200,7 @@ export default function FightCard({ fight, isPast }: Props) {
         </div>
       </div>
 
-      {/* Probability bar — no label, just the percentages */}
+      {/* Probability bar */}
       {hasPrediction && (
         <div className="mt-4">
           <div className="relative h-5 bg-slate-700/50 rounded-full overflow-hidden">
@@ -182,7 +225,7 @@ export default function FightCard({ fight, isPast }: Props) {
       )}
 
       {/* Result line for past fights */}
-      {showResult && (() => {
+      {showResult && !isDraw && (() => {
         const winnerName = isCorrect
           ? (pickedF1 ? f1Name : f2Name)
           : (pickedF1 ? f2Name : f1Name);
@@ -195,6 +238,13 @@ export default function FightCard({ fight, isPast }: Props) {
           </p>
         );
       })()}
+
+      {isDraw && (
+        <p className="mt-2 text-xs text-slate-400">
+          {formatMethod(fight.win_method) || 'Draw / No Contest'}
+          {fight.end_time ? ` · ${fight.end_time}` : ''}
+        </p>
+      )}
     </div>
   );
 }

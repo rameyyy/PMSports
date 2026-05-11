@@ -77,11 +77,15 @@ def update_prediction_correct(conn):
 def update_pow_correct(conn):
     run_query(conn, """
         UPDATE ufc_homepage uh
-        JOIN prediction_simplified ps ON uh.pow_fight_id = ps.fight_id
-        SET uh.pow_correct = ps.correct
+        JOIN fights f ON uh.pow_fight_id = f.fight_id
+        SET uh.pow_correct = CASE
+            WHEN f.winner_id = uh.pow_pick_id THEN 1
+            ELSE 0
+        END
         WHERE uh.pow_correct IS NULL
           AND uh.pow_no_pick = 0
-          AND ps.correct IS NOT NULL
+          AND f.winner_id IS NOT NULL
+          AND f.winner_id NOT IN ('drawornc', '', 'draw')
     """)
     print("Updated ufc_homepage.pow_correct")
 
