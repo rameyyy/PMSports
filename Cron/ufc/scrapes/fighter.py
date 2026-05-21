@@ -129,9 +129,9 @@ def clean_fighter_stats(raw: dict) -> dict:
                 cleaned[new_key] = func(raw[old_key])
         except Exception:
             cleaned[new_key] = None
-    cleaned['win'] = int(raw['win'])
-    cleaned['loss'] = int(raw['loss'])
-    cleaned['draw'] = int(raw['draw'])
+    cleaned['win'] = int(raw['win']) if raw.get('win') is not None else None
+    cleaned['loss'] = int(raw['loss']) if raw.get('loss') is not None else None
+    cleaned['draw'] = int(raw['draw']) if raw.get('draw') is not None else None
     return cleaned
 
 ### Parsing logic START
@@ -514,12 +514,19 @@ def extract_career_stats(soup):
     stat_items = soup.select("ul.b-list__box-list li.b-list__box-list-item")
 
     for p in soup.select('span.b-content__title-record'):
-        raw = p.text.strip()
-        WLD = raw.split(' ')[1]
-        win, loss, draw = WLD.split('-')
-        stats['win'] = win
-        stats['loss'] = loss
-        stats['draw'] = draw
+        try:
+            raw = p.text.strip()
+            parts = raw.split(' ')
+            if len(parts) < 2:
+                continue
+            wld_parts = parts[1].split('-')
+            if len(wld_parts) < 3:
+                continue
+            stats['win'] = wld_parts[0]
+            stats['loss'] = wld_parts[1]
+            stats['draw'] = wld_parts[2]
+        except Exception:
+            continue
     
     for item in stat_items:
         label_tag = item.find("i", class_="b-list__box-item-title")

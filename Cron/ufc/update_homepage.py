@@ -52,6 +52,30 @@ def calc_ev(prob: float, odds: int) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Step 0: remove draw/NC predictions from prediction_simplified
+# ---------------------------------------------------------------------------
+def remove_draw_nc_predictions(conn):
+    rows = fetch_query(conn, """
+        SELECT COUNT(*) AS cnt
+        FROM prediction_simplified ps
+        JOIN fights f ON ps.fight_id = f.fight_id
+        WHERE ps.date < CURDATE()
+          AND (f.winner_id IS NULL OR f.winner_id IN ('drawornc', '', 'draw'))
+    """)
+    cnt = int(rows[0]['cnt']) if rows else 0
+    if cnt == 0:
+        print("  No draw/NC/cancelled rows to remove")
+        return
+    run_query(conn, """
+        DELETE ps
+        FROM prediction_simplified ps
+        JOIN fights f ON ps.fight_id = f.fight_id
+        WHERE ps.date < CURDATE()
+          AND (f.winner_id IS NULL OR f.winner_id IN ('drawornc', '', 'draw'))
+    """)
+    print(f"  Removed {cnt} draw/NC/cancelled predictions from prediction_simplified")
+
+
 # Step 1: update prediction_simplified.correct
 # ---------------------------------------------------------------------------
 def update_prediction_correct(conn):
@@ -267,7 +291,10 @@ def main():
         print("Could not connect to DB")
         sys.exit(1)
 
-    print("\n--- Step 1: update prediction_simplified.correct ---")
+    print("\n--- Step 0: remove draw/NC predictions ---")
+    remove_draw_nc_predictions(conn)
+
+    print("--- Step 1: update prediction_simplified.correct ---")
     update_prediction_correct(conn)
 
     print("--- Step 2: update ufc_homepage.pow_correct ---")
