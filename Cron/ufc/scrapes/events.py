@@ -1,35 +1,12 @@
-import cloudscraper
 import time
 from bs4 import BeautifulSoup
-from requests.exceptions import ConnectionError as ReqConnectionError
 from .utils import get_event_title, get_event_date_location, ufc_weight_class
+from ._http import _get
 import re
 from datetime import datetime
 
 
 BASE_URL = "https://www.tapology.com"
-_scraper = cloudscraper.create_scraper()
-
-
-def _get(url, max_retries=4, base_wait=20, timeout=30):
-    """GET with exponential backoff on connection errors or rate limiting."""
-    for attempt in range(max_retries):
-        try:
-            resp = _scraper.get(url, timeout=timeout)
-            if resp.status_code == 429:
-                wait = base_wait * (2 ** attempt)
-                print(f"  Rate limited (429), waiting {wait}s...")
-                time.sleep(wait)
-                continue
-            return resp
-        except (ReqConnectionError, Exception) as e:
-            if attempt < max_retries - 1:
-                wait = base_wait * (2 ** attempt)
-                print(f"  Connection error ({e.__class__.__name__}), retrying in {wait}s...")
-                time.sleep(wait)
-            else:
-                raise
-    return _scraper.get(url, timeout=timeout)
 
 
 def empty_to_none(obj):

@@ -1,37 +1,14 @@
-import cloudscraper
 import time
 from bs4 import BeautifulSoup, NavigableString
 from datetime import datetime
 import re
-from requests.exceptions import ConnectionError as ReqConnectionError
 from .utils import parse_fight_type
 from difflib import SequenceMatcher
 from .sqlpush import fetch_query, create_connection
+from ._http import _get
 
 
 BASE_URL = "https://www.tapology.com"
-_scraper = cloudscraper.create_scraper()
-
-
-def _get(url, max_retries=4, base_wait=20, timeout=30):
-    """GET with exponential backoff on connection errors or rate limiting."""
-    for attempt in range(max_retries):
-        try:
-            resp = _scraper.get(url, timeout=timeout)
-            if resp.status_code == 429:
-                wait = base_wait * (2 ** attempt)
-                print(f"  Rate limited (429), waiting {wait}s...")
-                time.sleep(wait)
-                continue
-            return resp
-        except (ReqConnectionError, Exception) as e:
-            if attempt < max_retries - 1:
-                wait = base_wait * (2 ** attempt)
-                print(f"  Connection error ({e.__class__.__name__}), retrying in {wait}s...")
-                time.sleep(wait)
-            else:
-                raise
-    return _scraper.get(url, timeout=timeout)  # final attempt
 
 
 ### Grab ufc-stats link from Tapology ufc fighter stats page response soup:

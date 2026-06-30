@@ -55,12 +55,17 @@ def calc_ev(prob: float, odds: int) -> float:
 # Step 0: remove draw/NC predictions from prediction_simplified
 # ---------------------------------------------------------------------------
 def remove_draw_nc_predictions(conn):
+    # IMPORTANT: only remove predictions for fights CONFIRMED to be draw/NC.
+    # winner_id IS NULL just means the outcome hasn't been scraped yet (e.g. the
+    # UFCStats bot-challenge once blocked settling for weeks) — deleting those
+    # destroys legitimate predictions and was a major cause of "disappearing"
+    # data on the UI. NULL fights keep their predictions until they settle.
     rows = fetch_query(conn, """
         SELECT COUNT(*) AS cnt
         FROM prediction_simplified ps
         JOIN fights f ON ps.fight_id = f.fight_id
         WHERE ps.date < CURDATE()
-          AND (f.winner_id IS NULL OR f.winner_id IN ('drawornc', '', 'draw'))
+          AND f.winner_id IN ('drawornc', '', 'draw')
     """)
     cnt = int(rows[0]['cnt']) if rows else 0
     if cnt == 0:
@@ -71,7 +76,7 @@ def remove_draw_nc_predictions(conn):
         FROM prediction_simplified ps
         JOIN fights f ON ps.fight_id = f.fight_id
         WHERE ps.date < CURDATE()
-          AND (f.winner_id IS NULL OR f.winner_id IN ('drawornc', '', 'draw'))
+          AND f.winner_id IN ('drawornc', '', 'draw')
     """)
     print(f"  Removed {cnt} draw/NC/cancelled predictions from prediction_simplified")
 
