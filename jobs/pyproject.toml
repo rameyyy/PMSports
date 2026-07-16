@@ -1,0 +1,12 @@
+[tool.uv.workspace]
+members = ["libs/*", "apps/*"]
+
+[tool.uv.sources]
+db-io = { workspace = true }
+utils = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pytest",
+]
