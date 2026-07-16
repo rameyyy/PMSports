@@ -110,12 +110,17 @@ config*.json
 **/*.env
 .env
 .env.*
+!.env.example
+!**/.env.example
 
 # Data files
 *.parquet
 /Cron/temp/
 # *.pkl
 # *.csv
+
+# ML training telemetry (regenerates on next train)
+catboost_info/
 
 # React
 /react-site/src/Captcha.tsx
